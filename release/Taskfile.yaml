@@ -196,7 +196,10 @@ tasks:
             if [ "$declared" != '{{._REL_CHART}}' ]; then
               bad "chart name mismatch: Chart.yaml says '$declared', this publishes as '{{._REL_CHART}}' — set CHART_NAME"
             else
-              say '✔' "chart {{._REL_CHART}} at {{._REL_CHART_DIR}}"
+              # The full OCI path, not just the name: two components can carry
+              # the same chart name safely, and only the path says whether they
+              # actually land on top of each other.
+              say '✔' "chart {{._REL_CHART_DIR}} → {{._REL_CHART_REPO}}/{{._REL_CHART}}"
             fi
           fi
 
