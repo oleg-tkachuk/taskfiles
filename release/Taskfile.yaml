@@ -148,6 +148,114 @@ tasks:
         '{{._REL_VERSION}}' '{{._REL_SHA}}' '{{._REL_BUILD_TIME}}' > {{._REL_INFO_ENV}}
       - echo "▸ {{._REL_SVC}} · version · {{._REL_VERSION}} → {{._REL_INFO_ENV}}"
 
+  doctor:
+    desc: "Check that everything this component declares actually resolves"
+    # A report rather than a gate chain: `preconditions` stop at the first
+    # failure, and the point here is to see every problem at once, before a
+    # deploy spends minutes proving them one at a time.
+    #
+    # The checks are the mistakes that have actually happened: a Dockerfile
+    # named relative to the build context instead of the component, a chart
+    # whose Chart.yaml#name does not match what the push looks for, a version
+    # that cannot be derived because there is no git history.
+    cmds:
+      - cmd: |-
+          set -u
+          fail=0
+
+          say() { printf '%s %s · doctor · %s\n' "$1" '{{._REL_SVC}}' "$2"; }
+          bad() { say '✖' "$1" >&2; fail=1; }
+
+          # ─── tools ────────────────────────────────────────────────────────
+          for t in git helm; do
+            command -v "$t" >/dev/null 2>&1 || bad "$t is not installed"
+          done
+
+          # ─── version ──────────────────────────────────────────────────────
+          if [ -z '{{._REL_VERSION}}' ]; then
+            bad "no version could be derived — is this a git repository?"
+          elif [ '{{._REL_SHA}}' = "00000000" ]; then
+            bad "no git history — every build would publish the same version"
+          else
+            say '✔' "version {{._REL_VERSION}}"
+            # `cond && say …` would end the script here under Task's errexit
+            # shell whenever cond is false, silently truncating the report.
+            if [ -n '{{._REL_DIRTY}}' ]; then
+              say '⚠' "tree is dirty — this version is not reproducible"
+            fi
+          fi
+
+          # ─── chart ────────────────────────────────────────────────────────
+          if [ ! -f '{{._REL_CHART_DIR}}/Chart.yaml' ]; then
+            bad "CHART_DIR {{._REL_CHART_DIR}} has no Chart.yaml"
+          else
+            # `helm package` names the .tgz after Chart.yaml#name, and the push
+            # looks for <CHART_NAME>-<version>.tgz. A mismatch is a push that
+            # 404s on a file that was never written.
+            declared=$(sed -n 's/^name:[[:space:]]*//p' '{{._REL_CHART_DIR}}/Chart.yaml' | head -1 | tr -d '"'"'"'"')
+            if [ "$declared" != '{{._REL_CHART}}' ]; then
+              bad "chart name mismatch: Chart.yaml says '$declared', this publishes as '{{._REL_CHART}}' — set CHART_NAME"
+            else
+              say '✔' "chart {{._REL_CHART}} at {{._REL_CHART_DIR}}"
+            fi
+          fi
+
+          # ─── image ────────────────────────────────────────────────────────
+          # A declared DOCKERFILE that is missing is an error; an absent default
+          # one only means this component publishes a chart around an upstream
+          # image, which is a supported shape.
+          if [ -f '{{._REL_DOCKERFILE}}' ]; then
+            command -v docker >/dev/null 2>&1 || bad "docker is not installed"
+            [ -d '{{._REL_CONTEXT}}' ] || bad "DOCKER_CONTEXT {{._REL_CONTEXT}} is not a directory"
+            say '✔' "image {{._REL_IMAGE}} from {{._REL_DOCKERFILE}} (context {{._REL_CONTEXT}})"
+
+            # `COPY --from=NAME` resolves to a build stage, an earlier stage
+            # index, or an external tree passed as `--build-context NAME=path`.
+            # When it is none of the three BuildKit reads NAME as an image and
+            # pulls docker.io/library/NAME:latest — the failure reads as a
+            # registry permission error, which points nowhere near the cause.
+            external=$(awk '
+              { sub(/^[[:space:]]*#.*/, "") }
+              toupper($1) == "FROM" {
+                for (i = 2; i < NF; i++)
+                  if (toupper($i) == "AS") stage[tolower($(i + 1))] = 1
+              }
+              match($0, /--from=[A-Za-z0-9_.-]+/) {
+                used[tolower(substr($0, RSTART + 7, RLENGTH - 7))] = 1
+              }
+              END {
+                for (n in used)
+                  if (!(n in stage) && n !~ /^[0-9]+$/) print n
+              }
+            ' '{{._REL_DOCKERFILE}}')
+            for name in $external; do
+              case " {{._REL_BUILD_FLAGS}} " in
+                *" --build-context $name="*|*" --build-context=$name="*)
+                  say '✔' "build context $name is passed" ;;
+                *)
+                  bad "COPY --from=$name names no build stage and no build context — BuildKit would pull docker.io/library/$name:latest; add --build-context $name=<path> to DOCKER_BUILD_FLAGS" ;;
+              esac
+            done
+          elif [ -n '{{.DOCKERFILE | default ""}}' ]; then
+            bad "DOCKERFILE {{._REL_DOCKERFILE}} not found — it is resolved from this directory, not from DOCKER_CONTEXT"
+          else
+            say '⚠' "no {{._REL_DOCKERFILE}} — chart-only, publish with deploy:chart-only"
+          fi
+
+          # ─── registry ─────────────────────────────────────────────────────
+          # --max-time bounds the check: doctor is a report someone runs while
+          # waiting, and an unreachable registry must cost seconds, not a hang.
+          code=$(curl -sk --max-time 10 -o /dev/null -w '%{http_code}' 'https://{{._REL_REG}}/v2/' 2>/dev/null || echo 000)
+          case "$code" in
+            200|401|403) say '✔' "registry {{._REL_REG}} answers" ;;
+            *) say '⚠' "registry {{._REL_REG}} did not answer (got $code) — a push would fail" ;;
+          esac
+
+          if [ "$fail" = 0 ]; then
+            say '✔' "ready to publish"
+          fi
+          exit "$fail"
+
   # ═══ container image ════════════════════════════════════════════════════════
 
   image:build:

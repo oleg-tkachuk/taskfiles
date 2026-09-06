@@ -21,18 +21,19 @@ workspace — tasks then read `release:<task>`.
 | Task | What it does |
 |---|---|
 | `deploy` | Verify the chart, then publish image + chart to the registry |
+| `deploy:chart-only` | Publish the chart alone — for components running an upstream image |
+| `doctor` | Check that everything this component declares actually resolves |
 | `metadata` | Write APP_VERSION / GIT_COMMIT_HASH / BUILD_TIME into the deploy info file — alias `info` |
 | `version` | Print the version this working tree publishes as |
-| `chart` | clean:             Remove packaged chart tarballs from the component directory |
-| `chart` | lint:              helm lint the chart |
-| `chart` | package:           helm package the chart at the derived version |
-| `chart` | push:              Package and push the chart (skipped when that version is already published) |
-| `chart` | render:            Render the chart and fail on glued separators, unparseable YAML, or a resource drop |
-| `chart` | verify:            Lint the chart and render it through the multi-doc separator gate |
-| `deploy` | chart-only:       Publish the chart alone — for components running an upstream image |
-| `image` | build:             Build the component image (skipped when the tree is clean and it is already built) |
-| `image` | gc:                Trim the BuildKit cache to the keep floor and drop dangling images |
-| `image` | push:              Push the component image to the registry |
+| `image:build` | Build the component image (skipped when the tree is clean and it is already built) |
+| `image:push` | Push the component image to the registry |
+| `image:gc` | Trim the BuildKit cache to the keep floor and drop dangling images |
+| `chart:verify` | Lint the chart and render it through the multi-doc separator gate |
+| `chart:lint` | helm lint the chart |
+| `chart:render` | Render the chart and fail on glued separators, unparseable YAML, or a resource drop |
+| `chart:package` | helm package the chart at the derived version |
+| `chart:push` | Package and push the chart (skipped when that version is already published) |
+| `chart:clean` | Remove packaged chart tarballs from the component directory |
 
 ## Inputs
 
@@ -146,6 +147,42 @@ line, YAML that does not parse, and a resource count below `CHART_MIN_RESOURCES`
 The first is why the gate exists — a range block that strips the newline before a
 separator makes every parser read the stream as one garbage document and silently
 drop every resource after the first.
+
+## doctor
+
+`task release:doctor` reports, in one pass, whether what this component declares
+actually resolves — the version, the chart, the Dockerfile, the build contexts
+and the registry. It is a report, not a gate: it prints every problem instead of
+stopping at the first, then exits non-zero if any of them is fatal.
+
+```
+✔ billing-api · doctor · version 0.1.0-dev.1788728844.g6ec96167
+✔ billing-api · doctor · chart billing-api at ./deploy/chart
+✔ billing-api · doctor · image registry.example.com/acme/billing-api from ./deploy/Dockerfile (context .)
+✔ billing-api · doctor · build context proto is passed
+✔ billing-api · doctor · registry registry.example.com answers
+✔ billing-api · doctor · ready to publish
+```
+
+It checks the mistakes that have actually happened here:
+
+- **a `DOCKERFILE` named relative to the build context.** `docker build --file`
+  reads the path from the working directory, so a component building from the
+  repo root still names its own Dockerfile — `DOCKER_CONTEXT: ../..` with
+  `DOCKERFILE: ./Dockerfile`. Fatal when `DOCKERFILE` is declared and missing;
+  an absent default one is only a note, because a chart around an upstream image
+  is a supported shape.
+- **`CHART_NAME` disagreeing with `Chart.yaml#name`.** `helm package` names the
+  `.tgz` after `Chart.yaml`, while the push looks for `<CHART_NAME>-<version>.tgz`
+  — a mismatch is a push that 404s on a file that was never written.
+- **a `COPY --from=NAME` that names nothing.** `NAME` must be a build stage, an
+  earlier stage index, or an external tree passed as
+  `--build-context NAME=<path>` in `DOCKER_BUILD_FLAGS`. When it is none of the
+  three, BuildKit reads it as an image and pulls `docker.io/library/NAME:latest`
+  — which surfaces as a registry permission error pointing nowhere near the
+  cause.
+- **a version that cannot be derived**, an unreachable registry, and missing
+  tools.
 
 ---
 
