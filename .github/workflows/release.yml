@@ -105,6 +105,22 @@ jobs:
           fi
           echo "✔ $tag is documented in CHANGELOG.md"
 
+      - name: 'Guard: the README pins this tag'
+        # The quickstart is written to be copied as-is, so the version in it is
+        # part of the release rather than decoration — and nothing templates a
+        # README on GitHub, which is why this is a check and not a substitution.
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if grep -qF "?ref=$TAG" README.md; then
+            echo "✔ README pins $TAG"
+            exit 0
+          fi
+          found=$(grep -oE '\?ref=v[0-9]+\.[0-9]+\.[0-9]+' README.md | head -1 || true)
+          echo "::error::README.md still shows ${found:-no pin at all} where it should pin $TAG. Bump it in the release commit, before the tag." >&2
+          exit 1
+
       - name: 'Guard: the tag is SemVer'
         # Helm and OCI both reject a chart version that is not SemVer-2, and
         # the modules mint chart versions from these tags. A tag that cannot be
