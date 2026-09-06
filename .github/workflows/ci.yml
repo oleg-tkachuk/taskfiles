@@ -1,0 +1,112 @@
+# The same gate the git hooks run, on a machine that has never seen this repo.
+#
+# Everything here is `task lint` — the checks live in Taskfile.yaml so the hook
+# and the workflow cannot drift apart. What CI adds is a clean environment: a
+# module that only parses because of something left in a developer's checkout
+# fails here.
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A new push supersedes the run in flight for the same ref; nothing here is
+  # worth finishing twice.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # check:parse runs the modules through Task's loader, which resolves
+          # git state for the version scheme; a shallow clone is enough, but the
+          # tags are what make that resolution realistic.
+          fetch-depth: 0
+
+      - name: Install Task
+        uses: go-task/setup-task@v2
+        with:
+          # Pinned, not floating: remote Taskfiles are only stable from 3.53,
+          # and a silent upgrade under CI is how a green gate stops meaning
+          # what it meant. Bump deliberately.
+          version: 3.53.1
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint
+        run: task lint
+
+  consumer-smoke:
+    # A consumer is the only thing that exercises the modules the way they are
+    # actually used — included, with the consumer's vars overriding the
+    # defaults. This builds a throwaway one rather than depending on any other
+    # repository being present.
+    name: consumer smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: taskfiles
+
+      - name: Install Task
+        uses: go-task/setup-task@v2
+        with:
+          version: 3.53.1
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build a consumer against the library
+        run: |
+          set -euo pipefail
+          mkdir -p consumer && cd consumer
+          git init -q
+          git config user.email ci@example.invalid
+          git config user.name CI
+          echo placeholder > README.md
+          git add -A && git commit -qm "chore: seed"
+
+          cat > Taskfile.yaml <<'YAML'
+          version: "3"
+          silent: true
+          vars:
+            TASKLIB: ../taskfiles
+            TASKLIB_REF: ""
+            PROJECT_NAME: smoke
+            IMAGE_NAMESPACE: acme
+            K8S_NAMESPACE: smoke-ns
+            REGISTRY: registry.example
+            VERSION_BASE: 9.9.9
+          includes:
+            svc:  { taskfile: '{{.TASKLIB}}/service.yaml{{.TASKLIB_REF}}', dir: . }
+            go:   { taskfile: '{{.TASKLIB}}/go.yaml{{.TASKLIB_REF}}', dir: . }
+            py:   { taskfile: '{{.TASKLIB}}/python.yaml{{.TASKLIB_REF}}', dir: . }
+            node: { taskfile: '{{.TASKLIB}}/node.yaml{{.TASKLIB_REF}}', dir: . }
+            dev:  { taskfile: '{{.TASKLIB}}/compose.yaml{{.TASKLIB_REF}}', dir: . }
+            sec:  { taskfile: '{{.TASKLIB}}/security.yaml{{.TASKLIB_REF}}', dir: . }
+            all:  { taskfile: '{{.TASKLIB}}/monorepo.yaml{{.TASKLIB_REF}}', dir: . }
+            argocd: { taskfile: '{{.TASKLIB}}/argocd.yaml{{.TASKLIB_REF}}', dir: . }
+            auth: { taskfile: '{{.TASKLIB}}/auth.yaml{{.TASKLIB_REF}}', dir: . }
+          tasks: {}
+          YAML
+
+          # Every module loads side by side. This is the check that catches a
+          # module quietly claiming a name another module already uses.
+          task --list-all > /dev/null
+
+          # The consumer's own vars must win over the modules' defaults — the
+          # scoping rule the library is built around. VERSION_BASE is the
+          # cheapest observable proof of it.
+          version=$(task svc:version)
+          case "$version" in
+            9.9.9-dev.*) echo "✔ consumer vars reach the modules ($version)" ;;
+            *) echo "✖ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
+          esac
