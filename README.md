@@ -5,9 +5,9 @@
 [![Task 3.53+](https://img.shields.io/badge/Task-3.53%2B-29BEB0?logo=task&logoColor=white)](https://taskfile.dev)
 [![license: MIT](https://img.shields.io/github/license/oleg-tkachuk/taskfiles?label=license)](LICENSE)
 
-Shared [Task](https://taskfile.dev) modules for every service in this
-workspace — one implementation of the release chain, the language gates and
-the Kubernetes conveniences, instead of a copy per repository.
+Shared [Task](https://taskfile.dev) modules — one implementation of the release
+chain, the language gates and the Kubernetes conveniences, included over git
+instead of copied into every repository.
 
 Requires Task **3.53+** (remote Taskfiles are stable there; no experiment flag).
 
