@@ -1,12 +1,12 @@
 version: "3"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# argocd.yaml — force the Argo applications that track freshly pushed charts to
+# argocd — force the Argo applications that track freshly pushed charts to
 # re-read the registry.
 #
 #   includes:
 #     argocd:
-#       taskfile: '{{.TASKLIB}}/argocd.yaml{{.TASKLIB_REF}}'
+#       taskfile: '{{.TASKLIB}}/argocd{{.TASKLIB_REF}}'
 #       dir: .
 #       vars: { APP_PREFIX: "svc-" }
 #

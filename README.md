@@ -20,8 +20,8 @@ vars:
   K8S_NAMESPACE: acme
 
 includes:
-  svc: { taskfile: '{{.TASKLIB}}/service.yaml{{.TASKLIB_REF}}', dir: . }
-  go:  { taskfile: '{{.TASKLIB}}/go.yaml{{.TASKLIB_REF}}', dir: . }
+  svc: { taskfile: '{{.TASKLIB}}/service{{.TASKLIB_REF}}', dir: . }
+  go:  { taskfile: '{{.TASKLIB}}/go{{.TASKLIB_REF}}', dir: . }
 
 tasks:
   deploy: { cmds: [{ task: svc:deploy }] }
@@ -52,19 +52,45 @@ own primitives rather than shelling out to a helper.
 
 ## Modules
 
-| File | Namespace | What it covers |
+| Module | Namespace | What it covers |
 |---|---|---|
-| `service.yaml` | `svc` | version derivation, image build/push, chart lint/render/package/push, `deploy`, k8s restart/logs/status/upgrade/port-forward |
-| `go.yaml` | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, dep bumps |
-| `python.yaml` | `py` | poetry install/test/lint/format/typecheck/lock, dep bumps |
-| `node.yaml` | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
-| `compose.yaml` | `dev` | local stack up/down/reset/logs |
-| `monorepo.yaml` | `all` | run one target across every component, registry preflight |
-| `security.yaml` | `sec` | govulncheck, golangci-lint, gitleaks, trivy, buf breaking |
-| `argocd.yaml` | `argocd` | hard-refresh the apps a deploy just republished |
-| `auth.yaml` | `auth` | mint a local-dev JWT |
+| `service/` | `svc` | version derivation, image build/push, chart lint/render/package/push, `deploy`, k8s restart/logs/status/upgrade/port-forward |
+| `go/` | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, dep bumps |
+| `python/` | `py` | poetry install/test/lint/format/typecheck/lock, dep bumps |
+| `node/` | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
+| `compose/` | `dev` | local stack up/down/reset/logs |
+| `monorepo/` | `all` | run one target across every component, registry preflight |
+| `security/` | `sec` | govulncheck, golangci-lint, gitleaks, trivy, buf breaking |
+| `argocd/` | `argocd` | hard-refresh the apps a deploy just republished |
+| `auth/` | `auth` | mint a local-dev JWT |
+| `runtime/docker/`, `runtime/orbstack/`, `runtime/minikube/`, `runtime/kind/`, `runtime/k3d/` | `local` | run a locally built image on a local cluster, no registry |
 
-Each file's header documents its inputs. Run `task --list-all` in a consumer
+### Local clusters
+
+`svc:image:build` writes to whatever Docker daemon the host talks to. Whether
+that image is then visible to your cluster depends on the cluster: OrbStack and
+Docker Desktop share the host's store and need nothing, minikube and kind and
+k3d each have their own and need an import step. That difference is the only
+thing the `runtime/*` modules contain, and they all expose the same three
+tasks — `check`, `image:load`, `install` — so moving between them is one line:
+
+```yaml
+includes:
+  local: { taskfile: '{{.TASKLIB}}/runtime/orbstack{{.TASKLIB_REF}}', dir: . }
+```
+
+Include one alongside `service`, not instead of it: `local:image:load` moves
+what `svc:image:build` produced, and `local:install` helm-installs the chart
+from disk against it with `pullPolicy=IfNotPresent`.
+
+Each module is a directory holding a `Taskfile.yaml`; an include names the
+directory, so the layout inside a module stays the module's own business.
+
+One caveat if you split a module into several files: a module that includes its
+own parts hands those parts the *library's* working directory, not the
+consumer's, because only the consumer's include carries `dir: .`. Relative
+paths inside them then resolve in the wrong tree. Parts that need the
+consumer's directory have to be included by the consumer. Each module's header documents its inputs. Run `task --list-all` in a consumer
 to see the full surface.
 
 ## Conventions

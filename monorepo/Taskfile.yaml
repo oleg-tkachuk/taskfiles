@@ -1,11 +1,11 @@
 version: "3"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# monorepo.yaml — run one target across every component of a monorepo.
+# monorepo — run one target across every component of a monorepo.
 #
 #   includes:
 #     all:
-#       taskfile: '{{.TASKLIB}}/monorepo.yaml{{.TASKLIB_REF}}'
+#       taskfile: '{{.TASKLIB}}/monorepo{{.TASKLIB_REF}}'
 #       dir: .
 #       vars: { COMPONENTS: "backend frontend workers/api" }
 #
@@ -21,7 +21,7 @@ silent: true
 
 vars:
   _COMPONENTS: '{{.COMPONENTS | default ""}}'
-  _REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "registry.example.com"}}'
+  _REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}'
 
 tasks:
 

@@ -94,15 +94,16 @@ jobs:
             REGISTRY: registry.example
             VERSION_BASE: 9.9.9
           includes:
-            svc:  { taskfile: '{{.TASKLIB}}/service.yaml{{.TASKLIB_REF}}', dir: . }
-            go:   { taskfile: '{{.TASKLIB}}/go.yaml{{.TASKLIB_REF}}', dir: . }
-            py:   { taskfile: '{{.TASKLIB}}/python.yaml{{.TASKLIB_REF}}', dir: . }
-            node: { taskfile: '{{.TASKLIB}}/node.yaml{{.TASKLIB_REF}}', dir: . }
-            dev:  { taskfile: '{{.TASKLIB}}/compose.yaml{{.TASKLIB_REF}}', dir: . }
-            sec:  { taskfile: '{{.TASKLIB}}/security.yaml{{.TASKLIB_REF}}', dir: . }
-            all:  { taskfile: '{{.TASKLIB}}/monorepo.yaml{{.TASKLIB_REF}}', dir: . }
-            argocd: { taskfile: '{{.TASKLIB}}/argocd.yaml{{.TASKLIB_REF}}', dir: . }
-            auth: { taskfile: '{{.TASKLIB}}/auth.yaml{{.TASKLIB_REF}}', dir: . }
+            svc:  { taskfile: '{{.TASKLIB}}/service{{.TASKLIB_REF}}', dir: . }
+            go:   { taskfile: '{{.TASKLIB}}/go{{.TASKLIB_REF}}', dir: . }
+            py:   { taskfile: '{{.TASKLIB}}/python{{.TASKLIB_REF}}', dir: . }
+            node: { taskfile: '{{.TASKLIB}}/node{{.TASKLIB_REF}}', dir: . }
+            dev:  { taskfile: '{{.TASKLIB}}/compose{{.TASKLIB_REF}}', dir: . }
+            sec:  { taskfile: '{{.TASKLIB}}/security{{.TASKLIB_REF}}', dir: . }
+            all:  { taskfile: '{{.TASKLIB}}/monorepo{{.TASKLIB_REF}}', dir: . }
+            argocd: { taskfile: '{{.TASKLIB}}/argocd{{.TASKLIB_REF}}', dir: . }
+            auth: { taskfile: '{{.TASKLIB}}/auth{{.TASKLIB_REF}}', dir: . }
+            local: { taskfile: '{{.TASKLIB}}/runtime/orbstack{{.TASKLIB_REF}}', dir: . }
           tasks: {}
           YAML
 

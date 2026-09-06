@@ -1,30 +1,30 @@
 version: "3"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# python.yaml — Poetry-managed Python projects.
+# python — Poetry-managed Python projects.
 #
 #   includes:
-#     py: { taskfile: '{{.TASKLIB}}/python.yaml{{.TASKLIB_REF}}', dir: . }
+#     py: { taskfile: '{{.TASKLIB}}/python{{.TASKLIB_REF}}', dir: . }
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   PROJECT_NAME           label in log lines
-#   PY                     interpreter to build the venv on (default python3.13)
+#   PY                     interpreter to build the venv on (default python3)
 #   PY_SRC                 source directory for lint/format  (default src)
 #   PY_TEST_FLAGS          default "-q"
 #   POETRY_INSTALL_FLAGS   e.g. "--no-interaction --no-root"
 #
-# The interpreter is pinned rather than left to whatever `python3` resolves to.
-# A pyproject that admits ">=3.13,<4.0" also admits 3.14, and a venv built on
-# 3.14 falls back to source builds for native deps that ship no 3.14 wheel yet
-# — a Rust toolchain in the middle of `poetry install`. Move PY when the
-# deployed image's runtime moves.
+# Pin PY to the interpreter the deployed image runs. Left at the default, a
+# pyproject that admits ">=3.13,<4.0" also admits 3.14, and a venv built on the
+# newer one falls back to source builds for native deps that ship no wheel for
+# it yet — a Rust toolchain in the middle of `poetry install`. Set it per
+# project, and move it when the runtime moves.
 # ─────────────────────────────────────────────────────────────────────────────
 
 silent: true
 
 vars:
   _PY_NAME: '{{.PROJECT_NAME | default "python"}}'
-  _PY: '{{.PY | default "python3.13"}}'
+  _PY: '{{.PY | default "python3"}}'
   _PY_SRC: '{{.PY_SRC | default "src"}}'
   _PY_TEST_FLAGS: '{{.PY_TEST_FLAGS | default "-q"}}'
   _POETRY_FLAGS: '{{.POETRY_INSTALL_FLAGS | default "--no-interaction"}}'

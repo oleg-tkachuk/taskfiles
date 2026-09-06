@@ -1,13 +1,20 @@
 version: "3"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# service.yaml — the release surface every deployable component shares:
-# version derivation, container image, Helm chart, and the Kubernetes
-# conveniences that go with them.
+# service — the release surface every deployable component shares: version
+# derivation, container image, Helm chart, and the Kubernetes conveniences that
+# go with them.
+#
+# One file on purpose. The obvious split — image, chart, k8s beside each other —
+# does not work: a module that includes its own parts gives those parts the
+# LIBRARY's directory as their working directory, not the consumer's, so every
+# relative path in them (CHART_DIR, DOCKERFILE, the info file) resolves in the
+# wrong tree. Only the include written by the consumer carries `dir: .`. If this
+# ever has to be split, the consumer has to include each part.
 #
 #   includes:
 #     svc:
-#       taskfile: '{{.TASKLIB}}/service.yaml{{.TASKLIB_REF}}'
+#       taskfile: '{{.TASKLIB}}/service{{.TASKLIB_REF}}'
 #       dir: .
 #
 # `dir: .` is required — it pins every command to the INCLUDING component's
@@ -18,12 +25,16 @@ version: "3"
 #
 #   PROJECT_NAME         image + chart name, and the label in every log line
 #   CHART_NAME           chart name when it differs from PROJECT_NAME
-#   REGISTRY             OCI host                       (default registry.example.com)
+#   REGISTRY             OCI host                     (default localhost:5000)
 #   GLOBAL_REGISTRY      monorepo-wide override, wins over REGISTRY
 #   IMAGE_NAMESPACE      path between host and name     (default none)
 #   DOCKERFILE           default ./Dockerfile
 #   DOCKER_CONTEXT       default .
 #   DOCKER_BUILD_FLAGS   verbatim extra buildx flags    (default none)
+#
+# `image:build` writes to whatever Docker daemon the host talks to. Getting
+# that image into a local cluster is the `runtime/*` modules' job — they differ
+# per runtime, and only some of them have anything to do.
 #   CHART_DIR            default ./deploy/chart
 #   CHART_APP_VERSION    appVersion when the image is upstream's, not ours
 #   CHART_MIN_RESOURCES  render-gate floor              (default 1)
@@ -33,6 +44,7 @@ version: "3"
 #   K8S_CONTEXT          pin a cluster                  (default: current)
 #   INFO_ENV_FILE        default ./deploy/info.env
 #   VERSION_BASE         base for untagged builds       (default 0.1.0)
+#   VERSION_TAG_EXCLUDE  tag glob to keep out of the version (e.g. "api/*")
 #   APP_VERSION          pin the version outright, skipping git derivation
 #
 # Nothing here is defined as a bare knob name: a var declared in an included
@@ -48,19 +60,20 @@ vars:
 
   # One knob re-points everything. GLOBAL_REGISTRY (set by a monorepo root)
   # wins over a component's own REGISTRY.
-  _REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "registry.example.com"}}'
+  _REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}'
   _NS: '{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}'
-  _IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "registry.example.com"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
-  _CHART_REPO: 'oci://{{.GLOBAL_REGISTRY | default .REGISTRY | default "registry.example.com"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/charts'
-  # registry.example.com serves a self-signed leaf whose SANs cover *.example.com but not
-  # the apex, which strict oras clients reject — pass
-  # --insecure-skip-tls-verify there via HELM_FLAGS.
+  _IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
+  _CHART_REPO: 'oci://{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/charts'
+  # A registry serving a certificate strict oras clients reject — a wildcard
+  # that does not cover the apex, say — needs --insecure-skip-tls-verify here.
   _HELM_FLAGS: '{{.HELM_FLAGS | default ""}}'
 
   _DOCKERFILE: '{{.DOCKERFILE | default "./Dockerfile"}}'
   _CONTEXT: '{{.DOCKER_CONTEXT | default "."}}'
   _BUILD_FLAGS: '{{.DOCKER_BUILD_FLAGS | default ""}}'
-  _BUILDER: '{{.BUILDX_BUILDER | default "lean"}}'
+  # A named builder keeps a cache `docker builder prune` does not touch. Unset
+  # means the active builder, which is right for anyone who has not named one.
+  _BUILDER: '{{.BUILDX_BUILDER | default ""}}'
   _KEEP: '{{.BUILDX_KEEP_STORAGE | default "8GB"}}'
 
   _CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
@@ -95,14 +108,18 @@ vars:
   # short sha with a leading zero is an invalid SemVer numeric identifier
   # ("MUST NOT include leading zeroes") and Helm rejects the chart version.
   #
-  # `api/*` tags are excluded: they version a proto contract, carry a `/` that
-  # is invalid in a Docker tag, and must not restamp an image.
   _SHA:
     sh: git rev-parse --short=8 HEAD 2>/dev/null || echo 00000000
   _CTS:
     sh: git show -s --format=%ct HEAD 2>/dev/null || echo 0
+  # VERSION_TAG_EXCLUDE keeps a tag namespace out of the version: a repo that
+  # tags its proto contract `api/vN` must not let those restamp an image, and
+  # the `/` in them is invalid in a Docker tag anyway.
   _TAG:
-    sh: git describe --tags --exact-match --exclude 'api/*' HEAD 2>/dev/null | sed 's/^v//' || true
+    sh: >-
+      git describe --tags --exact-match
+      {{if .VERSION_TAG_EXCLUDE}}--exclude '{{.VERSION_TAG_EXCLUDE}}'{{end}}
+      HEAD 2>/dev/null | sed 's/^v//' || true
   _DIRTY:
     sh: git status --porcelain 2>/dev/null | head -c1
   _NOW:
@@ -115,19 +132,18 @@ vars:
     {{- if ._DIRTY}}.dirty.{{._NOW}}{{end}}
     {{- end -}}
   _BUILD_TIME:
-    sh: TZ='{{.TIMEZONE | default "Europe/Kyiv"}}' date +%Y-%m-%dT%H:%M:%S%z
+    sh: TZ='{{.TIMEZONE | default "UTC"}}' date +%Y-%m-%dT%H:%M:%S%z
 
 tasks:
-
-  # ═══ version + build metadata ═══════════════════════════════════════════════
 
   version:
     desc: "Print the version this working tree publishes as"
     cmds:
       - echo "{{._VERSION}}"
 
-  info:
+  metadata:
     desc: "Write APP_VERSION / GIT_COMMIT_HASH / BUILD_TIME into the deploy info file"
+    aliases: [info]
     cmds:
       - mkdir -p {{dir ._INFO_ENV}}
       - >-
@@ -155,7 +171,7 @@ tasks:
 
   image:build:_do:
     internal: true
-    deps: [info]
+    deps: [metadata]
     # Idempotency: a clean tree yields a deterministic version, so an image
     # already in the local store IS the image this commit builds. A dirty tree
     # never matches — its version carries a fresh timestamp — so local
@@ -183,26 +199,6 @@ tasks:
         {{._BUILD_FLAGS}} {{._CONTEXT}}
       - echo "✔ {{._SVC}} · image · built {{._VERSION}}"
 
-  image:build:local:
-    desc: "Build the image straight into the minikube daemon (no registry round-trip)"
-    deps: [info]
-    preconditions:
-      - sh: command -v minikube >/dev/null
-        msg: "minikube is not installed"
-    cmds:
-      - echo "▸ {{._SVC}} · image · build {{._IMAGE}}:{{._VERSION}} (minikube daemon)"
-      # eval is unavoidable: `minikube docker-env` exports DOCKER_HOST and
-      # friends into the calling shell, and Task runs every cmd in its own.
-      - >-
-        eval "$(minikube docker-env)" &&
-        docker build --file {{._DOCKERFILE}}
-        --tag {{._IMAGE}}:{{._VERSION}} --tag {{._IMAGE}}:latest
-        --build-arg APP_VERSION={{._VERSION}}
-        --build-arg GIT_COMMIT_HASH={{._SHA}}
-        --build-arg BUILD_TIME={{._BUILD_TIME}}
-        {{._BUILD_FLAGS}} {{._CONTEXT}}
-      - echo "✔ {{._SVC}} · image · built {{._VERSION}} inside minikube"
-
   image:push:
     desc: "Push the component image to the registry"
     deps: [image:build]
@@ -217,11 +213,11 @@ tasks:
   image:gc:
     desc: "Trim the BuildKit cache to the keep floor and drop dangling images"
     cmds:
-      # The named builder keeps a cache `docker builder prune` does not touch;
-      # prune it explicitly, falling back to the active builder. --keep-storage
-      # only reclaims ABOVE the floor, so the working set survives.
+      # --keep-storage only reclaims ABOVE the floor, so the working set
+      # survives; this just stops per-session growth from filling the disk.
+      # Falls back to the active builder when the named one is not there.
       - >-
-        docker buildx prune --builder {{._BUILDER}} --keep-storage={{._KEEP}} -f >/dev/null 2>&1 ||
+        docker buildx prune {{if ._BUILDER}}--builder {{._BUILDER}} {{end}}--keep-storage={{._KEEP}} -f >/dev/null 2>&1 ||
         docker buildx prune --keep-storage={{._KEEP}} -f >/dev/null 2>&1 || true
       - docker image prune -f >/dev/null 2>&1 || true
       - echo "✔ {{._SVC}} · image · build cache trimmed to {{._KEEP}}"

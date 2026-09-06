@@ -1,0 +1,68 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# runtime/orbstack — making a locally built image runnable by a OrbStack cluster,
+# with no registry in the loop.
+#
+#   includes:
+#     local: { taskfile: '{{.TASKLIB}}/runtime/orbstack{{.TASKLIB_REF}}', dir: . }
+#
+# Every runtime under runtime/ exposes the same three tasks — `check`,
+# `image:load`, `install` — so switching from one to another is a one-line
+# change in the consumer's includes and nothing else.
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+# The same vars the `service` module reads: PROJECT_NAME, REGISTRY,
+# IMAGE_NAMESPACE, CHART_DIR, K8S_NAMESPACE, K8S_CONTEXT. Include this
+# alongside `service`, not instead of it: `image:load` moves what
+# `svc:image:build` produced.
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+vars:
+  _SVC: '{{.PROJECT_NAME | default "service"}}'
+  _IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
+  _VERSION:
+    sh: task svc:version
+  _CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
+  _K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
+  _CTX: '{{.K8S_CONTEXT | default "orbstack"}}'
+
+tasks:
+
+  check:
+    desc: "Fail early when OrbStack or its kube context is not there"
+    preconditions:
+      - sh: docker info >/dev/null 2>&1
+        msg: "the Docker daemon is not running — start OrbStack"
+      - sh: kubectl config get-contexts -o name | grep -qx '{{._CTX}}'
+        msg: "there is no '{{._CTX}}' kube context — enable Kubernetes in OrbStack, or set K8S_CONTEXT"
+    cmds:
+      - echo "✔ {{._SVC}} · local · OrbStack ready ({{._CTX}})"
+
+  image:load:
+    desc: "No-op — OrbStack runs containers from the same image store the build wrote to"
+    # Nothing to move: the cluster and `docker build` share one daemon, so the
+    # image is already visible. The task exists so a consumer can call
+    # `local:image:load` without caring which runtime is underneath.
+    cmds:
+      - echo "✔ {{._SVC}} · local · {{._VERSION}} already visible to OrbStack"
+
+  install:
+    desc: "helm upgrade --install from the chart directory, running the local image"
+    # No registry in the path: the chart is installed from disk and the image
+    # is pinned to the tag just built, with IfNotPresent so nothing is pulled.
+    deps: [check]
+    cmds:
+      - task: image:load
+      - echo "▸ {{._SVC}} · local · helm upgrade --install into {{._CTX}}/{{._K8S_NS}}"
+      - >-
+        helm upgrade --install {{._SVC}} {{._CHART_DIR}}
+        --kube-context {{._CTX}}
+        --namespace {{._K8S_NS}} --create-namespace
+        --set image.tag={{._VERSION}}
+        --set image.pullPolicy=IfNotPresent
+        {{.HELM_UPGRADE_FLAGS | default ""}}
+        {{if .VALUES}}--values {{.VALUES}}{{end}}
+      - echo "✔ {{._SVC}} · local · {{._VERSION}} installed into {{._CTX}}"

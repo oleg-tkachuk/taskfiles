@@ -1,11 +1,11 @@
 version: "3"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# compose.yaml — the local dependency stack (Postgres, Redis, queues, …).
+# compose — the local dependency stack (Postgres, Redis, queues, …).
 #
 #   includes:
 #     dev:
-#       taskfile: '{{.TASKLIB}}/compose.yaml{{.TASKLIB_REF}}'
+#       taskfile: '{{.TASKLIB}}/compose{{.TASKLIB_REF}}'
 #       dir: .
 #       vars: { COMPOSE_FILE: docker-compose.dev.yaml }
 #

@@ -61,7 +61,7 @@ pre-commit:
     #    README table. See Taskfile.yaml for what each one is guarding against.
     - name: lint
       tags: [task, lint]
-      glob: "{*.yaml,README.md}"
+      glob: "{*/*.yaml,*/*/*.yaml,Taskfile.yaml,README.md}"
       run: task lint
 
 # Last gate before the change leaves the machine.

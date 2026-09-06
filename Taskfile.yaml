@@ -10,7 +10,14 @@ version: "3"
 silent: true
 
 vars:
-  MODULES: "service.yaml go.yaml python.yaml node.yaml compose.yaml monorepo.yaml security.yaml argocd.yaml auth.yaml"
+  # One directory per module. A module is a directory rather than a single file
+  # so it can be split when it outgrows one — `service` is — and so an include
+  # reads `{{.TASKLIB}}/service` instead of naming a file inside it.
+  MODULES: "service go python node compose monorepo security argocd auth
+    runtime/docker runtime/orbstack runtime/minikube runtime/kind runtime/k3d"
+  # Every YAML the modules are made of, for the file-level checks.
+  MODULE_FILES:
+    sh: ls */Taskfile.yaml */*/Taskfile.yaml 2>/dev/null | sort -u | tr '\n' ' '
 
 tasks:
   default:
@@ -42,7 +49,7 @@ tasks:
   _parse:
     internal: true
     cmds:
-      - task -t {{.MODULE}} --list-all >/dev/null
+      - task -t {{.MODULE}}/Taskfile.yaml --list-all >/dev/null
       - echo "  ✔ {{.MODULE}}"
 
   check:vars:
@@ -62,7 +69,7 @@ tasks:
               key = $1; sub(/:$/, "", key)
               if (substr(key, 1, 1) != "_") print FILENAME " → " key
             }
-          ' {{.MODULES}})
+          ' {{.MODULE_FILES}})
           if [ -n "$bare" ]; then
             echo "✖ taskfiles · these declared vars would shadow the consumer's:" >&2
             printf '  %s\n' "$bare" >&2
@@ -81,7 +88,7 @@ tasks:
       - cmd: |-
           set -eu
           fail=0
-          for f in {{.MODULES}}; do
+          for f in {{.MODULE_FILES}}; do
             grep -qE '^silent: true$' "$f" || { echo "✖ taskfiles · $f does not declare 'silent: true'" >&2; fail=1; }
           done
           [ "$fail" = 0 ] && echo "✔ taskfiles · every module runs quiet"
@@ -97,11 +104,10 @@ tasks:
           set -eu
           fail=0
           for f in {{.MODULES}}; do
-            grep -q "\`$f\`" README.md || { echo "✖ taskfiles · $f has no row in the README module table" >&2; fail=1; }
+            grep -q "\`$f/\`" README.md || { echo "✖ taskfiles · $f has no row in the README module table" >&2; fail=1; }
           done
-          for f in $(grep -oE '`[a-z-]+\.yaml`' README.md | tr -d '`' | sort -u); do
-            [ "$f" = "Taskfile.yaml" ] && continue
-            [ -f "$f" ] || { echo "✖ taskfiles · README documents $f, which is not in the repo" >&2; fail=1; }
+          for f in $(grep -oE '`[a-z-]+(/[a-z0-9-]+)?/`' README.md | tr -d '`' | sed 's|/$||' | sort -u); do
+            [ -d "$f" ] || { echo "✖ taskfiles · README documents $f/, which is not in the repo" >&2; fail=1; }
           done
           [ "$fail" = 0 ] && echo "✔ taskfiles · README matches the modules on disk"
           exit "$fail"
@@ -112,4 +118,4 @@ tasks:
     desc: "Print the task surface of every module — the library's public API"
     cmds:
       - for: { var: MODULES }
-        cmd: printf '\n── %s\n' '{{.ITEM}}' && task -t {{.ITEM}} --list-all | tail -n +2
+        cmd: printf '\n── %s\n' '{{.ITEM}}' && task -t {{.ITEM}}/Taskfile.yaml --list-all | tail -n +2
