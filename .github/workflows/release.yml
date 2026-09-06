@@ -30,10 +30,11 @@ env:
 
 jobs:
   gate:
-    name: gate
+    name: Gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 'Setup: check out the tag'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Nothing here pushes with the checkout credential, so it has no
           # reason to be left behind in .git/config.
@@ -41,16 +42,41 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
 
-      - name: Install Task
+      - name: 'Guard: releases only from main'
+        # This workflow is driven by a tag, so github.ref is refs/tags/vX.Y.Z
+        # and never a branch — comparing it to refs/heads/main would refuse
+        # every release. The invariant that actually matters is that main
+        # contains the tagged commit: consumers pin `?ref=vX.Y.Z` and fetch
+        # that exact tree, so a tag cut on a side branch would publish a tree
+        # main never held and CI on main never saw, forking the released line
+        # with nothing to say it had happened.
+        #
+        # HEAD rather than the tag ref: the checkout above is already the
+        # tagged commit, under a tag push and a workflow_dispatch alike.
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet origin/main >/dev/null; then
+            git fetch --quiet origin main:refs/remotes/origin/main
+          fi
+          if git merge-base --is-ancestor HEAD origin/main; then
+            echo "✔ $TAG is a commit on main"
+            exit 0
+          fi
+          echo "::error::Releases must be cut from main. $TAG points at a commit main does not contain, so it would publish a tree that never passed CI on main — and consumers pinning ?ref=$TAG would fetch exactly that tree."
+          exit 1
+
+      - name: 'Setup: Task'
         uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Lint
+      - name: 'Guard: every module lints'
         run: task lint
 
-      - name: Refuse a tag with no changelog entry
+      - name: 'Guard: the changelog documents this tag'
         # The notes on the Releases page are generated from commits; this is
         # the curated half, and the only place an upgrading consumer is told
         # which names changed and what to set instead. A tag published without
@@ -79,7 +105,7 @@ jobs:
           fi
           echo "✔ $tag is documented in CHANGELOG.md"
 
-      - name: Refuse a tag that is not SemVer
+      - name: 'Guard: the tag is SemVer'
         # Helm and OCI both reject a chart version that is not SemVer-2, and
         # the modules mint chart versions from these tags. A tag that cannot be
         # a chart version is a tag no consumer can use.
@@ -94,17 +120,17 @@ jobs:
           esac
 
   consumable:
-    name: consumable over git
+    name: Consumable over git
     needs: gate
     runs-on: ubuntu-latest
     steps:
-      - name: Install Task
+      - name: 'Setup: Task'
         uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Let git fetch this repository over HTTPS
+      - name: 'Setup: git credentials for the include fetch'
         # Task shells out to the system git for a remote include, so the token
         # goes in through git's own config rather than into the Taskfile — and
         # through env rather than `${{ }}`, so it is never substituted into the
@@ -114,7 +140,7 @@ jobs:
         run: |
           git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
 
-      - name: Include the tag the way a consumer does
+      - name: 'Verify: the tag includes the way a consumer does'
         env:
           REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag || github.ref_name }}
@@ -174,7 +200,7 @@ jobs:
           esac
 
   publish:
-    name: publish
+    name: Publish
     needs: [gate, consumable]
     runs-on: ubuntu-latest
     permissions:
@@ -182,7 +208,8 @@ jobs:
       # the elevation sits here rather than at the top of the file.
       contents: write # `gh release create` writes the release and its notes
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 'Setup: check out the tag'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Nothing here pushes with the checkout credential, so it has no
           # reason to be left behind in .git/config.
@@ -190,7 +217,7 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
 
-      - name: Create the GitHub release
+      - name: 'Publish: the GitHub release'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}

@@ -40,24 +40,26 @@ jobs:
     # zizmor is the linter for that: it catches an expression interpolated into
     # a shell script, a checkout that leaves its credential behind, an action
     # pinned to a mutable tag. Two of those had already shipped here.
-    name: workflow audit
+    name: Workflow audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 'Setup: check out the repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Audit the workflows
+      - name: 'Guard: the workflows pass the auditor'
         # pipx rather than uvx: pipx ships on the runner image, uv does not.
         # Pinned like everything else, and --persona=auditor so this is the
         # strict run rather than the default one.
         run: pipx run zizmor==1.30.0 --persona=auditor --format=plain .github/workflows/
 
   lint:
-    name: lint
+    name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 'Setup: check out the repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Nothing here pushes with the checkout credential, so it has no
           # reason to be left behind in .git/config.
@@ -66,13 +68,13 @@ jobs:
           # are what make that resolution realistic rather than a fallback.
           fetch-depth: 0
 
-      - name: Install Task
+      - name: 'Setup: Task'
         uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Lint
+      - name: 'Guard: every module lints'
         run: task lint
 
   consumer-smoke:
@@ -80,23 +82,24 @@ jobs:
     # actually used — included, with the consumer's vars overriding the
     # defaults. This builds a throwaway one rather than depending on any other
     # repository being present.
-    name: consumer smoke
+    name: Consumer smoke
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 'Setup: check out the repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Nothing here pushes with the checkout credential, so it has no
           # reason to be left behind in .git/config.
           persist-credentials: false
           path: taskfiles
 
-      - name: Install Task
+      - name: 'Setup: Task'
         uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build a consumer against the library
+      - name: 'Setup: a consumer that includes the library'
         run: |
           set -euo pipefail
           mkdir -p consumer && cd consumer
@@ -131,13 +134,13 @@ jobs:
           tasks: {}
           YAML
 
-      - name: Load every module side by side
+      - name: 'Verify: every module loads side by side'
         working-directory: consumer
         # This is the check that catches a module quietly claiming a name
         # another module already uses.
         run: task --list-all > /dev/null
 
-      - name: Prove the consumer's vars reach the modules
+      - name: "Verify: the consumer's vars reach the modules"
         working-directory: consumer
         # The scoping rule the whole library is built around: a var declared in
         # a module would shadow this. VERSION_BASE is the cheapest observable
