@@ -201,7 +201,11 @@ tasks:
       # written to a temp file, attached to the image, and dropped.
       - cmd: |-
           set -eu
-          sb="$(mktemp -t sbom-XXXXXX).json"
+          # An explicit template rather than `mktemp -t`: BSD reads that flag as
+          # a filename prefix and GNU as a directory hint. Naming the path
+          # outright also means the file trapped is the file written — the
+          # earlier `$(mktemp …).json` form left the mktemp'd file behind.
+          sb="${TMPDIR:-/tmp}/sbom-$$-$(date +%s).json"
           trap 'rm -f "$sb"' EXIT
           {{if eq (.SBOM_INSECURE | default "0") "1"}}SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY=true {{end}}syft '{{.REF}}' -q -o {{._CS_SBOM_FORMAT}}="$sb"
           COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign attest --yes \
