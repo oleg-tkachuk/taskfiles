@@ -16,6 +16,40 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [1.1.0] — 2026-09-07
+
+### Added
+
+- `release:doctor` — a pre-flight report that answers, in one pass, whether
+  what a component declares actually resolves: the version, the chart and its
+  full OCI path, the Dockerfile, the named build contexts and the registry. It
+  is a report rather than a gate chain, so it prints every problem at once
+  instead of stopping at the first, and exits non-zero when a finding is
+  fatal. Run it before a deploy, or when one failed for a reason that named
+  the symptom rather than the cause.
+
+  It checks the mistakes that actually happen: a `DOCKERFILE` resolved against
+  `DOCKER_CONTEXT` instead of the component directory; a `CHART_NAME` that
+  disagrees with `Chart.yaml#name`, so the push looks for a tarball helm never
+  wrote; a `COPY --from=NAME` naming neither a build stage nor a context passed
+  in `DOCKER_BUILD_FLAGS`, which BuildKit reads as an image and reports as a
+  registry permission error; an underivable version; an unreachable registry.
+
+  Nothing to set — it reads the variables the module already has.
+
+### Fixed
+
+- The paired skip notices in `release:image:build`, `release:chart:push` and
+  `k8s:restart` told the truth about the wrong moment. The task doing the work
+  ran first, and it changes the state its partner inspects, so a build logged
+  `built X` and `X already built — skipping` back to back. The notice is now
+  evaluated first, on the state before anything ran.
+- `release:image:build` also expressed its skip condition as two `status:`
+  entries, which Task ANDs, where staying quiet requires a disjunction. A clean
+  tree with no image reported `already built` for an image that did not exist.
+
+  Both are behaviour fixes inside existing tasks; no names or inputs changed.
+
 ## [1.0.0] — 2026-09-06
 
 First release.
@@ -78,4 +112,5 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[1.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.0
 [1.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.0.0
