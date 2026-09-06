@@ -10,7 +10,7 @@ which builds each module standalone — fails on it.
 
 ```yaml
 includes:
-  go: { taskfile: '{{.TASKLIB}}/go{{.TASKLIB_REF}}', dir: . }
+  go: { taskfile: '{{.TASKLIB}}go?ref={{.TASKLIB_TAG}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -57,7 +57,7 @@ vars:
   GO_TEST_FLAGS: -p 1          # this suite shares package-level state
 
 includes:
-  go: { taskfile: '{{.TASKLIB}}/go{{.TASKLIB_REF}}', dir: . }
+  go: { taskfile: '{{.TASKLIB}}go?ref={{.TASKLIB_TAG}}', dir: . }
 
 tasks:
   build: { cmds: [{ task: go:build }] }

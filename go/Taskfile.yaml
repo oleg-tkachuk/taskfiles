@@ -4,7 +4,7 @@ version: "3"
 # go — the Go build/test/lint surface.
 #
 #   includes:
-#     go: { taskfile: '{{.TASKLIB}}/go{{.TASKLIB_REF}}', dir: . }
+#     go: { taskfile: '{{.TASKLIB}}go?ref={{.TASKLIB_TAG}}', dir: . }
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   PROJECT_NAME     label in log lines

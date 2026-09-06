@@ -15,7 +15,7 @@ version: "3"
 #
 #   includes:
 #     release:
-#       taskfile: '{{.TASKLIB}}/release{{.TASKLIB_REF}}'
+#       taskfile: '{{.TASKLIB}}release?ref={{.TASKLIB_TAG}}'
 #       dir: .
 #
 # `dir: .` is required — it pins every command to the INCLUDING component's

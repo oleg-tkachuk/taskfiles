@@ -5,7 +5,7 @@ up in `task --list-all` instead of splitting across two tools.
 
 ```yaml
 includes:
-  node: { taskfile: '{{.TASKLIB}}/node{{.TASKLIB_REF}}', dir: . }
+  node: { taskfile: '{{.TASKLIB}}node?ref={{.TASKLIB_TAG}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -43,7 +43,7 @@ vars:
   PROJECT_NAME: billing-api
 
 includes:
-  node: { taskfile: '{{.TASKLIB}}/node{{.TASKLIB_REF}}', dir: . }
+  node: { taskfile: '{{.TASKLIB}}node?ref={{.TASKLIB_TAG}}', dir: . }
 
 tasks:
   dev:    { cmds: [{ task: node:dev }] }

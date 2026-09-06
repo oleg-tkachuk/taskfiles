@@ -5,7 +5,7 @@ alongside `release` and chain it after — the release publishes, this signs.
 
 ```yaml
 includes:
-  sign: { taskfile: '{{.TASKLIB}}/cosign{{.TASKLIB_REF}}', dir: . }
+  sign: { taskfile: '{{.TASKLIB}}cosign?ref={{.TASKLIB_TAG}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -44,8 +44,8 @@ same way `release` reads them.
 
 ```yaml
 includes:
-  release: { taskfile: '{{.TASKLIB}}/release{{.TASKLIB_REF}}', dir: . }
-  sign:    { taskfile: '{{.TASKLIB}}/cosign{{.TASKLIB_REF}}', dir: . }
+  release: { taskfile: '{{.TASKLIB}}release?ref={{.TASKLIB_TAG}}', dir: . }
+  sign:    { taskfile: '{{.TASKLIB}}cosign?ref={{.TASKLIB_TAG}}', dir: . }
 
 tasks:
   deploy:

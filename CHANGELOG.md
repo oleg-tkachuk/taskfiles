@@ -14,7 +14,21 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- The tag is its own variable: `TASKLIB_TAG: v1.0.0` rather than a
+  `TASKLIB_REF` carrying `?ref=v1.0.0`, with the query in the include line:
+
+  ```yaml
+  vars:
+    TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//'
+    TASKLIB_TAG: v1.0.0
+  includes:
+    release: { taskfile: '{{.TASKLIB}}release?ref={{.TASKLIB_TAG}}', dir: . }
+  ```
+
+  A local checkout drops the query instead of emptying a variable:
+  `{ taskfile: '{{.TASKLIB}}/release', dir: . }`.
 
 ## [1.0.0] — 2026-09-06
 

@@ -17,8 +17,8 @@ same three tasks, so moving between them is one line:
 
 ```yaml
 includes:
-  release: { taskfile: '{{.TASKLIB}}/release{{.TASKLIB_REF}}', dir: . }
-  local:   { taskfile: '{{.TASKLIB}}/runtime/orbstack{{.TASKLIB_REF}}', dir: . }
+  release: { taskfile: '{{.TASKLIB}}release?ref={{.TASKLIB_TAG}}', dir: . }
+  local:   { taskfile: '{{.TASKLIB}}runtime/orbstack?ref={{.TASKLIB_TAG}}', dir: . }
 ```
 
 Include one **alongside** `release`, not instead of it: `local:image:load` moves
@@ -53,8 +53,8 @@ vars:
   K8S_NAMESPACE: acme
 
 includes:
-  release: { taskfile: '{{.TASKLIB}}/release{{.TASKLIB_REF}}', dir: . }
-  local:   { taskfile: '{{.TASKLIB}}/runtime/minikube{{.TASKLIB_REF}}', dir: . }
+  release: { taskfile: '{{.TASKLIB}}release?ref={{.TASKLIB_TAG}}', dir: . }
+  local:   { taskfile: '{{.TASKLIB}}runtime/minikube?ref={{.TASKLIB_TAG}}', dir: . }
 
 tasks:
   deploy:local:

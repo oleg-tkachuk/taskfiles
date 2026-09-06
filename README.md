@@ -13,16 +13,16 @@ version: "3"
 silent: true
 
 vars:
-  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git/'
-  TASKLIB_REF: '?ref=v1.0.0'
+  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//'
+  TASKLIB_TAG: v1.0.0
   PROJECT_NAME: billing-api
   IMAGE_NAMESPACE: acme
   K8S_NAMESPACE: acme
 
 includes:
-  release: { taskfile: '{{.TASKLIB}}/release{{.TASKLIB_REF}}', dir: . }
-  k8s:     { taskfile: '{{.TASKLIB}}/k8s{{.TASKLIB_REF}}', dir: . }
-  go:      { taskfile: '{{.TASKLIB}}/go{{.TASKLIB_REF}}', dir: . }
+  release: { taskfile: '{{.TASKLIB}}release?ref={{.TASKLIB_TAG}}', dir: . }
+  k8s:     { taskfile: '{{.TASKLIB}}k8s?ref={{.TASKLIB_TAG}}', dir: . }
+  go:      { taskfile: '{{.TASKLIB}}go?ref={{.TASKLIB_TAG}}', dir: . }
 
 tasks:
   deploy:  { cmds: [{ task: release:deploy }] }
@@ -50,14 +50,22 @@ SHA with that flag. The tag above is an example; the current one is on the
 
 ### Working on the library itself
 
-Point `TASKLIB` at a checkout beside your repository and drop the ref, so an
+Point `TASKLIB` at a checkout beside your repository and drop the query, so an
 edit is visible without a tag:
 
 ```yaml
 vars:
   TASKLIB: ../taskfiles
-  TASKLIB_REF: ""
+
+includes:
+  release: { taskfile: '{{.TASKLIB}}/release', dir: . }
 ```
+
+The `?ref=` moves with the include line rather than hiding in a variable
+because Task substitutes plain `{{.VAR}}` references into an include path but
+does not evaluate anything else there — no `{{if}}`, and no variable whose
+value is itself a template. A single knob that could be empty for a local path
+and a query string for a tag is not expressible; two honest shapes are.
 
 Only the YAML is fetched. Sibling scripts in this repo are **not** downloaded,
 which is why every module is self-contained and expresses its logic in Task's
@@ -92,7 +100,7 @@ tasks — `check`, `image:load`, `install` — so moving between them is one lin
 
 ```yaml
 includes:
-  local: { taskfile: '{{.TASKLIB}}/runtime/orbstack{{.TASKLIB_REF}}', dir: . }
+  local: { taskfile: '{{.TASKLIB}}runtime/orbstack?ref={{.TASKLIB_TAG}}', dir: . }
 ```
 
 Include one alongside `service`, not instead of it: `local:image:load` moves

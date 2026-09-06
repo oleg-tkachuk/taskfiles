@@ -6,7 +6,7 @@ always fatal: a scan that can be silently skipped is a scan that does not exist.
 
 ```yaml
 includes:
-  sec: { taskfile: '{{.TASKLIB}}/security{{.TASKLIB_REF}}', dir: . }
+  sec: { taskfile: '{{.TASKLIB}}security?ref={{.TASKLIB_TAG}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -36,7 +36,7 @@ workspace — tasks then read `sec:<task>`.
 ```yaml
 includes:
   sec:
-    taskfile: '{{.TASKLIB}}/security{{.TASKLIB_REF}}'
+    taskfile: '{{.TASKLIB}}security?ref={{.TASKLIB_TAG}}'
     dir: .
     vars:
       GO_MODULES: "backend/api backend/worker"

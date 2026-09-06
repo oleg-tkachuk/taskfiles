@@ -134,25 +134,25 @@ jobs:
           version: "3"
           silent: true
           vars:
-            TASKLIB: 'https://github.com/OWNER_REPO.git/'
-            TASKLIB_REF: '?ref=TAG'
+            TASKLIB: 'https://github.com/OWNER_REPO.git//'
+            TASKLIB_TAG: 'TAGVALUE'
             PROJECT_NAME: smoke
             IMAGE_NAMESPACE: acme
             K8S_NAMESPACE: smoke-ns
             REGISTRY: registry.example
             VERSION_BASE: 9.9.9
           includes:
-            release: { taskfile: '{{.TASKLIB}}/release{{.TASKLIB_REF}}', dir: . }
-            k8s:     { taskfile: '{{.TASKLIB}}/k8s{{.TASKLIB_REF}}', dir: . }
-            go:      { taskfile: '{{.TASKLIB}}/go{{.TASKLIB_REF}}', dir: . }
-            py:      { taskfile: '{{.TASKLIB}}/python{{.TASKLIB_REF}}', dir: . }
-            node:    { taskfile: '{{.TASKLIB}}/node{{.TASKLIB_REF}}', dir: . }
-            dev:     { taskfile: '{{.TASKLIB}}/compose{{.TASKLIB_REF}}', dir: . }
-            sec:     { taskfile: '{{.TASKLIB}}/security{{.TASKLIB_REF}}', dir: . }
-            all:     { taskfile: '{{.TASKLIB}}/monorepo{{.TASKLIB_REF}}', dir: . }
-            argocd:  { taskfile: '{{.TASKLIB}}/argocd{{.TASKLIB_REF}}', dir: . }
-            auth:    { taskfile: '{{.TASKLIB}}/auth{{.TASKLIB_REF}}', dir: . }
-            local:   { taskfile: '{{.TASKLIB}}/runtime/orbstack{{.TASKLIB_REF}}', dir: . }
+            release: { taskfile: '{{.TASKLIB}}release?ref={{.TASKLIB_TAG}}', dir: . }
+            k8s:     { taskfile: '{{.TASKLIB}}k8s?ref={{.TASKLIB_TAG}}', dir: . }
+            go:      { taskfile: '{{.TASKLIB}}go?ref={{.TASKLIB_TAG}}', dir: . }
+            py:      { taskfile: '{{.TASKLIB}}python?ref={{.TASKLIB_TAG}}', dir: . }
+            node:    { taskfile: '{{.TASKLIB}}node?ref={{.TASKLIB_TAG}}', dir: . }
+            dev:     { taskfile: '{{.TASKLIB}}compose?ref={{.TASKLIB_TAG}}', dir: . }
+            sec:     { taskfile: '{{.TASKLIB}}security?ref={{.TASKLIB_TAG}}', dir: . }
+            all:     { taskfile: '{{.TASKLIB}}monorepo?ref={{.TASKLIB_TAG}}', dir: . }
+            argocd:  { taskfile: '{{.TASKLIB}}argocd?ref={{.TASKLIB_TAG}}', dir: . }
+            auth:    { taskfile: '{{.TASKLIB}}auth?ref={{.TASKLIB_TAG}}', dir: . }
+            local:   { taskfile: '{{.TASKLIB}}runtime/orbstack?ref={{.TASKLIB_TAG}}', dir: . }
           tasks: {}
           YAML
           # python rather than sed: the substitution is literal, so a tag
@@ -161,7 +161,7 @@ jobs:
           python3 - "$REPO" "$TAG" <<'SUBST'
           import sys, pathlib
           p = pathlib.Path("Taskfile.yaml")
-          p.write_text(p.read_text().replace("OWNER_REPO", sys.argv[1]).replace("TAG", sys.argv[2]))
+          p.write_text(p.read_text().replace("OWNER_REPO", sys.argv[1]).replace("TAGVALUE", sys.argv[2]))
           SUBST
 
           # --yes accepts the first-fetch trust prompt; unattended, that prompt

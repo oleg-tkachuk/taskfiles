@@ -5,7 +5,7 @@ that moves between the two changes one include line and nothing else.
 
 ```yaml
 includes:
-  py: { taskfile: '{{.TASKLIB}}/uv{{.TASKLIB_REF}}', dir: . }
+  py: { taskfile: '{{.TASKLIB}}uv?ref={{.TASKLIB_TAG}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -42,7 +42,7 @@ vars:
   PROJECT_NAME: ner-server
 
 includes:
-  py: { taskfile: '{{.TASKLIB}}/uv{{.TASKLIB_REF}}', dir: . }
+  py: { taskfile: '{{.TASKLIB}}uv?ref={{.TASKLIB_TAG}}', dir: . }
 
 tasks:
   test: { cmds: [{ task: py:test }] }

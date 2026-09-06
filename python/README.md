@@ -5,7 +5,7 @@ project. For uv, include [`uv/`](../uv/README.md) instead — same task names.
 
 ```yaml
 includes:
-  py: { taskfile: '{{.TASKLIB}}/python{{.TASKLIB_REF}}', dir: . }
+  py: { taskfile: '{{.TASKLIB}}python?ref={{.TASKLIB_TAG}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -45,7 +45,7 @@ vars:
   PY: python3.13
 
 includes:
-  py: { taskfile: '{{.TASKLIB}}/python{{.TASKLIB_REF}}', dir: . }
+  py: { taskfile: '{{.TASKLIB}}python?ref={{.TASKLIB_TAG}}', dir: . }
 
 tasks:
   build: { cmds: [{ task: py:install }] }

@@ -9,7 +9,7 @@ component does both — they read the same input names.
 
 ```yaml
 includes:
-  k8s: { taskfile: '{{.TASKLIB}}/k8s{{.TASKLIB_REF}}', dir: . }
+  k8s: { taskfile: '{{.TASKLIB}}k8s?ref={{.TASKLIB_TAG}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -47,7 +47,7 @@ vars:
   K8S_CONTEXT: orbstack
 
 includes:
-  k8s: { taskfile: '{{.TASKLIB}}/k8s{{.TASKLIB_REF}}', dir: . }
+  k8s: { taskfile: '{{.TASKLIB}}k8s?ref={{.TASKLIB_TAG}}', dir: . }
 
 tasks:
   restart: { cmds: [{ task: k8s:restart }] }
