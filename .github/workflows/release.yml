@@ -65,6 +65,12 @@ jobs:
           set -euo pipefail
           tag="$TAG"
           version="${tag#v}"
+          if [ ! -f CHANGELOG.md ]; then
+            echo "✖ $tag has no CHANGELOG.md in its tree" >&2
+            echo "  Tags cut before the changelog existed cannot pass this gate," >&2
+            echo "  and do not need to: release from a tag that contains it." >&2
+            exit 1
+          fi
           if ! grep -qF "## [$version]" CHANGELOG.md; then
             echo "✖ CHANGELOG.md has no '## [$version]' section" >&2
             echo "  Add one — what a consumer has to do about this release —" >&2

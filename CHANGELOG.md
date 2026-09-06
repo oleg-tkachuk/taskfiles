@@ -16,6 +16,26 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [3.5.1] — 2026-09-06
+
+No module changed — a consumer pinning this instead of 3.5.0 sees the same
+tasks and the same behaviour.
+
+### Fixed
+
+- The release workflow interpolated `${{ }}` values into `run:` scripts, which
+  are substituted as text before bash parses the line. Git allows `$`,
+  backticks and `;` in a tag name, so a tag could have run as a command with
+  the workflow's token. Inputs arrive through `env` now.
+
+### Added
+
+- This changelog, and a release gate that refuses a tag with no entry.
+- `zizmor` audits the workflows in CI and in the pre-commit hook. It found the
+  actions pinned to mutable tags (now commit SHAs, with Dependabot moving
+  them), a checkout leaving its credential in `.git/config`, and a release
+  workflow with no concurrency group.
+
 ## [3.5.0] — 2026-09-06
 
 ### Added
@@ -140,6 +160,7 @@ Replace `svc:image:build:local` with `release:image:build` plus
   `security`, `argocd` — one implementation of what had been copy-pasted into
   39 Taskfiles.
 
+[3.5.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.5.1
 [3.5.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.5.0
 [3.4.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.4.0
 [3.3.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.3.0
