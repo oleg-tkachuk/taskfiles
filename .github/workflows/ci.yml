@@ -22,6 +22,22 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # The official Task image, pinned. Bumping is this one line.
+  #
+  # It is used through `docker run` rather than as a job-level `container:`,
+  # because the image is Alpine with neither git nor Node: a container job
+  # cannot run actions/checkout (a JS action needing Node, and git to clone).
+  # The host does the checkout, the image does the Task.
+  #
+  # NOTE: hub.docker.com/r/taskfile/task last published v3.39.2 (2024-10),
+  # while Task itself is at 3.53.x. The library needs 3.53+ only for the
+  # remote-include path, which CI does not exercise — everything here loads
+  # from a local path — so the gate is sound on this image. It does mean CI
+  # runs an older Task than developers do; when upstream publishes again,
+  # bump this tag deliberately.
+  TASK_IMAGE: taskfile/task:v3.39.2-amd64
+
 jobs:
   lint:
     name: lint
@@ -29,22 +45,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # check:parse runs the modules through Task's loader, which resolves
-          # git state for the version scheme; a shallow clone is enough, but the
-          # tags are what make that resolution realistic.
+          # The modules resolve git state for their version scheme; the tags
+          # are what make that resolution realistic rather than a fallback.
           fetch-depth: 0
 
-      - name: Install Task
-        uses: go-task/setup-task@v2
-        with:
-          # Pinned, not floating: remote Taskfiles are only stable from 3.53,
-          # and a silent upgrade under CI is how a green gate stops meaning
-          # what it meant. Bump deliberately.
-          version: 3.53.1
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Lint
-        run: task lint
+        # The image's entrypoint is `task`, so the argument is the task name.
+        run: docker run --rm -v "$PWD":/w -w /w "$TASK_IMAGE" lint
 
   consumer-smoke:
     # A consumer is the only thing that exercises the modules the way they are
@@ -58,13 +65,9 @@ jobs:
         with:
           path: taskfiles
 
-      - name: Install Task
-        uses: go-task/setup-task@v2
-        with:
-          version: 3.53.1
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build a consumer against the library
+        # The consumer's git repo is created on the host, which has git; the
+        # image only runs Task against it.
         run: |
           set -euo pipefail
           mkdir -p consumer && cd consumer
@@ -98,14 +101,25 @@ jobs:
           tasks: {}
           YAML
 
-          # Every module loads side by side. This is the check that catches a
-          # module quietly claiming a name another module already uses.
-          task --list-all > /dev/null
+      - name: Load every module side by side
+        working-directory: consumer
+        # This is the check that catches a module quietly claiming a name
+        # another module already uses.
+        run: docker run --rm -v "$PWD/..":/w -w /w/consumer "$TASK_IMAGE" --list-all > /dev/null
 
-          # The consumer's own vars must win over the modules' defaults — the
-          # scoping rule the library is built around. VERSION_BASE is the
-          # cheapest observable proof of it.
-          version=$(task svc:version)
+      - name: Prove the consumer's vars reach the modules
+        working-directory: consumer
+        # The scoping rule the whole library is built around: a var declared in
+        # a module would shadow this. VERSION_BASE is the cheapest observable
+        # proof that it does not. git is installed into the image for this step
+        # so the version derivation runs for real rather than on its fallbacks.
+        run: |
+          set -euo pipefail
+          version=$(docker run --rm -v "$PWD/..":/w -w /w/consumer --entrypoint sh "$TASK_IMAGE" -c '
+            apk add --no-cache git >/dev/null 2>&1
+            git config --global --add safe.directory /w/consumer
+            task svc:version
+          ')
           case "$version" in
             9.9.9-dev.*) echo "✔ consumer vars reach the modules ($version)" ;;
             *) echo "✖ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
