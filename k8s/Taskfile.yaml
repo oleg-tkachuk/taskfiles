@@ -45,8 +45,8 @@ tasks:
     # in chains that must stay green on a laptop with no cluster running — and
     # it says which of the two happened.
     cmds:
-      - task: restart:_do
       - task: restart:_skipped
+      - task: restart:_do
 
   restart:_skipped:
     internal: true

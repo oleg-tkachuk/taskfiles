@@ -152,23 +152,30 @@ tasks:
 
   image:build:
     desc: "Build the component image (skipped when the tree is clean and it is already built)"
+    # Resolved once here rather than on each half of the pair: as a dep of both
+    # it would run twice and print the version banner twice.
+    deps: [metadata]
     # Two complementary status guards: exactly one of the pair runs, so a skip
     # says so out loud instead of leaving a silent gap in the deploy log.
+    # The skip notice runs FIRST, on the pristine state: `_do` changes the very
+    # condition the pair tests, so asking afterwards reports the work `_do` just
+    # did as a reason to skip it.
     cmds:
-      - task: image:build:_do
       - task: image:build:_skipped
+      - task: image:build:_do
 
   image:build:_skipped:
     internal: true
+    # One guard, not two: Task ANDs the entries in a `status:` list, and the
+    # condition for staying quiet is a disjunction — there is nothing to skip
+    # when the tree is dirty OR the image is missing.
     status:
-      - "! test -z '{{._REL_DIRTY}}'"
-      - "! docker image inspect {{._REL_IMAGE}}:{{._REL_VERSION}} >/dev/null 2>&1"
+      - test -n '{{._REL_DIRTY}}' || ! docker image inspect {{._REL_IMAGE}}:{{._REL_VERSION}} >/dev/null 2>&1
     cmds:
       - echo "⚠ {{._REL_SVC}} · image · {{._REL_VERSION}} already built — skipping"
 
   image:build:_do:
     internal: true
-    deps: [metadata]
     # Idempotency: a clean tree yields a deterministic version, so an image
     # already in the local store IS the image this commit builds. A dirty tree
     # never matches — its version carries a fresh timestamp — so local
@@ -298,9 +305,12 @@ tasks:
 
   chart:push:
     desc: "Package and push the chart (skipped when that version is already published)"
+    # The skip notice runs FIRST, on the pristine state: `_do` changes the very
+    # condition the pair tests, so asking afterwards reports the work `_do` just
+    # did as a reason to skip it.
     cmds:
-      - task: chart:push:_do
       - task: chart:push:_skipped
+      - task: chart:push:_do
 
   chart:push:_skipped:
     internal: true
