@@ -82,8 +82,8 @@ own primitives rather than shelling out to a helper.
 | [`release/`](release/README.md) | `release` | version derivation, image build/push, chart lint/render/package/push, `deploy` |
 | [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward |
 | [`go/`](go/README.md) | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, dep bumps |
-| [`python/`](python/README.md) | `py` | poetry install/test/lint/format/typecheck/lock, dep bumps |
-| [`uv/`](uv/README.md) | `py` | the same surface for uv-managed projects — swap the include line |
+| [`python/`](python/README.md) | `python` | poetry install/test/lint/format/typecheck/lock, dep bumps |
+| [`uv/`](uv/README.md) | `uv` | the same surface for uv-managed projects — swap the include line |
 | [`node/`](node/README.md) | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
 | [`compose/`](compose/README.md) | `dev` | local stack up/down/reset/logs |
 | [`monorepo/`](monorepo/README.md) | `all` | run one target across every component, registry preflight |
@@ -95,7 +95,7 @@ own primitives rather than shelling out to a helper.
 
 ### Local clusters
 
-`svc:image:build` writes to whatever Docker daemon the host talks to. Whether
+`release:image:build` writes to whatever Docker daemon the host talks to. Whether
 that image is then visible to your cluster depends on the cluster: OrbStack and
 Docker Desktop share the host's store and need nothing, minikube and kind and
 k3d each have their own and need an import step. That difference is the only
@@ -107,7 +107,7 @@ includes:
   local: { taskfile: '{{.TASKLIB}}runtime/orbstack{{.TASKLIB_REF}}', dir: . }
 ```
 
-Include one alongside `service`, not instead of it: `local:image:load` moves
+Include one alongside `release`, not instead of it: `local:image:load` moves
 what `release:image:build` produced, and `local:install` helm-installs the
 chart from disk against it with `pullPolicy=IfNotPresent`.
 
