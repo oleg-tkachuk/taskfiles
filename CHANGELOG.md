@@ -16,157 +16,53 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
-## [3.5.1] — 2026-09-06
-
-No module changed — a consumer pinning this instead of 3.5.0 sees the same
-tasks and the same behaviour.
-
-### Fixed
-
-- The release workflow interpolated `${{ }}` values into `run:` scripts, which
-  are substituted as text before bash parses the line. Git allows `$`,
-  backticks and `;` in a tag name, so a tag could have run as a command with
-  the workflow's token. Inputs arrive through `env` now.
-
-### Added
-
-- This changelog, and a release gate that refuses a tag with no entry.
-- `zizmor` audits the workflows in CI and in the pre-commit hook. It found the
-  actions pinned to mutable tags (now commit SHAs, with Dependabot moving
-  them), a checkout leaving its credential in `.git/config`, and a release
-  workflow with no concurrency group.
-
-## [3.5.0] — 2026-09-06
-
-### Added
-
-- MIT licence. Without one the repository was "all rights reserved" and nobody
-  could legally use or vendor it.
-
-### Fixed
-
-- `cosign` wrote its SBOM to a path that was not the file `mktemp` created, so
-  the temp file leaked and the trap cleaned up the wrong path. It now creates a
-  private `mktemp -d` directory and writes inside it — no leak, and no
-  predictable name in a world-writable `/tmp`.
-
-## [3.4.0] — 2026-09-06
-
-### Changed
-
-- Every internal var carries its own module's prefix — `_REL_IMAGE`, `_GO_PKG`,
-  `_CS_KEY`, `_RT_CTX` — so two modules can never mean different things by the
-  same name. `check:vars` enforces it.
-- `runtime/*` and `cosign` read `_REL_VERSION` and `_REL_IMAGE` from `release`
-  instead of deriving the image path a second time.
-- `python:format` and `uv:format` are `fmt`, matching `go:fmt`. `format` stays
-  as an alias, so nothing breaks.
-
-Internal names only — no consumer sets them.
-
-## [3.3.0] — 2026-09-06
-
-### Added
-
-- A `README.md` in every module, linked from the index: inputs with defaults,
-  the task list, a worked example with real output, and the decisions that look
-  arbitrary without their reason.
-
-## [3.2.0] — 2026-09-06
-
-### Added
-
-- `cosign/` — sign the published image and chart, attest an SPDX SBOM through
-  syft, verify both. Include it beside `release` and chain `sign:all` after
-  `release:deploy`.
-
-  A missing key or a missing syft is an error, not a skip: an artifact that is
-  quietly unsigned is the failure the module exists to prevent. Turn it off
-  deliberately with `COSIGN_SIGN=0`.
-
-## [3.1.0] — 2026-09-06
-
-### Added
-
-- `uv/` — the same task surface as `python/`, backed by uv. A project moving
-  between them changes one include line.
-
-## [3.0.0] — 2026-09-06
-
-### Changed — BREAKING
-
-- `service` is split into `release` (version, image, chart, `deploy`) and `k8s`
-  (restart, logs, status, upgrade, port-forward). Neither half called the
-  other: a publish-only CI job was carrying five kubectl tasks it had no
-  kubeconfig for.
-
-**Migration.** Replace the one include with two, and rename the references:
-
-```yaml
-includes:
-  release: { taskfile: '{{.TASKLIB}}/release{{.TASKLIB_REF}}', dir: . }
-  k8s:     { taskfile: '{{.TASKLIB}}/k8s{{.TASKLIB_REF}}', dir: . }
-```
-
-| Was | Now |
-|---|---|
-| `svc:deploy` | `release:deploy` |
-| `svc:version`, `svc:image:*`, `svc:chart:*` | `release:…` |
-| `svc:k8s:restart` and friends | `k8s:restart` |
-| `svc:info` | `release:metadata` (alias `info` kept) |
-
-## [2.0.0] — 2026-09-06
-
-### Changed — BREAKING
-
-- Each module is a directory: includes name `{{.TASKLIB}}/service`, not
-  `{{.TASKLIB}}/service.yaml`.
-- Defaults no longer assume one particular setup. The registry is
-  `localhost:5000`, the build timestamp is UTC, `golangci-lint` measures new
-  findings against `main`, `python3` is whatever the host resolves, and no
-  buildx builder is named.
-
-### Removed — BREAKING
-
-- `image:build:local`, which ran `eval $(minikube docker-env)` — one runtime's
-  answer to a question every local cluster answers differently.
-
-### Added
-
-- `runtime/{docker,orbstack,minikube,kind,k3d}` — same `check` / `image:load` /
-  `install` in each, so switching runtime is one include line.
-
-**Migration.** Drop the `.yaml` from every include path, and set what the old
-defaults gave you: `REGISTRY`, `TIMEZONE`, `BASE`, `PY`, `BUILDX_BUILDER`.
-Replace `svc:image:build:local` with `release:image:build` plus
-`local:image:load` from the runtime module for your cluster.
-
-## [1.1.0] — 2026-09-06
-
-### Added
-
-- `auth/` — mint a local-development JWT.
-
-### Changed
-
-- `image:build`, `chart:push` and `k8s:restart` say when they skip. A silent
-  skip reads exactly like a task that did nothing.
-
 ## [1.0.0] — 2026-09-06
 
+First release.
+
 ### Added
 
-- The first modules: `service`, `go`, `python`, `node`, `compose`, `monorepo`,
-  `security`, `argocd` — one implementation of what had been copy-pasted into
-  39 Taskfiles.
+- `release` — the publish chain: version derivation, image build and push,
+  chart lint/render/package/push, and `deploy` doing all three in order. It
+  talks to no cluster, so a repository that only publishes needs this and
+  nothing else.
+- `k8s` — restart, logs, status, `helm upgrade --install`, port-forward.
+  Independent of `release`, for a repository that operates a cluster it does
+  not build for.
+- `go`, `python`, `uv`, `node` — build, test, lint, format and dependency bumps
+  per ecosystem. `python` and `uv` share a task surface, so moving between them
+  is one include line.
+- `compose` — the local dependency stack, waiting on health checks.
+- `monorepo` — run one target across every component, with a registry
+  preflight before a deploy fan-out.
+- `security` — govulncheck, golangci-lint limited to findings new since a base
+  branch, gitleaks, trivy, buf breaking.
+- `cosign` — sign the published image and chart, attest an SPDX SBOM, verify
+  both.
+- `argocd` — hard-refresh the applications a deploy republished, because a
+  push to the registry does not reach the cluster until Argo drops its cached
+  chart.
+- `auth` — mint a local-development JWT.
+- `runtime/{docker,orbstack,minikube,kind,k3d}` — make a locally built image
+  runnable by a local cluster. Same three tasks in each, so switching runtime
+  is one include line.
 
-[3.5.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.5.1
-[3.5.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.5.0
-[3.4.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.4.0
-[3.3.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.3.0
-[3.2.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.0
-[3.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.1.0
-[3.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.0.0
-[2.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.0.0
-[1.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.0
+### Notes for consumers
+
+- Versions derive from the **committer** timestamp, so a clean tree publishes
+  the same version on every run. That is what makes `deploy` idempotent: an
+  image already built for this commit is not rebuilt, and a chart version
+  already in the registry is not re-pushed. Both say so rather than going
+  quiet.
+- The scheme is timestamp-first (`<base>-dev.<ts>.g<sha>`) because SemVer
+  compares pre-release identifiers left to right — a sha-first form lets an
+  alphabetically larger sha from an older commit shadow a newer build.
+- No floating `:latest` is pushed. Charts resolve their tag from the chart's
+  appVersion, which the deploy stamps with the version it tagged the image
+  with.
+- Defaults assume nothing about one particular setup: the registry is
+  `localhost:5000`, timestamps are UTC, `golangci-lint` measures against
+  `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
+  `TIMEZONE`, `BASE` and `PY` for yours.
+
 [1.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.0.0
