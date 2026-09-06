@@ -1,0 +1,65 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# compose.yaml — the local dependency stack (Postgres, Redis, queues, …).
+#
+#   includes:
+#     dev:
+#       taskfile: '{{.TASKLIB}}/compose.yaml{{.TASKLIB_REF}}'
+#       dir: .
+#       vars: { COMPOSE_FILE: docker-compose.dev.yaml }
+#
+# `up` waits for health checks, so a task chained after it does not race the
+# seeding. Everything here is idempotent: `up` on a running healthy stack is a
+# no-op, and `down` on an absent one is the desired end state, not an error.
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+vars:
+  _FILE: '{{.COMPOSE_FILE | default "docker-compose.yaml"}}'
+  _COMPOSE: 'docker compose -f {{.COMPOSE_FILE | default "docker-compose.yaml"}}'
+  _NAME: '{{.PROJECT_NAME | default "stack"}}'
+
+tasks:
+
+  up:
+    desc: "Start the stack and wait until every service is healthy"
+    preconditions:
+      - sh: test -f {{._FILE}}
+        msg: "{{._FILE}} not found (set COMPOSE_FILE)"
+    cmds:
+      - echo "▸ {{._NAME}} · compose · up ({{._FILE}})"
+      - "{{._COMPOSE}} up -d --wait"
+      - task: ps
+      - echo "✔ {{._NAME}} · compose · stack healthy"
+
+  build:
+    desc: "Rebuild the images the stack is composed of, then start it"
+    cmds:
+      - "{{._COMPOSE}} up -d --build --wait"
+      - echo "✔ {{._NAME}} · compose · rebuilt and healthy"
+
+  down:
+    desc: "Stop the stack. Volumes are preserved."
+    cmds:
+      - "{{._COMPOSE}} down"
+      - echo "✔ {{._NAME}} · compose · stopped (volumes kept)"
+
+  reset:
+    desc: "Stop the stack and DELETE its volumes — local data is lost"
+    prompt: "Delete every volume of {{._FILE}}? Local database contents are lost."
+    cmds:
+      - "{{._COMPOSE}} down -v"
+      - echo "✔ {{._NAME}} · compose · torn down, volumes dropped"
+
+  ps:
+    desc: "Show what is running"
+    cmds:
+      - "{{._COMPOSE}} ps"
+
+  logs:
+    desc: "Tail the stack's logs (SERVICE=… for one of them)"
+    interactive: true
+    cmds:
+      - "{{._COMPOSE}} logs -f --tail={{.TAIL | default \"200\"}} {{.SERVICE | default \"\"}}"

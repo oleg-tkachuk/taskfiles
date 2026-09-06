@@ -1,0 +1,118 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# node.yaml — pnpm/npm front-ends.
+#
+#   includes:
+#     node: { taskfile: '{{.TASKLIB}}/node.yaml{{.TASKLIB_REF}}', dir: . }
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+#   PROJECT_NAME   label in log lines
+#   PM             package manager        (default pnpm; pass npm for npm ci)
+#   PM_INSTALL     override the install command outright
+#
+# Every task is a thin wrapper over a package.json script, which keeps the
+# whole developer surface visible in `task --list-all` instead of split across
+# two tools.
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+vars:
+  _NODE_NAME: '{{.PROJECT_NAME | default "node"}}'
+  _PM: '{{.PM | default "pnpm"}}'
+
+env:
+  # Let corepack fetch the pinned package manager without the interactive
+  # download prompt, so installs run unattended in CI and in deps:update.
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+
+tasks:
+
+  install:
+    desc: "Install dependencies from the lockfile (skipped when the manifests are unchanged)"
+    # The reproducible form: a lockfile that disagrees with package.json should
+    # fail the install, not be quietly rewritten.
+    sources:
+      - package.json
+      - pnpm-lock.yaml
+      - package-lock.json
+    generates:
+      - node_modules/.modules.yaml
+      - node_modules/.package-lock.json
+    cmds:
+      - echo "▸ {{._NODE_NAME}} · node · {{._PM}} install"
+      - >-
+        {{if .PM_INSTALL}}{{.PM_INSTALL}}{{else if eq ._PM "npm"}}npm ci{{else}}{{._PM}} install --frozen-lockfile{{end}}
+      - echo "✔ {{._NODE_NAME}} · node · dependencies installed"
+
+  dev:
+    desc: "Start the dev server"
+    interactive: true
+    cmds:
+      - echo "▸ {{._NODE_NAME}} · node · {{._PM}} run dev"
+      - "{{._PM}} run dev"
+
+  build:
+    desc: "Build the production bundle"
+    cmds:
+      - echo "▸ {{._NODE_NAME}} · node · {{._PM}} run build"
+      - "{{._PM}} run build"
+      - echo "✔ {{._NODE_NAME}} · node · bundle built"
+
+  lint:
+    desc: "Run the lint script (read-only)"
+    cmds:
+      - echo "▸ {{._NODE_NAME}} · node · lint"
+      - "{{._PM}} run lint"
+      - echo "✔ {{._NODE_NAME}} · node · lint clean"
+
+  lint:fix:
+    desc: "Run the lint script with --fix"
+    cmds:
+      - "{{._PM}} run lint --fix"
+      - echo "✔ {{._NODE_NAME}} · node · lint fixed"
+
+  test:
+    desc: "Run the test script"
+    cmds:
+      - echo "▸ {{._NODE_NAME}} · node · test"
+      - "{{._PM}} run test"
+      - echo "✔ {{._NODE_NAME}} · node · tests pass"
+
+  test:e2e:
+    desc: "Run the Playwright suite, installing chromium when it is missing"
+    cmds:
+      - echo "▸ {{._NODE_NAME}} · node · playwright"
+      - "{{._PM}} exec playwright install --with-deps chromium >/dev/null"
+      - "{{._PM}} run test:e2e"
+      - echo "✔ {{._NODE_NAME}} · node · e2e pass"
+
+  verify:
+    desc: "Lint then build — the pre-push gate"
+    # Lint first: fail on style in seconds rather than after paying for a build.
+    cmds:
+      - task: lint
+      - task: build
+
+  generate:
+    desc: "Run the codegen script"
+    cmds:
+      - echo "▸ {{._NODE_NAME}} · node · generate"
+      - "{{._PM}} run generate"
+      - echo "✔ {{._NODE_NAME}} · node · generated"
+
+  deps:update:
+    desc: "Bump dependencies to the latest minor/patch (no majors), then reinstall"
+    cmds:
+      - echo "▸ {{._NODE_NAME}} · node · npm-check-updates --target minor"
+      - "{{._PM}} dlx npm-check-updates --target minor --upgrade"
+      - "{{._PM}} install"
+      - echo "✔ {{._NODE_NAME}} · node · deps bumped — review the lockfile diff, then verify"
+
+  deps:outdated:
+    desc: "Show dependencies with a newer version available (read-only)"
+    cmds:
+      # `pnpm outdated` exits non-zero when anything is outdated; for a report
+      # that is the normal case, not a failure.
+      - "{{._PM}} outdated || true"

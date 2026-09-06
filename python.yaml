@@ -1,0 +1,111 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# python.yaml — Poetry-managed Python projects.
+#
+#   includes:
+#     py: { taskfile: '{{.TASKLIB}}/python.yaml{{.TASKLIB_REF}}', dir: . }
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+#   PROJECT_NAME           label in log lines
+#   PY                     interpreter to build the venv on (default python3.13)
+#   PY_SRC                 source directory for lint/format  (default src)
+#   PY_TEST_FLAGS          default "-q"
+#   POETRY_INSTALL_FLAGS   e.g. "--no-interaction --no-root"
+#
+# The interpreter is pinned rather than left to whatever `python3` resolves to.
+# A pyproject that admits ">=3.13,<4.0" also admits 3.14, and a venv built on
+# 3.14 falls back to source builds for native deps that ship no 3.14 wheel yet
+# — a Rust toolchain in the middle of `poetry install`. Move PY when the
+# deployed image's runtime moves.
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+vars:
+  _PY_NAME: '{{.PROJECT_NAME | default "python"}}'
+  _PY: '{{.PY | default "python3.13"}}'
+  _PY_SRC: '{{.PY_SRC | default "src"}}'
+  _PY_TEST_FLAGS: '{{.PY_TEST_FLAGS | default "-q"}}'
+  _POETRY_FLAGS: '{{.POETRY_INSTALL_FLAGS | default "--no-interaction"}}'
+
+tasks:
+
+  install:
+    desc: "poetry install (skipped when pyproject and the lockfile are unchanged)"
+    # Fingerprinted on the manifests, so re-running after an unrelated edit
+    # costs nothing — which is what makes it safe to put in a deps list.
+    sources:
+      - pyproject.toml
+      - poetry.lock
+    preconditions:
+      - sh: command -v poetry >/dev/null
+        msg: "poetry is not installed — https://python-poetry.org/docs/#installation"
+      - sh: command -v {{._PY}} >/dev/null
+        msg: "{{._PY}} is not on PATH — install it or pass PY=<interpreter>"
+    cmds:
+      - echo "▸ {{._PY_NAME}} · py · poetry install ({{._PY}})"
+      - poetry env use {{._PY}} >/dev/null
+      - poetry install {{._POETRY_FLAGS}}
+      - echo "✔ {{._PY_NAME}} · py · dependencies installed"
+
+  test:
+    desc: "pytest"
+    cmds:
+      - echo "▸ {{._PY_NAME}} · py · pytest"
+      - poetry run pytest {{._PY_TEST_FLAGS}}
+      - echo "✔ {{._PY_NAME}} · py · tests pass"
+
+  lint:
+    desc: "ruff check"
+    cmds:
+      - echo "▸ {{._PY_NAME}} · py · ruff check"
+      - poetry run ruff check {{._PY_SRC}}
+      - echo "✔ {{._PY_NAME}} · py · lint clean"
+
+  format:
+    desc: "ruff format"
+    cmds:
+      - poetry run ruff format {{._PY_SRC}}
+      - echo "✔ {{._PY_NAME}} · py · formatted"
+
+  typecheck:
+    desc: "mypy (skipped when mypy is not a project dependency)"
+    status:
+      - "! poetry run python -c 'import mypy' >/dev/null 2>&1"
+    cmds:
+      - echo "▸ {{._PY_NAME}} · py · mypy"
+      - poetry run mypy {{._PY_SRC}}
+      - echo "✔ {{._PY_NAME}} · py · types clean"
+
+  lock:
+    desc: "Regenerate poetry.lock"
+    cmds:
+      - poetry env use {{._PY}} >/dev/null
+      - poetry lock
+      - echo "✔ {{._PY_NAME}} · py · poetry.lock regenerated"
+
+  deps:update:
+    desc: "Bump dependencies within their pyproject constraints, then refresh the lock"
+    # Stays inside the caret/tilde ranges already written in pyproject.toml.
+    # Widening those is deps:update:latest.
+    cmds:
+      - echo "▸ {{._PY_NAME}} · py · poetry update"
+      - poetry update --no-interaction
+      - echo "✔ {{._PY_NAME}} · py · deps bumped — review poetry.lock, then lint + test"
+
+  deps:update:latest:
+    desc: "Widen constraints and bump everything, majors included"
+    # Deliberately separate: majors carry breaking changes and usually need
+    # code edits to clear deprecations.
+    cmds:
+      # Idempotent — `poetry self add` on an installed plugin is a no-op.
+      - poetry self add poetry-plugin-up >/dev/null
+      - echo "▸ {{._PY_NAME}} · py · poetry up --latest (majors included)"
+      - poetry up --latest
+      - echo "✔ {{._PY_NAME}} · py · review pyproject.toml + poetry.lock, then lint + test"
+
+  deps:outdated:
+    desc: "Show dependencies with a newer version available (read-only)"
+    cmds:
+      - poetry show --outdated || true

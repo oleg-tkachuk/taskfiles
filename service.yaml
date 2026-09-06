@@ -1,0 +1,369 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# service.yaml — the release surface every deployable component shares:
+# version derivation, container image, Helm chart, and the Kubernetes
+# conveniences that go with them.
+#
+#   includes:
+#     svc:
+#       taskfile: '{{.TASKLIB}}/service.yaml{{.TASKLIB_REF}}'
+#       dir: .
+#
+# `dir: .` is required — it pins every command to the INCLUDING component's
+# directory, so CHART_DIR / DOCKERFILE / INFO_ENV_FILE stay relative to it.
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+# Set these in the including Taskfile's `vars:`. Only PROJECT_NAME is required.
+#
+#   PROJECT_NAME         image + chart name, and the label in every log line
+#   CHART_NAME           chart name when it differs from PROJECT_NAME
+#   REGISTRY             OCI host                       (default registry.example.com)
+#   GLOBAL_REGISTRY      monorepo-wide override, wins over REGISTRY
+#   IMAGE_NAMESPACE      path between host and name     (default none)
+#   DOCKERFILE           default ./Dockerfile
+#   DOCKER_CONTEXT       default .
+#   DOCKER_BUILD_FLAGS   verbatim extra buildx flags    (default none)
+#   CHART_DIR            default ./deploy/chart
+#   CHART_APP_VERSION    appVersion when the image is upstream's, not ours
+#   CHART_MIN_RESOURCES  render-gate floor              (default 1)
+#   HELM_FLAGS           extra flags for every helm registry call
+#   K8S_NAMESPACE        default "default"
+#   K8S_DEPLOYMENT_NAME  default PROJECT_NAME
+#   K8S_CONTEXT          pin a cluster                  (default: current)
+#   INFO_ENV_FILE        default ./deploy/info.env
+#   VERSION_BASE         base for untagged builds       (default 0.1.0)
+#   APP_VERSION          pin the version outright, skipping git derivation
+#
+# Nothing here is defined as a bare knob name: a var declared in an included
+# file SHADOWS the including file's value of the same name, so every input is
+# read through `{{.NAME | default …}}` and every derived value is prefixed `_`.
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+vars:
+  _SVC: '{{.PROJECT_NAME | default "service"}}'
+  _CHART: '{{.CHART_NAME | default .PROJECT_NAME | default "service"}}'
+
+  # One knob re-points everything. GLOBAL_REGISTRY (set by a monorepo root)
+  # wins over a component's own REGISTRY.
+  _REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "registry.example.com"}}'
+  _NS: '{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}'
+  _IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "registry.example.com"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
+  _CHART_REPO: 'oci://{{.GLOBAL_REGISTRY | default .REGISTRY | default "registry.example.com"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/charts'
+  # registry.example.com serves a self-signed leaf whose SANs cover *.example.com but not
+  # the apex, which strict oras clients reject — pass
+  # --insecure-skip-tls-verify there via HELM_FLAGS.
+  _HELM_FLAGS: '{{.HELM_FLAGS | default ""}}'
+
+  _DOCKERFILE: '{{.DOCKERFILE | default "./Dockerfile"}}'
+  _CONTEXT: '{{.DOCKER_CONTEXT | default "."}}'
+  _BUILD_FLAGS: '{{.DOCKER_BUILD_FLAGS | default ""}}'
+  _BUILDER: '{{.BUILDX_BUILDER | default "lean"}}'
+  _KEEP: '{{.BUILDX_KEEP_STORAGE | default "8GB"}}'
+
+  _CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
+  _MIN_RES: '{{.CHART_MIN_RESOURCES | default "1"}}'
+  _RENDER: '{{.RENDER_OUT | default ".task/render.yaml"}}'
+
+  _K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
+  _DEPLOY: '{{.K8S_DEPLOYMENT_NAME | default .PROJECT_NAME | default "service"}}'
+  _KUBECTL: 'kubectl{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT}}{{end}}'
+
+  _INFO_ENV: '{{.INFO_ENV_FILE | default "./deploy/info.env"}}'
+
+  # ─── version derivation ────────────────────────────────────────────────────
+  # One scheme for every repo, always SemVer-2 (Helm OCI rejects anything else):
+  #
+  #   exact tag, clean tree  →  X.Y.Z
+  #   otherwise, clean tree  →  <base>-dev.<committer-ts>.g<sha>
+  #   dirty tree             →  <base>-dev.<committer-ts>.g<sha>.dirty.<now>
+  #
+  # The committer timestamp, not `date +%s`: a clean tree then produces the
+  # SAME version on every run, which is what lets image:build and chart:push
+  # skip work that is already published. A dirty tree is not reproducible by
+  # definition, so it takes a wall-clock suffix and always rebuilds.
+  #
+  # Timestamp first, sha second: SemVer compares pre-release identifiers left
+  # to right, so a leading numeric timestamp orders builds chronologically and
+  # ArgoCD's `>=0.0.0-0` resolver always lands on the newest push. A sha-first
+  # form lets an alphabetically larger sha from an OLDER commit shadow a newer
+  # build — that bug has been shipped twice; do not reintroduce it.
+  #
+  # The `g` prefix on the sha follows git-describe. Without it an all-digit
+  # short sha with a leading zero is an invalid SemVer numeric identifier
+  # ("MUST NOT include leading zeroes") and Helm rejects the chart version.
+  #
+  # `api/*` tags are excluded: they version a proto contract, carry a `/` that
+  # is invalid in a Docker tag, and must not restamp an image.
+  _SHA:
+    sh: git rev-parse --short=8 HEAD 2>/dev/null || echo 00000000
+  _CTS:
+    sh: git show -s --format=%ct HEAD 2>/dev/null || echo 0
+  _TAG:
+    sh: git describe --tags --exact-match --exclude 'api/*' HEAD 2>/dev/null | sed 's/^v//' || true
+  _DIRTY:
+    sh: git status --porcelain 2>/dev/null | head -c1
+  _NOW:
+    sh: date +%s
+  _VERSION: >-
+    {{- if .APP_VERSION -}}{{.APP_VERSION}}
+    {{- else if and ._TAG (not ._DIRTY) -}}{{._TAG}}
+    {{- else -}}
+    {{- ._TAG | default .VERSION_BASE | default "0.1.0"}}-dev.{{._CTS}}.g{{._SHA}}
+    {{- if ._DIRTY}}.dirty.{{._NOW}}{{end}}
+    {{- end -}}
+  _BUILD_TIME:
+    sh: TZ='{{.TIMEZONE | default "Europe/Kyiv"}}' date +%Y-%m-%dT%H:%M:%S%z
+
+tasks:
+
+  # ═══ version + build metadata ═══════════════════════════════════════════════
+
+  version:
+    desc: "Print the version this working tree publishes as"
+    cmds:
+      - echo "{{._VERSION}}"
+
+  info:
+    desc: "Write APP_VERSION / GIT_COMMIT_HASH / BUILD_TIME into the deploy info file"
+    cmds:
+      - mkdir -p {{dir ._INFO_ENV}}
+      - >-
+        printf 'APP_VERSION=%s\nGIT_COMMIT_HASH=%s\nBUILD_TIME=%s\n'
+        '{{._VERSION}}' '{{._SHA}}' '{{._BUILD_TIME}}' > {{._INFO_ENV}}
+      - echo "▸ {{._SVC}} · version {{._VERSION}} → {{._INFO_ENV}}"
+
+  # ═══ container image ════════════════════════════════════════════════════════
+
+  image:build:
+    desc: "Build the component image (skipped when the tree is clean and it is already built)"
+    deps: [info]
+    # Idempotency: a clean tree yields a deterministic version, so an image
+    # already in the local store IS the image this commit builds. A dirty tree
+    # never matches — its version carries a fresh timestamp — so local
+    # iteration always rebuilds.
+    status:
+      - test -z '{{._DIRTY}}'
+      - docker image inspect {{._IMAGE}}:{{._VERSION}} >/dev/null 2>&1
+    preconditions:
+      - sh: command -v docker >/dev/null
+        msg: "docker is not installed"
+      - sh: test -f {{._DOCKERFILE}}
+        msg: "{{._DOCKERFILE}} not found — set DOCKERFILE"
+    cmds:
+      - echo "▸ {{._SVC}} · image · build {{._IMAGE}}:{{._VERSION}}"
+      # --load is required under the docker-container buildx driver: without it
+      # the result stays in the build cache and the next push fails with "tag
+      # does not exist". Harmless no-op under the plain docker driver.
+      - >-
+        docker buildx build --load
+        --file {{._DOCKERFILE}}
+        --tag {{._IMAGE}}:{{._VERSION}}
+        --build-arg APP_VERSION={{._VERSION}}
+        --build-arg GIT_COMMIT_HASH={{._SHA}}
+        --build-arg BUILD_TIME={{._BUILD_TIME}}
+        {{._BUILD_FLAGS}} {{._CONTEXT}}
+      - echo "✔ {{._SVC}} · image · built {{._VERSION}}"
+
+  image:build:local:
+    desc: "Build the image straight into the minikube daemon (no registry round-trip)"
+    deps: [info]
+    preconditions:
+      - sh: command -v minikube >/dev/null
+        msg: "minikube is not installed"
+    cmds:
+      - echo "▸ {{._SVC}} · image · build {{._IMAGE}}:{{._VERSION}} (minikube daemon)"
+      # eval is unavoidable: `minikube docker-env` exports DOCKER_HOST and
+      # friends into the calling shell, and Task runs every cmd in its own.
+      - >-
+        eval "$(minikube docker-env)" &&
+        docker build --file {{._DOCKERFILE}}
+        --tag {{._IMAGE}}:{{._VERSION}} --tag {{._IMAGE}}:latest
+        --build-arg APP_VERSION={{._VERSION}}
+        --build-arg GIT_COMMIT_HASH={{._SHA}}
+        --build-arg BUILD_TIME={{._BUILD_TIME}}
+        {{._BUILD_FLAGS}} {{._CONTEXT}}
+      - echo "✔ {{._SVC}} · image · built {{._VERSION}} inside minikube"
+
+  image:push:
+    desc: "Push the component image to the registry"
+    deps: [image:build]
+    preconditions:
+      - sh: docker image inspect {{._IMAGE}}:{{._VERSION}} >/dev/null 2>&1
+        msg: "{{._IMAGE}}:{{._VERSION}} is not in the local image store — run `task svc:image:build`"
+    cmds:
+      - echo "▸ {{._SVC}} · image · push {{._IMAGE}}:{{._VERSION}}"
+      - docker push {{._IMAGE}}:{{._VERSION}}
+      - echo "✔ {{._SVC}} · image · pushed {{._VERSION}}"
+
+  image:gc:
+    desc: "Trim the BuildKit cache to the keep floor and drop dangling images"
+    cmds:
+      # The named builder keeps a cache `docker builder prune` does not touch;
+      # prune it explicitly, falling back to the active builder. --keep-storage
+      # only reclaims ABOVE the floor, so the working set survives.
+      - >-
+        docker buildx prune --builder {{._BUILDER}} --keep-storage={{._KEEP}} -f >/dev/null 2>&1 ||
+        docker buildx prune --keep-storage={{._KEEP}} -f >/dev/null 2>&1 || true
+      - docker image prune -f >/dev/null 2>&1 || true
+      - echo "✔ {{._SVC}} · image · build cache trimmed to {{._KEEP}}"
+
+  # ═══ helm chart ═════════════════════════════════════════════════════════════
+
+  chart:verify:
+    desc: "Lint the chart and render it through the multi-doc separator gate"
+    cmds:
+      - task: chart:lint
+      - task: chart:render
+
+  chart:lint:
+    desc: "helm lint the chart"
+    preconditions:
+      - sh: command -v helm >/dev/null
+        msg: "helm is not installed"
+      - sh: test -f {{._CHART_DIR}}/Chart.yaml
+        msg: "{{._CHART_DIR}}/Chart.yaml not found — set CHART_DIR"
+    cmds:
+      - helm lint {{._CHART_DIR}}
+
+  chart:render:
+    desc: "Render the chart and fail on glued separators, unparseable YAML, or a resource drop"
+    # Why this gate exists: a range block that strips the newline before a
+    # `---` glues the separator onto the previous line
+    # (`automountServiceAccountToken: true---`). Every YAML parser then reads
+    # the stream as one garbage document and silently drops every resource
+    # after the first — a chart shipped 1 of N Deployments and the cluster ran
+    # wedged for hours before anyone found it. Seconds to check, hours to find.
+    deps: [chart:render:_write]
+    preconditions:
+      - sh: '! grep -qE "[^[:space:]]---" {{._RENDER}}'
+        msg: |-
+          broken multi-doc YAML separator in the rendered chart.
+          A `---` is glued to the end of the previous line, so kubectl and ArgoCD
+          drop every resource after the first one.
+          Fix: leave a literal blank line before `---` in the offending template
+          and drop the trailing whitespace-strip on the line above it.
+          Offenders: grep -nE '[^[:space:]]---' {{._RENDER}}
+      - sh: test "$(grep -c '^kind:' {{._RENDER}})" -ge {{._MIN_RES}}
+        msg: |-
+          the chart rendered fewer than {{._MIN_RES}} resources.
+          That is the signature of documents being dropped by a separator bug
+          the pattern check did not catch. Inspect {{._RENDER}}.
+    cmds:
+      # yq is optional: the separator gate above already catches the bug this
+      # file was written for, and a missing tool should not turn a checkout red.
+      - >-
+        command -v yq >/dev/null 2>&1 && yq ea '.' {{._RENDER}} >/dev/null ||
+        echo "⚠ {{._SVC}} · chart · yq absent, YAML parse gate skipped"
+      - echo "✔ {{._SVC}} · chart · renders $(grep -c '^kind:' {{._RENDER}}) resources cleanly"
+      - rm -f {{._RENDER}}
+
+  chart:render:_write:
+    internal: true
+    preconditions:
+      - sh: command -v helm >/dev/null
+        msg: "helm is not installed"
+    cmds:
+      - mkdir -p {{dir ._RENDER}}
+      - helm template {{._SVC}} {{._CHART_DIR}} --namespace {{._K8S_NS}} > {{._RENDER}}
+
+  chart:package:
+    desc: "helm package the chart at the derived version"
+    preconditions:
+      - sh: test -f {{._CHART_DIR}}/Chart.yaml
+        msg: "{{._CHART_DIR}}/Chart.yaml not found — set CHART_DIR"
+    generates:
+      - "{{._CHART}}-{{._VERSION}}.tgz"
+    cmds:
+      - >-
+        helm package {{._CHART_DIR}} --version {{._VERSION}}
+        --app-version {{.CHART_APP_VERSION | default ._VERSION}} >/dev/null
+      - echo "▸ {{._SVC}} · chart · packaged {{._CHART}}-{{._VERSION}}.tgz"
+
+  chart:push:
+    desc: "Package and push the chart (skipped when that version is already published)"
+    # Idempotency: the registry is the source of truth. A version already there
+    # is the desired end state, so repeating `task deploy` on an unchanged
+    # commit costs one lookup and changes nothing.
+    status:
+      - helm show chart {{._CHART_REPO}}/{{._CHART}} --version {{._VERSION}} {{._HELM_FLAGS}} >/dev/null 2>&1
+    cmds:
+      - task: chart:package
+      # Runs whether the push succeeds or fails — a stray .tgz in the component
+      # directory is how the next `helm package` picks up the wrong file.
+      - defer: rm -f {{._CHART}}-{{._VERSION}}.tgz
+      - echo "▸ {{._SVC}} · chart · push {{._CHART}}:{{._VERSION}} → {{._CHART_REPO}}"
+      - helm push {{._CHART}}-{{._VERSION}}.tgz {{._CHART_REPO}} {{._HELM_FLAGS}} >/dev/null
+      - echo "✔ {{._SVC}} · chart · pushed {{._VERSION}}"
+
+  chart:clean:
+    desc: "Remove packaged chart tarballs from the component directory"
+    cmds:
+      - rm -f {{._CHART}}-*.tgz
+
+  # ═══ release ════════════════════════════════════════════════════════════════
+
+  deploy:
+    desc: "Verify the chart, then publish image + chart to the registry"
+    # Gate first: a chart regression must never reach the registry, and the
+    # verify costs seconds against a push that costs minutes.
+    cmds:
+      - task: chart:verify
+      - task: image:push
+      - task: chart:push
+      - echo "✔ {{._SVC}} · deployed {{._VERSION}} → {{._REG}}"
+
+  deploy:chart-only:
+    desc: "Publish the chart alone — for components running an upstream image"
+    cmds:
+      - task: chart:verify
+      - task: chart:push
+      - echo "✔ {{._SVC}} · chart {{._VERSION}} → {{._CHART_REPO}}"
+
+  # ═══ kubernetes ═════════════════════════════════════════════════════════════
+
+  k8s:restart:
+    desc: "Roll the deployment (no-op when the namespace or deployment is absent)"
+    # Skipped rather than failed when there is nothing to roll: this task sits
+    # in chains that must stay green on a laptop with no cluster running.
+    status:
+      - "! {{._KUBECTL}} -n {{._K8S_NS}} get deploy/{{._DEPLOY}} >/dev/null 2>&1"
+    cmds:
+      - echo "▸ {{._SVC}} · k8s · roll deploy/{{._DEPLOY}} in {{._K8S_NS}}"
+      - "{{._KUBECTL}} -n {{._K8S_NS}} rollout restart deploy/{{._DEPLOY}}"
+      - "{{._KUBECTL}} -n {{._K8S_NS}} rollout status deploy/{{._DEPLOY}} --timeout={{.ROLLOUT_TIMEOUT | default \"2m\"}}"
+      - echo "✔ {{._SVC}} · k8s · rolled {{._DEPLOY}}"
+
+  k8s:upgrade:
+    desc: "helm upgrade --install the release from the local chart directory"
+    cmds:
+      - echo "▸ {{._SVC}} · k8s · helm upgrade --install {{._DEPLOY}} ({{._K8S_NS}})"
+      - >-
+        helm upgrade --install {{._DEPLOY}} {{._CHART_DIR}}
+        --namespace {{._K8S_NS}} --create-namespace
+        {{if .K8S_CONTEXT}}--kube-context {{.K8S_CONTEXT}}{{end}}
+        {{.HELM_UPGRADE_FLAGS | default ""}}
+      - echo "✔ {{._SVC}} · k8s · release {{._DEPLOY}} upgraded"
+
+  k8s:logs:
+    desc: "Tail the deployment's logs (Ctrl-C to stop)"
+    interactive: true
+    cmds:
+      - "{{._KUBECTL}} -n {{._K8S_NS}} logs deploy/{{._DEPLOY}} -f --tail={{.TAIL | default \"100\"}}"
+
+  k8s:status:
+    desc: "Show the deployment and its pods"
+    cmds:
+      - "{{._KUBECTL}} -n {{._K8S_NS}} get deploy/{{._DEPLOY}} -o wide"
+      - "{{._KUBECTL}} -n {{._K8S_NS}} get pods -l app.kubernetes.io/name={{._DEPLOY}} -o wide"
+
+  k8s:port-forward:
+    desc: "Port-forward the deployment (PORT=8080 by default)"
+    interactive: true
+    vars:
+      PORT: '{{.PORT | default "8080"}}'
+    cmds:
+      - echo "▸ {{._SVC}} · k8s · localhost:{{.PORT}} → deploy/{{._DEPLOY}}"
+      - "{{._KUBECTL}} -n {{._K8S_NS}} port-forward deploy/{{._DEPLOY}} {{.PORT}}:{{.PORT}}"

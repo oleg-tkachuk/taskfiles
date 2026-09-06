@@ -1,0 +1,153 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# go.yaml — the Go build/test/lint surface.
+#
+#   includes:
+#     go: { taskfile: '{{.TASKLIB}}/go.yaml{{.TASKLIB_REF}}', dir: . }
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+#   PROJECT_NAME     label in log lines
+#   GO_PKG           package pattern to test/lint       (default ./...)
+#   GO_MAIN          package(s) that produce binaries   (default ./cmd/...)
+#   GO_BIN_DIR       output directory                   (default ./bin)
+#   GO_TEST_FLAGS    default "-race -short"
+#   GO_BUILD_FLAGS   extra `go build` flags
+#   GOLANGCI_FLAGS   extra golangci-lint flags
+#   GO_TEST_TAGS     build tags for test:tagged:compile (default integration)
+#   GOWORK           set to "" to build through a go.work workspace
+#
+# GOWORK=off is the default and is the point of this file. A go.work in the
+# tree makes a local build resolve dependencies through the workspace, so a
+# module can be missing entries from its own go.sum and still look green here
+# while CI — which builds each module standalone — fails on it. That has
+# happened more than once, most recently on a dependency bump that left go.sum
+# with an h1 hash and no /go.mod hash beside it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+vars:
+  _GO: '{{.PROJECT_NAME | default "go"}}'
+  _PKG: '{{.GO_PKG | default "./..."}}'
+  _MAIN: '{{.GO_MAIN | default "./cmd/..."}}'
+  _BIN: '{{.GO_BIN_DIR | default "./bin"}}'
+  _TEST_FLAGS: '{{.GO_TEST_FLAGS | default "-race -short"}}'
+  _BUILD_FLAGS: '{{.GO_BUILD_FLAGS | default ""}}'
+  _LINT_FLAGS: '{{.GOLANGCI_FLAGS | default ""}}'
+  _TAGS: '{{.GO_TEST_TAGS | default "integration"}}'
+
+env:
+  GOWORK: '{{.GOWORK | default "off"}}'
+
+tasks:
+
+  build:
+    desc: "Compile the command packages into the bin directory"
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - "{{._BIN}}/*"
+    preconditions:
+      - sh: command -v go >/dev/null
+        msg: "go is not installed"
+    cmds:
+      - echo "▸ {{._GO}} · go · build {{._MAIN}}"
+      - go build {{._BUILD_FLAGS}} -o {{._BIN}}/ {{._MAIN}}
+      - echo "✔ {{._GO}} · go · built → {{._BIN}}"
+
+  compile:
+    desc: "Type-check every package without writing a binary (for library modules)"
+    cmds:
+      - echo "▸ {{._GO}} · go · compile {{._PKG}}"
+      # -o /dev/null compiles every package but writes nothing, so a main under
+      # ./cmd cannot collide with the cmd/ directory itself.
+      - go build -o /dev/null {{._PKG}}
+      - echo "✔ {{._GO}} · go · compiles clean"
+
+  test:
+    desc: "Run the unit suite"
+    cmds:
+      - echo "▸ {{._GO}} · go · test {{._PKG}}"
+      # gotestsum when it is installed (one line per package), plain go test
+      # otherwise — neither is worth a hard dependency.
+      - >-
+        command -v gotestsum >/dev/null 2>&1 &&
+        gotestsum --format pkgname --hide-summary skipped -- {{._TEST_FLAGS}} {{._PKG}} ||
+        go test {{._TEST_FLAGS}} {{._PKG}}
+      - echo "✔ {{._GO}} · go · tests pass"
+
+  test:coverage:
+    desc: "Run the unit suite with coverage; HTML report lands in coverage/"
+    cmds:
+      - mkdir -p coverage
+      - go test -coverprofile=coverage/cover.out {{._PKG}}
+      - go tool cover -html=coverage/cover.out -o coverage/cover.html
+      - echo "✔ {{._GO}} · go · coverage report → coverage/cover.html"
+
+  test:integration:
+    desc: "Run the integration suite (build tag, needs Docker)"
+    cmds:
+      - echo "▸ {{._GO}} · go · integration tests"
+      - go test -race -tags={{._TAGS}} {{._PKG}}
+      - echo "✔ {{._GO}} · go · integration tests pass"
+
+  test:tagged:compile:
+    desc: "Type-check build-tagged suites that the default test run never compiles"
+    # A tagged suite is invisible to the normal gate: it does not compile, it
+    # does not run, and nothing notices it has rotted until someone needs it.
+    # `go vet` with the tag takes seconds and catches exactly that.
+    cmds:
+      - echo "▸ {{._GO}} · go · vet -tags={{._TAGS}}"
+      - go vet -tags={{._TAGS}} {{._PKG}}
+      - echo "✔ {{._GO}} · go · tagged suites compile"
+
+  lint:
+    desc: "golangci-lint over the module"
+    preconditions:
+      - sh: command -v golangci-lint >/dev/null
+        msg: "golangci-lint is not installed — brew install golangci-lint"
+    cmds:
+      - echo "▸ {{._GO}} · go · golangci-lint"
+      - golangci-lint run {{._LINT_FLAGS}} {{._PKG}}
+      - echo "✔ {{._GO}} · go · lint clean"
+
+  fmt:
+    desc: "gofmt -s -w, plus goimports when it is installed"
+    cmds:
+      - gofmt -s -w .
+      - command -v goimports >/dev/null 2>&1 && goimports -w . || true
+      - echo "✔ {{._GO}} · go · formatted"
+
+  tidy:
+    desc: "go mod tidy the way CI resolves the module — standalone"
+    cmds:
+      - go mod tidy
+      - echo "✔ {{._GO}} · go · go.mod tidy"
+
+  vuln:
+    desc: "govulncheck — vulnerabilities this module's code actually reaches"
+    preconditions:
+      - sh: command -v govulncheck >/dev/null
+        msg: "govulncheck is not installed — go install golang.org/x/vuln/cmd/govulncheck@latest"
+    cmds:
+      - echo "▸ {{._GO}} · go · govulncheck"
+      - govulncheck {{._PKG}}
+
+  deps:update:
+    desc: "Bump dependencies to the latest minor/patch, tidy, then prove it still builds"
+    # Majors are deliberately not crossed: they need an import-path /vN edit and
+    # a read of the upstream CHANGELOG.
+    cmds:
+      - echo "▸ {{._GO}} · go · go get -u ./..."
+      - go get -u ./...
+      - go mod tidy
+      - go build -o /dev/null {{._PKG}}
+      - echo "✔ {{._GO}} · go · deps bumped — review git diff go.mod go.sum"
+
+  deps:outdated:
+    desc: "List dependencies with a newer version available (read-only)"
+    cmds:
+      - go list -u -m all 2>/dev/null | grep '\[' || echo "✔ {{._GO}} · go · every dependency current"

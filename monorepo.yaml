@@ -1,0 +1,76 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# monorepo.yaml — run one target across every component of a monorepo.
+#
+#   includes:
+#     all:
+#       taskfile: '{{.TASKLIB}}/monorepo.yaml{{.TASKLIB_REF}}'
+#       dir: .
+#       vars: { COMPONENTS: "backend frontend workers/api" }
+#
+# COMPONENTS is a whitespace-separated list of directories, each holding its
+# own Taskfile. The fan-out is sequential and stops at the first failure: a
+# half-shipped registry is worse than a failed command with a name attached to
+# it. Narrow the run by overriding COMPONENTS on the CLI:
+#
+#   task all:deploy COMPONENTS="backend"
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+vars:
+  _COMPONENTS: '{{.COMPONENTS | default ""}}'
+  _REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "registry.example.com"}}'
+
+tasks:
+
+  each:
+    desc: "Run TARGET in every component (TARGET=test, TARGET=deploy, …)"
+    requires:
+      vars: [TARGET]
+    cmds:
+      - for: { var: _COMPONENTS }
+        task: _run
+        vars: { COMPONENT: "{{.ITEM}}", TARGET: "{{.TARGET}}" }
+
+  _run:
+    internal: true
+    dir: "{{.COMPONENT}}"
+    cmds:
+      - echo "── {{.COMPONENT}} · {{.TARGET}}"
+      # A child `task` process rather than a namespaced reference: the
+      # component owns its own Taskfile, its own vars and its own includes, and
+      # this file must not need to know any of them.
+      - task {{.TARGET}} {{.CLI_ARGS}}
+
+  test:
+    desc: "Run `task test` in every component"
+    cmds: [{ task: each, vars: { TARGET: test } }]
+
+  lint:
+    desc: "Run `task lint` in every component"
+    cmds: [{ task: each, vars: { TARGET: lint } }]
+
+  build:
+    desc: "Run `task build` in every component"
+    cmds: [{ task: each, vars: { TARGET: build } }]
+
+  deploy:
+    desc: "Run `task deploy` in every component, after checking the registry answers"
+    deps: [registry:check]
+    cmds: [{ task: each, vars: { TARGET: deploy } }]
+
+  registry:check:
+    desc: "Fail fast when {{._REG}} is not reachable"
+    # A misconfigured registry should cost seconds, not a half-finished push
+    # chain. 200/401/403 all mean the registry answered.
+    preconditions:
+      - sh: >-
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://{{._REG}}/v2/ || echo 000)" != "000"
+        msg: |-
+          {{._REG}} is not answering on :443.
+          Bring the OCI registry up, or point the run somewhere else with
+          GLOBAL_REGISTRY=<host> task …
+    cmds:
+      - echo "✔ registry {{._REG}} reachable"

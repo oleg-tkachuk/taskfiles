@@ -1,0 +1,61 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# argocd.yaml — force the Argo applications that track freshly pushed charts to
+# re-read the registry.
+#
+#   includes:
+#     argocd:
+#       taskfile: '{{.TASKLIB}}/argocd.yaml{{.TASKLIB_REF}}'
+#       dir: .
+#       vars: { APP_PREFIX: "svc-" }
+#
+# A push to the OCI registry does not reach the cluster until Argo's repo-server
+# drops its cached chart. Without a hard refresh the cluster can sit on the
+# previous version until the next poll fires — the deploy looks done and is not.
+#
+# Every task here no-ops (exit 0) when kubectl cannot reach the cluster, so it
+# is safe to chain after a deploy on a laptop.
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+vars:
+  _ARGO_NS: '{{.ARGOCD_NS | default "argocd"}}'
+  # APP_PREFIX deliberately has no default: a bare prefix would hard-refresh
+  # unrelated applications (infra Postgres, registries) that must not be touched.
+  _ARGO_PREFIX: '{{.APP_PREFIX | default ""}}'
+  _KUBECTL: 'kubectl{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT}}{{end}}'
+
+tasks:
+
+  refresh:
+    desc: "Hard-refresh every Argo application matching APP_PREFIX"
+    requires:
+      vars: [APP_PREFIX]
+    # Skipped, not failed, when there is no cluster to talk to.
+    status:
+      - "! {{._KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
+    vars:
+      _APPS:
+        sh: >-
+          {{._KUBECTL}} -n {{._ARGO_NS}} get applications.argoproj.io
+          -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null
+          | grep -E '^{{._ARGO_PREFIX}}' || true
+    cmds:
+      - for: { var: _APPS }
+        cmd: >-
+          {{._KUBECTL}} -n {{._ARGO_NS}} patch application.argoproj.io {{.ITEM}} --type merge
+          -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' >/dev/null
+          && echo "✔ argocd · hard-refreshed {{.ITEM}}"
+      - '{{if not ._APPS}}echo "⚠ argocd · no application matches {{._ARGO_PREFIX}}* in {{._ARGO_NS}}"{{end}}'
+
+  list:
+    desc: "Show the sync + health state of every application matching APP_PREFIX"
+    status:
+      - "! {{._KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
+    cmds:
+      - >-
+        {{._KUBECTL}} -n {{._ARGO_NS}} get applications.argoproj.io
+        -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status
+        {{if .APP_PREFIX}}| grep -E '^(NAME|{{._ARGO_PREFIX}})'{{end}}
