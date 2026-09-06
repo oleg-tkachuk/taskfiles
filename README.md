@@ -1,5 +1,10 @@
 # taskfiles
 
+[![release](https://img.shields.io/github/v/release/oleg-tkachuk/taskfiles?sort=semver&label=release)](https://github.com/oleg-tkachuk/taskfiles/releases/latest)
+[![ci](https://github.com/oleg-tkachuk/taskfiles/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/oleg-tkachuk/taskfiles/actions/workflows/ci.yml)
+[![Task 3.53+](https://img.shields.io/badge/Task-3.53%2B-29BEB0?logo=task&logoColor=white)](https://taskfile.dev)
+[![license: MIT](https://img.shields.io/github/license/oleg-tkachuk/taskfiles?label=license)](LICENSE)
+
 Shared [Task](https://taskfile.dev) modules for every service in this
 workspace — one implementation of the release chain, the language gates and
 the Kubernetes conveniences, instead of a copy per repository.
