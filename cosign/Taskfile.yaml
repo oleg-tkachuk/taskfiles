@@ -1,0 +1,208 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# cosign — signing what a release pushed, and attesting what is inside it.
+#
+#   includes:
+#     sign:
+#       taskfile: '{{.TASKLIB}}/cosign{{.TASKLIB_REF}}'
+#       dir: .
+#
+# Include it alongside `release` and chain it after: the release publishes, this
+# signs what was published. It asks `release:version` for the version rather
+# than deriving a second one, so the consumer must include the release module
+# under the `release` name.
+#
+#   tasks:
+#     deploy:
+#       cmds:
+#         - task: release:deploy
+#         - task: sign:all
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+#   PROJECT_NAME       image and chart name, as in the release module
+#   REGISTRY           OCI host                        (default localhost:5000)
+#   IMAGE_NAMESPACE    path between host and name
+#   CHART_NAME         when the chart is not named after PROJECT_NAME
+#   COSIGN_DIR         where the key pair lives        (default deploy/sigstore)
+#   COSIGN_KEY         private key       (default <COSIGN_DIR>/cosign.key)
+#   COSIGN_PUB         public key        (default <COSIGN_DIR>/cosign.pub)
+#   COSIGN_SIGNING_CONFIG  signing config (default <COSIGN_DIR>/signing-config.json)
+#   COSIGN_SIGN        set to "0" to make every task here a no-op
+#   COSIGN_SIGN_FLAGS  extra flags for sign/attest
+#   COSIGN_VERIFY_FLAGS  extra flags for verify   (default --insecure-ignore-tlog)
+#   SBOM_FORMAT        syft output format             (default spdx-json)
+#   SBOM_INSECURE      "1" when the registry serves a certificate syft rejects
+#
+# The default configuration signs with a local key pair and no transparency
+# log, because that is what a private registry can actually verify against.
+# `task sign:keygen` writes both the keys and a signing config that has no
+# Rekor, Fulcio, TSA or OIDC in it. Publishing to a public registry instead?
+# Drop COSIGN_KEY, pass keyless flags through COSIGN_SIGN_FLAGS, and take
+# `--insecure-ignore-tlog` back out of COSIGN_VERIFY_FLAGS.
+#
+# Missing key or missing syft is an ERROR, not a skip. An artifact that is
+# quietly unsigned is the whole failure mode this module exists to prevent; if
+# you want it off for a run, say so with COSIGN_SIGN=0.
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+vars:
+  _CS_NAME: '{{.PROJECT_NAME | default "service"}}'
+  _CS_CHART: '{{.CHART_NAME | default .PROJECT_NAME | default "service"}}'
+  _CS_REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}'
+  _CS_IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
+  _CS_CHART_REF: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/charts/{{.CHART_NAME | default .PROJECT_NAME | default "service"}}'
+
+  _CS_DIR: '{{.COSIGN_DIR | default "deploy/sigstore"}}'
+  _CS_KEY: '{{.COSIGN_KEY | default (printf "%s/cosign.key" (.COSIGN_DIR | default "deploy/sigstore"))}}'
+  _CS_PUB: '{{.COSIGN_PUB | default (printf "%s/cosign.pub" (.COSIGN_DIR | default "deploy/sigstore"))}}'
+  _CS_CONFIG: '{{.COSIGN_SIGNING_CONFIG | default (printf "%s/signing-config.json" (.COSIGN_DIR | default "deploy/sigstore"))}}'
+  _CS_ON: '{{.COSIGN_SIGN | default "1"}}'
+  _CS_SIGN_FLAGS: '{{.COSIGN_SIGN_FLAGS | default ""}}'
+  _CS_VERIFY_FLAGS: '{{.COSIGN_VERIFY_FLAGS | default "--insecure-ignore-tlog=true"}}'
+  _CS_SBOM_FORMAT: '{{.SBOM_FORMAT | default "spdx-json"}}'
+
+  # Every included file shares one var namespace, so the release module's
+  # derived version is readable here directly. Do NOT shell out to
+  # `task release:version`: that re-loads the consumer Taskfile, which
+  # re-includes this module, which evaluates this var again — an infinite fork.
+  _CS_VERSION: '{{._VERSION}}'
+
+tasks:
+
+  keygen:
+    desc: "One-time — generate the cosign key pair and a no-transparency-log signing config"
+    # Refuses to overwrite: a regenerated key silently invalidates every
+    # signature already published under the old one. Rotation is deliberate.
+    status:
+      - test -f {{._CS_KEY}}
+    preconditions:
+      - sh: command -v cosign >/dev/null
+        msg: "cosign is not installed — brew install cosign"
+    cmds:
+      - mkdir -p {{._CS_DIR}}
+      - cmd: cd {{._CS_DIR}} && COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign generate-key-pair
+      # No Rekor, Fulcio, TSA or OIDC: key-based signing that a private
+      # registry can verify without reaching the public transparency log.
+      - >-
+        cosign signing-config create --no-default-rekor --no-default-fulcio
+        --no-default-tsa --no-default-oidc --out {{._CS_CONFIG}}
+      - echo "✔ {{._CS_NAME}} · cosign · wrote {{._CS_DIR}}/cosign.{key,pub} + signing-config.json"
+      - echo "⚠ {{._CS_NAME}} · cosign · commit cosign.pub, keep cosign.key out of the repo"
+
+  all:
+    desc: "Sign the image and the chart, then attest the image's SBOM"
+    # COSIGN_SIGN=0 turns this off. The guard sits here rather than on the
+    # internal task because Task evaluates preconditions BEFORE status, so a
+    # status guard cannot skip past the internal task's own preconditions.
+    status:
+      - test '{{._CS_ON}}' = '0'
+    cmds:
+      - task: image
+      - task: chart
+      - task: sbom
+
+  image:
+    desc: "Sign the published image at the release version"
+    # COSIGN_SIGN=0 turns this off. The guard sits here rather than on the
+    # internal task because Task evaluates preconditions BEFORE status, so a
+    # status guard cannot skip past the internal task's own preconditions.
+    status:
+      - test '{{._CS_ON}}' = '0'
+    cmds:
+      - task: _sign
+        vars: { REF: "{{._CS_IMAGE}}:{{._CS_VERSION}}" }
+
+  chart:
+    desc: "Sign the published chart at the release version"
+    # COSIGN_SIGN=0 turns this off. The guard sits here rather than on the
+    # internal task because Task evaluates preconditions BEFORE status, so a
+    # status guard cannot skip past the internal task's own preconditions.
+    status:
+      - test '{{._CS_ON}}' = '0'
+    cmds:
+      - task: _sign
+        vars: { REF: "{{._CS_CHART_REF}}:{{._CS_VERSION}}" }
+
+  sbom:
+    desc: "Generate an SBOM for the published image and attest it with cosign"
+    # COSIGN_SIGN=0 turns this off. The guard sits here rather than on the
+    # internal task because Task evaluates preconditions BEFORE status, so a
+    # status guard cannot skip past the internal task's own preconditions.
+    status:
+      - test '{{._CS_ON}}' = '0'
+    cmds:
+      - task: _attest
+        vars: { REF: "{{._CS_IMAGE}}:{{._CS_VERSION}}" }
+
+  verify:
+    desc: "Verify the signatures on the published image and chart"
+    # The counterpart of `all`, and the only proof that signing worked: a sign
+    # step that quietly wrote nothing looks exactly like one that worked.
+    status:
+      - test '{{._CS_ON}}' = '0'
+    preconditions:
+      - sh: command -v cosign >/dev/null
+        msg: "cosign is not installed — brew install cosign"
+      - sh: test -f {{._CS_PUB}}
+        msg: "{{._CS_PUB}} not found — nothing to verify against (run `task sign:keygen`)"
+      - sh: test -n '{{._CS_VERSION}}'
+        msg: "no version resolved — include the shared `release` module under the name `release` beside this one"
+    vars:
+      # A literal `for:` list is taken verbatim — templates in its items are
+      # not expanded — so the refs are built here and split on whitespace.
+      REFS: "{{._CS_IMAGE}}:{{._CS_VERSION}} {{._CS_CHART_REF}}:{{._CS_VERSION}}"
+    cmds:
+      - for: { var: REFS }
+        cmd: >-
+          cosign verify {{._CS_VERIFY_FLAGS}} --key {{._CS_PUB}} '{{.ITEM}}' >/dev/null 2>&1
+          && echo "✔ {{._CS_NAME}} · cosign · verified {{.ITEM}}"
+          || { echo "✖ {{._CS_NAME}} · cosign · unsigned or bad signature: {{.ITEM}}" >&2; exit 1; }
+
+  # ─── internals ──────────────────────────────────────────────────────────────
+
+  _sign:
+    internal: true
+    requires:
+      vars: [REF]
+    preconditions:
+      - sh: test -n '{{._CS_VERSION}}'
+        msg: "no version resolved — include the shared `release` module under the name `release` beside this one"
+      - sh: command -v cosign >/dev/null
+        msg: "cosign is not installed — brew install cosign (or set COSIGN_SIGN=0)"
+      - sh: test -f {{._CS_KEY}}
+        msg: "{{._CS_KEY}} not found — run `task sign:keygen`, or set COSIGN_SIGN=0 to publish unsigned"
+    cmds:
+      - >-
+        COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign sign --yes
+        {{if ._CS_CONFIG}}--signing-config {{._CS_CONFIG}} {{end}}--key {{._CS_KEY}}
+        {{._CS_SIGN_FLAGS}} '{{.REF}}' >/dev/null
+      - echo "✔ {{._CS_NAME}} · cosign · signed {{.REF}}"
+
+  _attest:
+    internal: true
+    requires:
+      vars: [REF]
+    preconditions:
+      - sh: test -n '{{._CS_VERSION}}'
+        msg: "no version resolved — include the shared `release` module under the name `release` beside this one"
+      - sh: command -v syft >/dev/null
+        msg: "syft is not installed — brew install syft (or set COSIGN_SIGN=0)"
+      - sh: command -v cosign >/dev/null
+        msg: "cosign is not installed — brew install cosign (or set COSIGN_SIGN=0)"
+      - sh: test -f {{._CS_KEY}}
+        msg: "{{._CS_KEY}} not found — run `task sign:keygen`, or set COSIGN_SIGN=0"
+    cmds:
+      # The SBOM is a build artifact of this task, not of the repository: it is
+      # written to a temp file, attached to the image, and dropped.
+      - cmd: |-
+          set -eu
+          sb="$(mktemp -t sbom-XXXXXX).json"
+          trap 'rm -f "$sb"' EXIT
+          {{if eq (.SBOM_INSECURE | default "0") "1"}}SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY=true {{end}}syft '{{.REF}}' -q -o {{._CS_SBOM_FORMAT}}="$sb"
+          COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign attest --yes \
+            {{if ._CS_CONFIG}}--signing-config {{._CS_CONFIG}} {{end}}--key {{._CS_KEY}} \
+            --predicate "$sb" --type spdxjson {{._CS_SIGN_FLAGS}} '{{.REF}}' >/dev/null
+      - echo "✔ {{._CS_NAME}} · cosign · SBOM attested to {{.REF}}"

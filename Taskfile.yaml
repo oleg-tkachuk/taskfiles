@@ -14,7 +14,7 @@ vars:
   # file inside it. The split is by domain, not by file size: `release` never
   # talks to a cluster and `k8s` never publishes anything, so a repository that
   # only does one of the two includes only one of them.
-  MODULES: "release k8s go python uv node compose monorepo security argocd auth
+  MODULES: "release k8s go python uv node compose monorepo security cosign argocd auth
     runtime/docker runtime/orbstack runtime/minikube runtime/kind runtime/k3d"
   # Every YAML the modules are made of, for the file-level checks.
   MODULE_FILES:

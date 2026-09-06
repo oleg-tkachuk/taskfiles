@@ -20,11 +20,14 @@ version: "3"
 
 silent: true
 
+# `_VERSION` and `_IMAGE` below come from the `release` module: every included
+# file shares one var namespace, so its derived values are readable here. Do
+# NOT shell out to `task release:version` for them — that re-loads the consumer
+# Taskfile, which re-includes this module, which asks again: an infinite fork.
+
 vars:
   _SVC: '{{.PROJECT_NAME | default "service"}}'
   _IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
-  _VERSION:
-    sh: task release:version
   _CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
   _K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
   _CTX: '{{.K8S_CONTEXT | default "orbstack"}}'

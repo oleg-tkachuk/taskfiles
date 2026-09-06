@@ -65,6 +65,7 @@ own primitives rather than shelling out to a helper.
 | `compose/` | `dev` | local stack up/down/reset/logs |
 | `monorepo/` | `all` | run one target across every component, registry preflight |
 | `security/` | `sec` | govulncheck, golangci-lint, gitleaks, trivy, buf breaking |
+| `cosign/` | `sign` | sign the published image and chart, attest an SBOM, verify both |
 | `argocd/` | `argocd` | hard-refresh the apps a deploy just republished |
 | `auth/` | `auth` | mint a local-dev JWT |
 | `runtime/docker/`, `runtime/orbstack/`, `runtime/minikube/`, `runtime/kind/`, `runtime/k3d/` | `local` | run a locally built image on a local cluster, no registry |
