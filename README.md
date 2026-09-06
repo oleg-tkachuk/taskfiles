@@ -170,10 +170,16 @@ git tag -a v1.2.0 -m "…" && git push --tags # release.yml takes it from here
 ```
 
 Pushing the tag runs `.github/workflows/release.yml`, which lints the tagged
-tree, refuses a tag that is not `vMAJOR.MINOR.PATCH`, includes the published
-tag **over the network** the way a consumer does — the only check that proves
-the tag is actually fetchable — and then creates the GitHub release with notes
-generated from the commits.
+tree, refuses a tag that is not `vMAJOR.MINOR.PATCH` or has no
+[CHANGELOG](CHANGELOG.md) entry, includes the published tag **over the network**
+the way a consumer does — the only check that proves the tag is actually
+fetchable — and then creates the GitHub release with notes generated from the
+commits.
+
+The release notes and the changelog are deliberately different things. The
+notes list what changed; the changelog says what to do about it. Write the
+entry under `## [Unreleased]` as you go, and move it under the version when you
+cut the tag.
 
 Renaming or removing a task is a major bump: these modules are a public API,
 and `?ref=` is the only thing standing between a rename here and forty broken

@@ -40,6 +40,23 @@ jobs:
       - name: Lint
         run: task lint
 
+      - name: Refuse a tag with no changelog entry
+        # The notes on the Releases page are generated from commits; this is
+        # the curated half, and the only place an upgrading consumer is told
+        # which names changed and what to set instead. A tag published without
+        # it is a tag nobody can act on.
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          if ! grep -qF "## [$version]" CHANGELOG.md; then
+            echo "✖ CHANGELOG.md has no '## [$version]' section" >&2
+            echo "  Add one — what a consumer has to do about this release —" >&2
+            echo "  and move anything under [Unreleased] into it." >&2
+            exit 1
+          fi
+          echo "✔ $tag is documented in CHANGELOG.md"
+
       - name: Refuse a tag that is not SemVer
         # Helm and OCI both reject a chart version that is not SemVer-2, and
         # the modules mint chart versions from these tags. A tag that cannot be
