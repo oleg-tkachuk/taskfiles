@@ -178,3 +178,9 @@ generated from the commits.
 Renaming or removing a task is a major bump: these modules are a public API,
 and `?ref=` is the only thing standing between a rename here and forty broken
 Taskfiles.
+
+## License
+
+[MIT](LICENSE) — use it, copy a module into your own repository, change it,
+ship it in something commercial. The one condition is that a copy carries the
+copyright line and the permission notice with it.
