@@ -139,6 +139,22 @@ tasks:
 
   image:build:
     desc: "Build the component image (skipped when the tree is clean and it is already built)"
+    # Two complementary status guards: exactly one of the pair runs, so a skip
+    # says so out loud instead of leaving a silent gap in the deploy log.
+    cmds:
+      - task: image:build:_do
+      - task: image:build:_skipped
+
+  image:build:_skipped:
+    internal: true
+    status:
+      - "! test -z '{{._DIRTY}}'"
+      - "! docker image inspect {{._IMAGE}}:{{._VERSION}} >/dev/null 2>&1"
+    cmds:
+      - echo "⚠ {{._SVC}} · image · {{._VERSION}} already built — skipping"
+
+  image:build:_do:
+    internal: true
     deps: [info]
     # Idempotency: a clean tree yields a deterministic version, so an image
     # already in the local store IS the image this commit builds. A dirty tree
@@ -284,6 +300,19 @@ tasks:
 
   chart:push:
     desc: "Package and push the chart (skipped when that version is already published)"
+    cmds:
+      - task: chart:push:_do
+      - task: chart:push:_skipped
+
+  chart:push:_skipped:
+    internal: true
+    status:
+      - "! helm show chart {{._CHART_REPO}}/{{._CHART}} --version {{._VERSION}} {{._HELM_FLAGS}} >/dev/null 2>&1"
+    cmds:
+      - echo "⚠ {{._SVC}} · chart · {{._VERSION}} already in the registry — skipping"
+
+  chart:push:_do:
+    internal: true
     # Idempotency: the registry is the source of truth. A version already there
     # is the desired end state, so repeating `task deploy` on an unchanged
     # commit costs one lookup and changes nothing.
@@ -327,7 +356,21 @@ tasks:
   k8s:restart:
     desc: "Roll the deployment (no-op when the namespace or deployment is absent)"
     # Skipped rather than failed when there is nothing to roll: this task sits
-    # in chains that must stay green on a laptop with no cluster running.
+    # in chains that must stay green on a laptop with no cluster running — and
+    # it says which of the two happened.
+    cmds:
+      - task: k8s:restart:_do
+      - task: k8s:restart:_skipped
+
+  k8s:restart:_skipped:
+    internal: true
+    status:
+      - "{{._KUBECTL}} -n {{._K8S_NS}} get deploy/{{._DEPLOY}} >/dev/null 2>&1"
+    cmds:
+      - echo "⚠ {{._SVC}} · k8s · deploy/{{._DEPLOY}} not found in {{._K8S_NS}} — skipping restart"
+
+  k8s:restart:_do:
+    internal: true
     status:
       - "! {{._KUBECTL}} -n {{._K8S_NS}} get deploy/{{._DEPLOY}} >/dev/null 2>&1"
     cmds:
@@ -360,10 +403,13 @@ tasks:
       - "{{._KUBECTL}} -n {{._K8S_NS}} get pods -l app.kubernetes.io/name={{._DEPLOY}} -o wide"
 
   k8s:port-forward:
-    desc: "Port-forward the deployment (PORT=8080 by default)"
+    desc: "Port-forward the deployment (PORT local, TARGET_PORT in the pod)"
     interactive: true
     vars:
       PORT: '{{.PORT | default "8080"}}'
+      # Defaults to PORT, so a service listening on the same number needs no
+      # second knob; TEI-style containers on :80 set TARGET_PORT.
+      TARGET: '{{.TARGET_PORT | default .PORT | default "8080"}}'
     cmds:
-      - echo "▸ {{._SVC}} · k8s · localhost:{{.PORT}} → deploy/{{._DEPLOY}}"
-      - "{{._KUBECTL}} -n {{._K8S_NS}} port-forward deploy/{{._DEPLOY}} {{.PORT}}:{{.PORT}}"
+      - echo "▸ {{._SVC}} · k8s · localhost:{{.PORT}} → deploy/{{._DEPLOY}}:{{.TARGET}}"
+      - "{{._KUBECTL}} -n {{._K8S_NS}} port-forward deploy/{{._DEPLOY}} {{.PORT}}:{{.TARGET}}"

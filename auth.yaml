@@ -1,0 +1,47 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# auth.yaml — local-development credentials.
+#
+#   includes:
+#     auth:
+#       taskfile: '{{.TASKLIB}}/auth.yaml{{.TASKLIB_REF}}'
+#       dir: .
+#       vars: { JWT_ISS: acme-dev, JWT_AUD: billing-api }
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+#   JWT_SECRET        signing key         (default: an obvious dev placeholder)
+#   JWT_ALG           default HS256
+#   JWT_ISS/AUD/SUB   claims
+#   JWT_TTL_SECONDS   default 86400
+#
+# Dev only. The default secret is deliberately a self-describing placeholder:
+# a token minted here must never be accepted by anything that matters.
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+tasks:
+
+  mint-token:
+    desc: "Mint a JWT for local development (override any JWT_* var)"
+    aliases: [mint]
+    vars:
+      ALG: '{{.JWT_ALG | default "HS256"}}'
+      SECRET: '{{.JWT_SECRET | default "dev-secret-change-me-32-bytes-min"}}'
+      ISS: '{{.JWT_ISS | default "local-dev"}}'
+      AUD: '{{.JWT_AUD | default "local-api"}}'
+      SUB: '{{.JWT_SUB | default "dev-user"}}'
+      TTL: '{{.JWT_TTL_SECONDS | default "86400"}}'
+    preconditions:
+      - sh: command -v step >/dev/null
+        msg: "the smallstep CLI is not installed — brew install step"
+    cmds:
+      # The key goes in through a process substitution rather than an argument,
+      # so it never lands in the process table.
+      - >-
+        step crypto jwt sign --alg '{{.ALG}}'
+        --key <(printf '%s' '{{.SECRET}}')
+        --iss '{{.ISS}}' --aud '{{.AUD}}' --sub '{{.SUB}}'
+        --exp $(($(date +%s) + {{.TTL}}))
+        --subtle

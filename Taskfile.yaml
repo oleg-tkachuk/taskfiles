@@ -6,7 +6,7 @@ version: "3"
 silent: true
 
 vars:
-  MODULES: "service.yaml go.yaml python.yaml node.yaml compose.yaml monorepo.yaml security.yaml argocd.yaml"
+  MODULES: "service.yaml go.yaml python.yaml node.yaml compose.yaml monorepo.yaml security.yaml argocd.yaml auth.yaml"
 
 tasks:
   default:

@@ -63,6 +63,7 @@ own primitives rather than shelling out to a helper.
 | `monorepo.yaml` | `all` | run one target across every component, registry preflight |
 | `security.yaml` | `sec` | govulncheck, golangci-lint, gitleaks, trivy, buf breaking |
 | `argocd.yaml` | `argocd` | hard-refresh the apps a deploy just republished |
+| `auth.yaml` | `auth` | mint a local-dev JWT |
 
 Each file's header documents its inputs. Run `task --list-all` in a consumer
 to see the full surface.
