@@ -60,6 +60,7 @@ own primitives rather than shelling out to a helper.
 | `k8s/` | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward |
 | `go/` | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, dep bumps |
 | `python/` | `py` | poetry install/test/lint/format/typecheck/lock, dep bumps |
+| `uv/` | `py` | the same surface for uv-managed projects — swap the include line |
 | `node/` | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
 | `compose/` | `dev` | local stack up/down/reset/logs |
 | `monorepo/` | `all` | run one target across every component, registry preflight |
