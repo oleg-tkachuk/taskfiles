@@ -13,8 +13,8 @@ version: "3"
 silent: true
 
 vars:
-  TASKLIB: ../taskfiles          # sibling checkout
-  TASKLIB_REF: ""
+  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git/'
+  TASKLIB_REF: '?ref=v3.5.1'
   PROJECT_NAME: billing-api
   IMAGE_NAMESPACE: acme
   K8S_NAMESPACE: acme
@@ -33,20 +33,31 @@ tasks:
 `dir: .` is required on every include — it pins the module's commands to the
 including component's directory.
 
-### Consuming it remotely
+Task fetches the modules over git and caches them under `.task/remote/`, asking
+for confirmation the first time; in CI pass `--yes` or
+`--trusted-hosts github.com`. A private repository needs git to be able to
+reach it — `gh auth setup-git`, or an `insteadOf` rewrite carrying a token:
 
-Once this repo is pushed, switch the two vars and nothing else changes:
+```bash
+git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+```
+
+**Pin a tag.** Not a branch, or your build changes when someone else commits —
+and never a commit SHA: Task clones with `--depth 1`, and git refuses a bare
+SHA with that flag. The tag above is an example; the current one is on the
+[releases page](https://github.com/oleg-tkachuk/taskfiles/releases), and
+[CHANGELOG.md](CHANGELOG.md) says what moving to it costs.
+
+### Working on the library itself
+
+Point `TASKLIB` at a checkout beside your repository and drop the ref, so an
+edit is visible without a tag:
 
 ```yaml
 vars:
-  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git/'
-  TASKLIB_REF: '?ref=v1.1.0'
+  TASKLIB: ../taskfiles
+  TASKLIB_REF: ""
 ```
-
-Task caches the fetched files under `.task/remote/` and asks for confirmation
-the first time; in CI pass `--yes` or `--trusted-hosts github.com`. Pin a tag,
-never a branch — and never a commit SHA: Task clones with `--depth 1`, and git
-refuses a bare SHA with that flag.
 
 Only the YAML is fetched. Sibling scripts in this repo are **not** downloaded,
 which is why every module is self-contained and expresses its logic in Task's
