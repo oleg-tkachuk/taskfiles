@@ -60,12 +60,12 @@ $ task sign:keygen              # once, then commit cosign.pub only
 ⚠ billing · cosign · commit cosign.pub, keep cosign.key out of the repo
 
 $ task deploy
-✔ billing · cosign · signed registry.internal/acme/billing:1.4.0
-✔ billing · cosign · signed registry.internal/acme/charts/billing:1.4.0
-✔ billing · cosign · SBOM attested to registry.internal/acme/billing:1.4.0
+✔ billing · cosign · signed registry.example.com/acme/billing:1.4.0
+✔ billing · cosign · signed registry.example.com/acme/charts/billing:1.4.0
+✔ billing · cosign · SBOM attested to registry.example.com/acme/billing:1.4.0
 
 $ task sign:verify
-✔ billing · cosign · verified registry.internal/acme/billing:1.4.0
+✔ billing · cosign · verified registry.example.com/acme/billing:1.4.0
 ```
 
 Publishing unsigned on purpose, for one run:

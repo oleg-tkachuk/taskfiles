@@ -117,7 +117,7 @@ jobs:
             PROJECT_NAME: smoke
             IMAGE_NAMESPACE: acme
             K8S_NAMESPACE: smoke-ns
-            REGISTRY: registry.example
+            REGISTRY: registry.example.com
             VERSION_BASE: 9.9.9
           includes:
             release: { taskfile: '{{.TASKLIB}}release{{.TASKLIB_REF}}', dir: . }

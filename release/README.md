@@ -66,7 +66,7 @@ workspace — tasks then read `release:<task>`.
 vars:
   PROJECT_NAME: core-api
   IMAGE_NAMESPACE: acme
-  REGISTRY: registry.internal
+  REGISTRY: registry.example.com
   DOCKERFILE: ./deploy/Dockerfile
   HELM_FLAGS: --insecure-skip-tls-verify
 
@@ -80,7 +80,7 @@ tasks:
 ```console
 $ task deploy
 ▸ core-api · version 1.4.0 → ./deploy/info.env
-▸ core-api · image · build registry.internal/acme/core-api:1.4.0
+▸ core-api · image · build registry.example.com/acme/core-api:1.4.0
 ✔ core-api · chart · renders 10 resources cleanly
 ✔ core-api · image · pushed 1.4.0
 ✔ core-api · chart · pushed 1.4.0
