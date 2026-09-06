@@ -56,7 +56,15 @@ pre-commit:
         }
         gitleaks protect --staged --redact --verbose=true
 
-    # 3) The library's own gates: every module parses through Task, declares no
+    # 3) The workflows are the one part of this repository that runs with a
+    #    token, and two injectable expressions had already shipped in them.
+    #    Same audit CI runs, so a finding shows up here rather than on a PR.
+    - name: zizmor
+      tags: [ci, security]
+      glob: ".github/workflows/*.yml"
+      run: pipx run zizmor==1.30.0 --persona=auditor --format=plain .github/workflows/
+
+    # 4) The library's own gates: every module parses through Task, declares no
     #    var that would shadow a consumer's, runs quiet, and appears in the
     #    README table. See Taskfile.yaml for what each one is guarding against.
     - name: lint

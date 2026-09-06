@@ -153,6 +153,11 @@ registry. A dirty tree always rebuilds — it is not reproducible by definition.
 Everything runs under `silent: true`, so what you see is these lines plus
 whatever the underlying tool prints.
 
+**Workflows are audited.** `zizmor` runs over `.github/workflows/` in CI and in
+the pre-commit hook, in its `auditor` persona. Actions are pinned to commit
+SHAs with the version in a trailing comment, and Dependabot moves the pins —
+a tag is mutable, and a pin nobody updates is its own problem.
+
 **Less shell.** Guards are `preconditions` (with an explanatory `msg`),
 skips are `status`, cleanup is `defer`, iteration is `for`, and required
 inputs are `requires`. Multi-line bash blocks were the previous

@@ -1,0 +1,13 @@
+# SHA-pinned actions do not update themselves, and an action frozen at a commit
+# from a year ago is a supply-chain problem of a different shape. Dependabot
+# moves the pins and puts the version back in the trailing comment.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      # The commit-msg hook requires Conventional Commits, and Dependabot's
+      # commits go through the same history.
+      prefix: ci

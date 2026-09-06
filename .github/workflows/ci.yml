@@ -35,18 +35,39 @@ env:
   TASK_VERSION: 3.53.1
 
 jobs:
+  workflows:
+    # The workflows are the one part of this repository that runs with a token.
+    # zizmor is the linter for that: it catches an expression interpolated into
+    # a shell script, a checkout that leaves its credential behind, an action
+    # pinned to a mutable tag. Two of those had already shipped here.
+    name: workflow audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Audit the workflows
+        # pipx rather than uvx: pipx ships on the runner image, uv does not.
+        # Pinned like everything else, and --persona=auditor so this is the
+        # strict run rather than the default one.
+        run: pipx run zizmor==1.30.0 --persona=auditor --format=plain .github/workflows/
+
   lint:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Nothing here pushes with the checkout credential, so it has no
+          # reason to be left behind in .git/config.
+          persist-credentials: false
           # The modules resolve git state for their version scheme; the tags
           # are what make that resolution realistic rather than a fallback.
           fetch-depth: 0
 
       - name: Install Task
-        uses: go-task/setup-task@v2
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -62,12 +83,15 @@ jobs:
     name: consumer smoke
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Nothing here pushes with the checkout credential, so it has no
+          # reason to be left behind in .git/config.
+          persist-credentials: false
           path: taskfiles
 
       - name: Install Task
-        uses: go-task/setup-task@v2
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}

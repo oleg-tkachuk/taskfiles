@@ -17,6 +17,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # One release at a time for a given tag. Not cancel-in-progress: a publish
+  # killed halfway is worse than a second run that finds the release already
+  # created and says so.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   # Remote Taskfiles are only stable from 3.53; keep this in step with ci.yml.
   TASK_VERSION: 3.53.1
@@ -26,13 +33,16 @@ jobs:
     name: gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Nothing here pushes with the checkout credential, so it has no
+          # reason to be left behind in .git/config.
+          persist-credentials: false
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
 
       - name: Install Task
-        uses: go-task/setup-task@v2
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -83,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install Task
-        uses: go-task/setup-task@v2
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -162,10 +172,15 @@ jobs:
     needs: [gate, consumable]
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      # The only job in either workflow that needs more than read, which is why
+      # the elevation sits here rather than at the top of the file.
+      contents: write # `gh release create` writes the release and its notes
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Nothing here pushes with the checkout credential, so it has no
+          # reason to be left behind in .git/config.
+          persist-credentials: false
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
 
