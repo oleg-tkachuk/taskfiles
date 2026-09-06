@@ -16,7 +16,7 @@ workspace — tasks then read `py:<task>`.
 
 | Task | What it does |
 |---|---|
-| `format` | ruff format |
+| `fmt` | ruff format — alias `format` |
 | `install` | uv sync (skipped when the manifests are unchanged) |
 | `lint` | ruff check |
 | `lock` | Regenerate uv.lock without changing any version |

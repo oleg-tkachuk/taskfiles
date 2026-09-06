@@ -64,8 +64,11 @@ tasks:
       - uv run ruff check {{._UV_SRC}}
       - echo "✔ {{._UV_NAME}} · uv · lint clean"
 
-  format:
+  fmt:
     desc: "ruff format"
+    # `fmt` to match the Go module's verb for the same operation; `format` is
+    # what ruff calls it, so it stays as an alias.
+    aliases: [format]
     deps: [install]
     cmds:
       - uv run ruff format {{._UV_SRC}}

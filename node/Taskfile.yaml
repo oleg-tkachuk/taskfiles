@@ -20,7 +20,7 @@ silent: true
 
 vars:
   _NODE_NAME: '{{.PROJECT_NAME | default "node"}}'
-  _PM: '{{.PM | default "pnpm"}}'
+  _NODE_PM: '{{.PM | default "pnpm"}}'
 
 env:
   # Let corepack fetch the pinned package manager without the interactive
@@ -41,51 +41,51 @@ tasks:
       - node_modules/.modules.yaml
       - node_modules/.package-lock.json
     cmds:
-      - echo "▸ {{._NODE_NAME}} · node · {{._PM}} install"
+      - echo "▸ {{._NODE_NAME}} · node · {{._NODE_PM}} install"
       - >-
-        {{if .PM_INSTALL}}{{.PM_INSTALL}}{{else if eq ._PM "npm"}}npm ci{{else}}{{._PM}} install --frozen-lockfile{{end}}
+        {{if .PM_INSTALL}}{{.PM_INSTALL}}{{else if eq ._NODE_PM "npm"}}npm ci{{else}}{{._NODE_PM}} install --frozen-lockfile{{end}}
       - echo "✔ {{._NODE_NAME}} · node · dependencies installed"
 
   dev:
     desc: "Start the dev server"
     interactive: true
     cmds:
-      - echo "▸ {{._NODE_NAME}} · node · {{._PM}} run dev"
-      - "{{._PM}} run dev"
+      - echo "▸ {{._NODE_NAME}} · node · {{._NODE_PM}} run dev"
+      - "{{._NODE_PM}} run dev"
 
   build:
     desc: "Build the production bundle"
     cmds:
-      - echo "▸ {{._NODE_NAME}} · node · {{._PM}} run build"
-      - "{{._PM}} run build"
+      - echo "▸ {{._NODE_NAME}} · node · {{._NODE_PM}} run build"
+      - "{{._NODE_PM}} run build"
       - echo "✔ {{._NODE_NAME}} · node · bundle built"
 
   lint:
     desc: "Run the lint script (read-only)"
     cmds:
       - echo "▸ {{._NODE_NAME}} · node · lint"
-      - "{{._PM}} run lint"
+      - "{{._NODE_PM}} run lint"
       - echo "✔ {{._NODE_NAME}} · node · lint clean"
 
   lint:fix:
     desc: "Run the lint script with --fix"
     cmds:
-      - "{{._PM}} run lint --fix"
+      - "{{._NODE_PM}} run lint --fix"
       - echo "✔ {{._NODE_NAME}} · node · lint fixed"
 
   test:
     desc: "Run the test script"
     cmds:
       - echo "▸ {{._NODE_NAME}} · node · test"
-      - "{{._PM}} run test"
+      - "{{._NODE_PM}} run test"
       - echo "✔ {{._NODE_NAME}} · node · tests pass"
 
   test:e2e:
     desc: "Run the Playwright suite, installing chromium when it is missing"
     cmds:
       - echo "▸ {{._NODE_NAME}} · node · playwright"
-      - "{{._PM}} exec playwright install --with-deps chromium >/dev/null"
-      - "{{._PM}} run test:e2e"
+      - "{{._NODE_PM}} exec playwright install --with-deps chromium >/dev/null"
+      - "{{._NODE_PM}} run test:e2e"
       - echo "✔ {{._NODE_NAME}} · node · e2e pass"
 
   verify:
@@ -99,15 +99,15 @@ tasks:
     desc: "Run the codegen script"
     cmds:
       - echo "▸ {{._NODE_NAME}} · node · generate"
-      - "{{._PM}} run generate"
+      - "{{._NODE_PM}} run generate"
       - echo "✔ {{._NODE_NAME}} · node · generated"
 
   deps:update:
     desc: "Bump dependencies to the latest minor/patch (no majors), then reinstall"
     cmds:
       - echo "▸ {{._NODE_NAME}} · node · npm-check-updates --target minor"
-      - "{{._PM}} dlx npm-check-updates --target minor --upgrade"
-      - "{{._PM}} install"
+      - "{{._NODE_PM}} dlx npm-check-updates --target minor --upgrade"
+      - "{{._NODE_PM}} install"
       - echo "✔ {{._NODE_NAME}} · node · deps bumped — review the lockfile diff, then verify"
 
   deps:outdated:
@@ -115,4 +115,4 @@ tasks:
     cmds:
       # `pnpm outdated` exits non-zero when anything is outdated; for a report
       # that is the normal case, not a failure.
-      - "{{._PM}} outdated || true"
+      - "{{._NODE_PM}} outdated || true"

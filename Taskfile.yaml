@@ -58,31 +58,44 @@ tasks:
       - echo "  ✔ {{.MODULE}}"
 
   check:vars:
-    desc: "Refuse a module that declares a top-level var without a leading underscore"
-    # A var declared in an included Taskfile SHADOWS the including file's value
-    # of the same name — and every include shares one namespace, so it shadows
-    # it for the other modules too. A module declaring `PROJECT_NAME:` would
-    # silently override every consumer's. The convention that avoids it: read
-    # inputs inline as `{{.NAME | default "…"}}` and prefix declared vars `_`.
+    desc: "Refuse a module var that is not prefixed, or a module that uses two prefixes"
+    # Two rules, one reason. A var declared in an included Taskfile SHADOWS the
+    # including file's value of the same name, and every include shares one
+    # namespace — so a module declaring `PROJECT_NAME:` would silently override
+    # every consumer's, and two modules declaring `_IMAGE:` differently would
+    # each mean something else by it.
+    #
+    # So: read inputs inline as `{{`{{`}}.NAME | default "…"{{`}}`}}`, and give
+    # every declared var this module's own prefix — `_REL_`, `_GO_`, `_CS_`.
+    # A cross-module read (runtime and cosign read `_REL_VERSION`) is a read:
+    # the module must not declare it.
     cmds:
       - cmd: |-
           set -eu
-          bare=$(awk '
-            /^vars:/      { inv = 1; next }
-            /^[^[:space:]]/ { inv = 0 }
-            inv && /^  [A-Za-z_][A-Za-z0-9_]*:/ {
-              key = $1; sub(/:$/, "", key)
-              if (substr(key, 1, 1) != "_") print FILENAME " → " key
-            }
-          ' {{.MODULE_FILES}})
-          if [ -n "$bare" ]; then
-            echo "✖ taskfiles · these declared vars would shadow the consumer's:" >&2
-            printf '  %s\n' "$bare" >&2
-            echo "  Read the input as {{`{{`}}.NAME | default \"…\"{{`}}`}} at the use site," >&2
-            echo "  and name the derived var _NAME." >&2
-            exit 1
-          fi
-          echo "✔ taskfiles · no module shadows a consumer's vars"
+          fail=0
+          for f in {{.MODULE_FILES}}; do
+            vars=$(awk '
+              /^vars:/      { inv = 1; next }
+              /^[^[:space:]]/ { inv = 0 }
+              inv && /^  [A-Za-z_][A-Za-z0-9_]*:/ { k = $1; sub(/:$/, "", k); print k }
+            ' "$f")
+            [ -n "$vars" ] || continue
+
+            bare=$(printf '%s\n' "$vars" | grep -vE '^_[A-Z0-9]+_' || true)
+            if [ -n "$bare" ]; then
+              echo "✖ taskfiles · $f declares vars that are not <_PREFIX_>-scoped:" >&2
+              printf '    %s\n' $bare >&2
+              fail=1
+            fi
+
+            prefixes=$(printf '%s\n' "$vars" | sed -nE 's/^(_[A-Z0-9]+_).*/\1/p' | sort -u)
+            if [ "$(printf '%s\n' "$prefixes" | grep -c .)" -gt 1 ]; then
+              echo "✖ taskfiles · $f mixes prefixes: $(printf '%s ' $prefixes)" >&2
+              fail=1
+            fi
+          done
+          [ "$fail" = 0 ] && echo "✔ taskfiles · every module var is scoped to its own module"
+          exit "$fail"
 
   check:silent:
     desc: "Refuse a module that does not run quiet"

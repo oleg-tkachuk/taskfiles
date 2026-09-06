@@ -54,34 +54,34 @@ version: "3"
 silent: true
 
 vars:
-  _SVC: '{{.PROJECT_NAME | default "service"}}'
-  _CHART: '{{.CHART_NAME | default .PROJECT_NAME | default "service"}}'
+  _REL_SVC: '{{.PROJECT_NAME | default "service"}}'
+  _REL_CHART: '{{.CHART_NAME | default .PROJECT_NAME | default "service"}}'
 
   # One knob re-points everything. GLOBAL_REGISTRY (set by a monorepo root)
   # wins over a component's own REGISTRY.
-  _REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}'
-  _NS: '{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}'
-  _IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
-  _CHART_REPO: 'oci://{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/charts'
+  _REL_REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}'
+  _REL_NS: '{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}'
+  _REL_IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
+  _REL_CHART_REPO: 'oci://{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/charts'
   # A registry serving a certificate strict oras clients reject — a wildcard
   # that does not cover the apex, say — needs --insecure-skip-tls-verify here.
-  _HELM_FLAGS: '{{.HELM_FLAGS | default ""}}'
+  _REL_HELM_FLAGS: '{{.HELM_FLAGS | default ""}}'
 
-  _DOCKERFILE: '{{.DOCKERFILE | default "./Dockerfile"}}'
-  _CONTEXT: '{{.DOCKER_CONTEXT | default "."}}'
-  _BUILD_FLAGS: '{{.DOCKER_BUILD_FLAGS | default ""}}'
+  _REL_DOCKERFILE: '{{.DOCKERFILE | default "./Dockerfile"}}'
+  _REL_CONTEXT: '{{.DOCKER_CONTEXT | default "."}}'
+  _REL_BUILD_FLAGS: '{{.DOCKER_BUILD_FLAGS | default ""}}'
   # A named builder keeps a cache `docker builder prune` does not touch. Unset
   # means the active builder, which is right for anyone who has not named one.
-  _BUILDER: '{{.BUILDX_BUILDER | default ""}}'
-  _KEEP: '{{.BUILDX_KEEP_STORAGE | default "8GB"}}'
+  _REL_BUILDER: '{{.BUILDX_BUILDER | default ""}}'
+  _REL_KEEP: '{{.BUILDX_KEEP_STORAGE | default "8GB"}}'
 
-  _CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
-  _MIN_RES: '{{.CHART_MIN_RESOURCES | default "1"}}'
-  _RENDER: '{{.RENDER_OUT | default ".task/render.yaml"}}'
+  _REL_CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
+  _REL_MIN_RES: '{{.CHART_MIN_RESOURCES | default "1"}}'
+  _REL_RENDER: '{{.RENDER_OUT | default ".task/render.yaml"}}'
 
-  _K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
+  _REL_K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
 
-  _INFO_ENV: '{{.INFO_ENV_FILE | default "./deploy/info.env"}}'
+  _REL_INFO_ENV: '{{.INFO_ENV_FILE | default "./deploy/info.env"}}'
 
   # ─── version derivation ────────────────────────────────────────────────────
   # One scheme for every repo, always SemVer-2 (Helm OCI rejects anything else):
@@ -105,30 +105,30 @@ vars:
   # short sha with a leading zero is an invalid SemVer numeric identifier
   # ("MUST NOT include leading zeroes") and Helm rejects the chart version.
   #
-  _SHA:
+  _REL_SHA:
     sh: git rev-parse --short=8 HEAD 2>/dev/null || echo 00000000
-  _CTS:
+  _REL_CTS:
     sh: git show -s --format=%ct HEAD 2>/dev/null || echo 0
   # VERSION_TAG_EXCLUDE keeps a tag namespace out of the version: a repo that
   # tags its proto contract `api/vN` must not let those restamp an image, and
   # the `/` in them is invalid in a Docker tag anyway.
-  _TAG:
+  _REL_TAG:
     sh: >-
       git describe --tags --exact-match
       {{if .VERSION_TAG_EXCLUDE}}--exclude '{{.VERSION_TAG_EXCLUDE}}'{{end}}
       HEAD 2>/dev/null | sed 's/^v//' || true
-  _DIRTY:
+  _REL_DIRTY:
     sh: git status --porcelain 2>/dev/null | head -c1
-  _NOW:
+  _REL_NOW:
     sh: date +%s
-  _VERSION: >-
+  _REL_VERSION: >-
     {{- if .APP_VERSION -}}{{.APP_VERSION}}
-    {{- else if and ._TAG (not ._DIRTY) -}}{{._TAG}}
+    {{- else if and ._REL_TAG (not ._REL_DIRTY) -}}{{._REL_TAG}}
     {{- else -}}
-    {{- ._TAG | default .VERSION_BASE | default "0.1.0"}}-dev.{{._CTS}}.g{{._SHA}}
-    {{- if ._DIRTY}}.dirty.{{._NOW}}{{end}}
+    {{- ._REL_TAG | default .VERSION_BASE | default "0.1.0"}}-dev.{{._REL_CTS}}.g{{._REL_SHA}}
+    {{- if ._REL_DIRTY}}.dirty.{{._REL_NOW}}{{end}}
     {{- end -}}
-  _BUILD_TIME:
+  _REL_BUILD_TIME:
     sh: TZ='{{.TIMEZONE | default "UTC"}}' date +%Y-%m-%dT%H:%M:%S%z
 
 tasks:
@@ -136,17 +136,17 @@ tasks:
   version:
     desc: "Print the version this working tree publishes as"
     cmds:
-      - echo "{{._VERSION}}"
+      - echo "{{._REL_VERSION}}"
 
   metadata:
     desc: "Write APP_VERSION / GIT_COMMIT_HASH / BUILD_TIME into the deploy info file"
     aliases: [info]
     cmds:
-      - mkdir -p {{dir ._INFO_ENV}}
+      - mkdir -p {{dir ._REL_INFO_ENV}}
       - >-
         printf 'APP_VERSION=%s\nGIT_COMMIT_HASH=%s\nBUILD_TIME=%s\n'
-        '{{._VERSION}}' '{{._SHA}}' '{{._BUILD_TIME}}' > {{._INFO_ENV}}
-      - echo "▸ {{._SVC}} · version {{._VERSION}} → {{._INFO_ENV}}"
+        '{{._REL_VERSION}}' '{{._REL_SHA}}' '{{._REL_BUILD_TIME}}' > {{._REL_INFO_ENV}}
+      - echo "▸ {{._REL_SVC}} · version · {{._REL_VERSION}} → {{._REL_INFO_ENV}}"
 
   # ═══ container image ════════════════════════════════════════════════════════
 
@@ -161,10 +161,10 @@ tasks:
   image:build:_skipped:
     internal: true
     status:
-      - "! test -z '{{._DIRTY}}'"
-      - "! docker image inspect {{._IMAGE}}:{{._VERSION}} >/dev/null 2>&1"
+      - "! test -z '{{._REL_DIRTY}}'"
+      - "! docker image inspect {{._REL_IMAGE}}:{{._REL_VERSION}} >/dev/null 2>&1"
     cmds:
-      - echo "⚠ {{._SVC}} · image · {{._VERSION}} already built — skipping"
+      - echo "⚠ {{._REL_SVC}} · image · {{._REL_VERSION}} already built — skipping"
 
   image:build:_do:
     internal: true
@@ -174,38 +174,38 @@ tasks:
     # never matches — its version carries a fresh timestamp — so local
     # iteration always rebuilds.
     status:
-      - test -z '{{._DIRTY}}'
-      - docker image inspect {{._IMAGE}}:{{._VERSION}} >/dev/null 2>&1
+      - test -z '{{._REL_DIRTY}}'
+      - docker image inspect {{._REL_IMAGE}}:{{._REL_VERSION}} >/dev/null 2>&1
     preconditions:
       - sh: command -v docker >/dev/null
         msg: "docker is not installed"
-      - sh: test -f {{._DOCKERFILE}}
-        msg: "{{._DOCKERFILE}} not found — set DOCKERFILE"
+      - sh: test -f {{._REL_DOCKERFILE}}
+        msg: "{{._REL_DOCKERFILE}} not found — set DOCKERFILE"
     cmds:
-      - echo "▸ {{._SVC}} · image · build {{._IMAGE}}:{{._VERSION}}"
+      - echo "▸ {{._REL_SVC}} · image · build {{._REL_IMAGE}}:{{._REL_VERSION}}"
       # --load is required under the docker-container buildx driver: without it
       # the result stays in the build cache and the next push fails with "tag
       # does not exist". Harmless no-op under the plain docker driver.
       - >-
         docker buildx build --load
-        --file {{._DOCKERFILE}}
-        --tag {{._IMAGE}}:{{._VERSION}}
-        --build-arg APP_VERSION={{._VERSION}}
-        --build-arg GIT_COMMIT_HASH={{._SHA}}
-        --build-arg BUILD_TIME={{._BUILD_TIME}}
-        {{._BUILD_FLAGS}} {{._CONTEXT}}
-      - echo "✔ {{._SVC}} · image · built {{._VERSION}}"
+        --file {{._REL_DOCKERFILE}}
+        --tag {{._REL_IMAGE}}:{{._REL_VERSION}}
+        --build-arg APP_VERSION={{._REL_VERSION}}
+        --build-arg GIT_COMMIT_HASH={{._REL_SHA}}
+        --build-arg BUILD_TIME={{._REL_BUILD_TIME}}
+        {{._REL_BUILD_FLAGS}} {{._REL_CONTEXT}}
+      - echo "✔ {{._REL_SVC}} · image · built {{._REL_VERSION}}"
 
   image:push:
     desc: "Push the component image to the registry"
     deps: [image:build]
     preconditions:
-      - sh: docker image inspect {{._IMAGE}}:{{._VERSION}} >/dev/null 2>&1
-        msg: "{{._IMAGE}}:{{._VERSION}} is not in the local image store — run `task svc:image:build`"
+      - sh: docker image inspect {{._REL_IMAGE}}:{{._REL_VERSION}} >/dev/null 2>&1
+        msg: "{{._REL_IMAGE}}:{{._REL_VERSION}} is not in the local image store — run `task svc:image:build`"
     cmds:
-      - echo "▸ {{._SVC}} · image · push {{._IMAGE}}:{{._VERSION}}"
-      - docker push {{._IMAGE}}:{{._VERSION}}
-      - echo "✔ {{._SVC}} · image · pushed {{._VERSION}}"
+      - echo "▸ {{._REL_SVC}} · image · push {{._REL_IMAGE}}:{{._REL_VERSION}}"
+      - docker push {{._REL_IMAGE}}:{{._REL_VERSION}}
+      - echo "✔ {{._REL_SVC}} · image · pushed {{._REL_VERSION}}"
 
   image:gc:
     desc: "Trim the BuildKit cache to the keep floor and drop dangling images"
@@ -214,10 +214,10 @@ tasks:
       # survives; this just stops per-session growth from filling the disk.
       # Falls back to the active builder when the named one is not there.
       - >-
-        docker buildx prune {{if ._BUILDER}}--builder {{._BUILDER}} {{end}}--keep-storage={{._KEEP}} -f >/dev/null 2>&1 ||
-        docker buildx prune --keep-storage={{._KEEP}} -f >/dev/null 2>&1 || true
+        docker buildx prune {{if ._REL_BUILDER}}--builder {{._REL_BUILDER}} {{end}}--keep-storage={{._REL_KEEP}} -f >/dev/null 2>&1 ||
+        docker buildx prune --keep-storage={{._REL_KEEP}} -f >/dev/null 2>&1 || true
       - docker image prune -f >/dev/null 2>&1 || true
-      - echo "✔ {{._SVC}} · image · build cache trimmed to {{._KEEP}}"
+      - echo "✔ {{._REL_SVC}} · image · build cache trimmed to {{._REL_KEEP}}"
 
   # ═══ helm chart ═════════════════════════════════════════════════════════════
 
@@ -232,10 +232,10 @@ tasks:
     preconditions:
       - sh: command -v helm >/dev/null
         msg: "helm is not installed"
-      - sh: test -f {{._CHART_DIR}}/Chart.yaml
-        msg: "{{._CHART_DIR}}/Chart.yaml not found — set CHART_DIR"
+      - sh: test -f {{._REL_CHART_DIR}}/Chart.yaml
+        msg: "{{._REL_CHART_DIR}}/Chart.yaml not found — set CHART_DIR"
     cmds:
-      - helm lint {{._CHART_DIR}}
+      - helm lint {{._REL_CHART_DIR}}
 
   chart:render:
     desc: "Render the chart and fail on glued separators, unparseable YAML, or a resource drop"
@@ -247,27 +247,27 @@ tasks:
     # wedged for hours before anyone found it. Seconds to check, hours to find.
     deps: [chart:render:_write]
     preconditions:
-      - sh: '! grep -qE "[^[:space:]]---" {{._RENDER}}'
+      - sh: '! grep -qE "[^[:space:]]---" {{._REL_RENDER}}'
         msg: |-
           broken multi-doc YAML separator in the rendered chart.
           A `---` is glued to the end of the previous line, so kubectl and ArgoCD
           drop every resource after the first one.
           Fix: leave a literal blank line before `---` in the offending template
           and drop the trailing whitespace-strip on the line above it.
-          Offenders: grep -nE '[^[:space:]]---' {{._RENDER}}
-      - sh: test "$(grep -c '^kind:' {{._RENDER}})" -ge {{._MIN_RES}}
+          Offenders: grep -nE '[^[:space:]]---' {{._REL_RENDER}}
+      - sh: test "$(grep -c '^kind:' {{._REL_RENDER}})" -ge {{._REL_MIN_RES}}
         msg: |-
-          the chart rendered fewer than {{._MIN_RES}} resources.
+          the chart rendered fewer than {{._REL_MIN_RES}} resources.
           That is the signature of documents being dropped by a separator bug
-          the pattern check did not catch. Inspect {{._RENDER}}.
+          the pattern check did not catch. Inspect {{._REL_RENDER}}.
     cmds:
       # yq is optional: the separator gate above already catches the bug this
       # file was written for, and a missing tool should not turn a checkout red.
       - >-
-        command -v yq >/dev/null 2>&1 && yq ea '.' {{._RENDER}} >/dev/null ||
-        echo "⚠ {{._SVC}} · chart · yq absent, YAML parse gate skipped"
-      - echo "✔ {{._SVC}} · chart · renders $(grep -c '^kind:' {{._RENDER}}) resources cleanly"
-      - rm -f {{._RENDER}}
+        command -v yq >/dev/null 2>&1 && yq ea '.' {{._REL_RENDER}} >/dev/null ||
+        echo "⚠ {{._REL_SVC}} · chart · yq absent, YAML parse gate skipped"
+      - echo "✔ {{._REL_SVC}} · chart · renders $(grep -c '^kind:' {{._REL_RENDER}}) resources cleanly"
+      - rm -f {{._REL_RENDER}}
 
   chart:render:_write:
     internal: true
@@ -275,21 +275,21 @@ tasks:
       - sh: command -v helm >/dev/null
         msg: "helm is not installed"
     cmds:
-      - mkdir -p {{dir ._RENDER}}
-      - helm template {{._SVC}} {{._CHART_DIR}} --namespace {{._K8S_NS}} > {{._RENDER}}
+      - mkdir -p {{dir ._REL_RENDER}}
+      - helm template {{._REL_SVC}} {{._REL_CHART_DIR}} --namespace {{._REL_K8S_NS}} > {{._REL_RENDER}}
 
   chart:package:
     desc: "helm package the chart at the derived version"
     preconditions:
-      - sh: test -f {{._CHART_DIR}}/Chart.yaml
-        msg: "{{._CHART_DIR}}/Chart.yaml not found — set CHART_DIR"
+      - sh: test -f {{._REL_CHART_DIR}}/Chart.yaml
+        msg: "{{._REL_CHART_DIR}}/Chart.yaml not found — set CHART_DIR"
     generates:
-      - "{{._CHART}}-{{._VERSION}}.tgz"
+      - "{{._REL_CHART}}-{{._REL_VERSION}}.tgz"
     cmds:
       - >-
-        helm package {{._CHART_DIR}} --version {{._VERSION}}
-        --app-version {{.CHART_APP_VERSION | default ._VERSION}} >/dev/null
-      - echo "▸ {{._SVC}} · chart · packaged {{._CHART}}-{{._VERSION}}.tgz"
+        helm package {{._REL_CHART_DIR}} --version {{._REL_VERSION}}
+        --app-version {{.CHART_APP_VERSION | default ._REL_VERSION}} >/dev/null
+      - echo "▸ {{._REL_SVC}} · chart · packaged {{._REL_CHART}}-{{._REL_VERSION}}.tgz"
 
   chart:push:
     desc: "Package and push the chart (skipped when that version is already published)"
@@ -300,9 +300,9 @@ tasks:
   chart:push:_skipped:
     internal: true
     status:
-      - "! helm show chart {{._CHART_REPO}}/{{._CHART}} --version {{._VERSION}} {{._HELM_FLAGS}} >/dev/null 2>&1"
+      - "! helm show chart {{._REL_CHART_REPO}}/{{._REL_CHART}} --version {{._REL_VERSION}} {{._REL_HELM_FLAGS}} >/dev/null 2>&1"
     cmds:
-      - echo "⚠ {{._SVC}} · chart · {{._VERSION}} already in the registry — skipping"
+      - echo "⚠ {{._REL_SVC}} · chart · {{._REL_VERSION}} already in the registry — skipping"
 
   chart:push:_do:
     internal: true
@@ -310,20 +310,20 @@ tasks:
     # is the desired end state, so repeating `task deploy` on an unchanged
     # commit costs one lookup and changes nothing.
     status:
-      - helm show chart {{._CHART_REPO}}/{{._CHART}} --version {{._VERSION}} {{._HELM_FLAGS}} >/dev/null 2>&1
+      - helm show chart {{._REL_CHART_REPO}}/{{._REL_CHART}} --version {{._REL_VERSION}} {{._REL_HELM_FLAGS}} >/dev/null 2>&1
     cmds:
       - task: chart:package
       # Runs whether the push succeeds or fails — a stray .tgz in the component
       # directory is how the next `helm package` picks up the wrong file.
-      - defer: rm -f {{._CHART}}-{{._VERSION}}.tgz
-      - echo "▸ {{._SVC}} · chart · push {{._CHART}}:{{._VERSION}} → {{._CHART_REPO}}"
-      - helm push {{._CHART}}-{{._VERSION}}.tgz {{._CHART_REPO}} {{._HELM_FLAGS}} >/dev/null
-      - echo "✔ {{._SVC}} · chart · pushed {{._VERSION}}"
+      - defer: rm -f {{._REL_CHART}}-{{._REL_VERSION}}.tgz
+      - echo "▸ {{._REL_SVC}} · chart · push {{._REL_CHART}}:{{._REL_VERSION}} → {{._REL_CHART_REPO}}"
+      - helm push {{._REL_CHART}}-{{._REL_VERSION}}.tgz {{._REL_CHART_REPO}} {{._REL_HELM_FLAGS}} >/dev/null
+      - echo "✔ {{._REL_SVC}} · chart · pushed {{._REL_VERSION}}"
 
   chart:clean:
     desc: "Remove packaged chart tarballs from the component directory"
     cmds:
-      - rm -f {{._CHART}}-*.tgz
+      - rm -f {{._REL_CHART}}-*.tgz
 
   # ═══ release ════════════════════════════════════════════════════════════════
 
@@ -335,11 +335,11 @@ tasks:
       - task: chart:verify
       - task: image:push
       - task: chart:push
-      - echo "✔ {{._SVC}} · deployed {{._VERSION}} → {{._REG}}"
+      - echo "✔ {{._REL_SVC}} · deploy · {{._REL_VERSION}} → {{._REL_REG}}"
 
   deploy:chart-only:
     desc: "Publish the chart alone — for components running an upstream image"
     cmds:
       - task: chart:verify
       - task: chart:push
-      - echo "✔ {{._SVC}} · chart {{._VERSION}} → {{._CHART_REPO}}"
+      - echo "✔ {{._REL_SVC}} · deploy · chart {{._REL_VERSION}} → {{._REL_CHART_REPO}}"

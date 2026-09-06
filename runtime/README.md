@@ -45,7 +45,7 @@ The same vars `release` reads — `PROJECT_NAME`, `REGISTRY`, `IMAGE_NAMESPACE`,
 | `HELM_UPGRADE_FLAGS` | — | extra flags for `install` |
 | `KIND_CLUSTER` / `K3D_CLUSTER` | — | when the cluster is not the default one |
 
-## Example
+## Examples
 
 ```yaml
 vars:

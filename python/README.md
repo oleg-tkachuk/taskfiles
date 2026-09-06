@@ -16,7 +16,7 @@ workspace — tasks then read `py:<task>`.
 
 | Task | What it does |
 |---|---|
-| `format` | ruff format |
+| `fmt` | ruff format — alias `format` |
 | `install` | poetry install (skipped when pyproject and the lockfile are unchanged) |
 | `lint` | ruff check |
 | `lock` | Regenerate poetry.lock |

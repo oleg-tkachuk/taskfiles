@@ -109,8 +109,27 @@ to see the full surface.
 **Variable scoping.** A var declared in an included file *shadows* the
 including file's value of the same name, and all included files share one
 namespace. So no module here declares a bare knob name: every input is read
-inline as `{{.NAME | default …}}` and every derived value is prefixed with `_`
-(`_IMAGE`, `_VERSION`, `_PKG`). Consumers own the plain names.
+inline as `{{.NAME | default …}}`, and every derived value carries its module's
+prefix — `_REL_IMAGE`, `_GO_PKG`, `_CS_KEY`, `_RT_CTX`. Consumers own the plain
+names, and two modules can never mean different things by the same one.
+
+Two derived values cross a module boundary on purpose: `runtime/*` and `cosign`
+read `_REL_VERSION` and `_REL_IMAGE` from `release`, because they act on what a
+release published. They read them — they must never declare them, or they would
+shadow the very values they are supposed to act on.
+
+**Task naming.** Public tasks are the plain verb for the work (`build`, `test`,
+`deploy`, `restart`) namespaced by area when a module has several (`chart:push`,
+`image:build`, `deps:update`). Internal helpers are `internal: true` and named
+`_verb` when they stand alone, or `parent:_variant` when they are one branch of
+a public task — the complementary `image:build:_do` / `image:build:_skipped`
+pair, for instance, where exactly one of the two runs.
+
+**Logging.** Component-scoped modules print `<marker> <component> · <area> ·
+<what happened>`; repo-scoped ones (`security`, `monorepo`, `argocd`) print
+`<marker> <module> · <what happened>`, because there is no one component to
+name. The markers are `▸` starting work, `✔` done, `⚠` skipped on purpose, `✖`
+failed.
 
 **Versioning.** One scheme, in `service.yaml`:
 
@@ -131,10 +150,8 @@ the image build is skipped when a clean tree's image is already in the local
 store, and the chart push is skipped when that version is already in the
 registry. A dirty tree always rebuilds — it is not reproducible by definition.
 
-**Logging.** `▸` starting work, `✔` done, `⚠` skipped something on purpose,
-each line prefixed with the component name. Everything runs under
-`silent: true`, so what you see is these lines plus whatever the underlying
-tool prints.
+Everything runs under `silent: true`, so what you see is these lines plus
+whatever the underlying tool prints.
 
 **Less shell.** Guards are `preconditions` (with an explanatory `msg`),
 skips are `status`, cleanup is `defer`, iteration is `for`, and required

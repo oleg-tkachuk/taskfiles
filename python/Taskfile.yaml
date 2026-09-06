@@ -24,10 +24,10 @@ silent: true
 
 vars:
   _PY_NAME: '{{.PROJECT_NAME | default "python"}}'
-  _PY: '{{.PY | default "python3"}}'
+  _PY_BIN: '{{.PY | default "python3"}}'
   _PY_SRC: '{{.PY_SRC | default "src"}}'
   _PY_TEST_FLAGS: '{{.PY_TEST_FLAGS | default "-q"}}'
-  _POETRY_FLAGS: '{{.POETRY_INSTALL_FLAGS | default "--no-interaction"}}'
+  _PY_INSTALL_FLAGS: '{{.POETRY_INSTALL_FLAGS | default "--no-interaction"}}'
 
 tasks:
 
@@ -41,12 +41,12 @@ tasks:
     preconditions:
       - sh: command -v poetry >/dev/null
         msg: "poetry is not installed — https://python-poetry.org/docs/#installation"
-      - sh: command -v {{._PY}} >/dev/null
-        msg: "{{._PY}} is not on PATH — install it or pass PY=<interpreter>"
+      - sh: command -v {{._PY_BIN}} >/dev/null
+        msg: "{{._PY_BIN}} is not on PATH — install it or pass PY=<interpreter>"
     cmds:
-      - echo "▸ {{._PY_NAME}} · py · poetry install ({{._PY}})"
-      - poetry env use {{._PY}} >/dev/null
-      - poetry install {{._POETRY_FLAGS}}
+      - echo "▸ {{._PY_NAME}} · py · poetry install ({{._PY_BIN}})"
+      - poetry env use {{._PY_BIN}} >/dev/null
+      - poetry install {{._PY_INSTALL_FLAGS}}
       - echo "✔ {{._PY_NAME}} · py · dependencies installed"
 
   test:
@@ -63,8 +63,11 @@ tasks:
       - poetry run ruff check {{._PY_SRC}}
       - echo "✔ {{._PY_NAME}} · py · lint clean"
 
-  format:
+  fmt:
     desc: "ruff format"
+    # `fmt` to match the Go module's verb for the same operation; `format` is
+    # what ruff calls it, so it stays as an alias.
+    aliases: [format]
     cmds:
       - poetry run ruff format {{._PY_SRC}}
       - echo "✔ {{._PY_NAME}} · py · formatted"
@@ -81,7 +84,7 @@ tasks:
   lock:
     desc: "Regenerate poetry.lock"
     cmds:
-      - poetry env use {{._PY}} >/dev/null
+      - poetry env use {{._PY_BIN}} >/dev/null
       - poetry lock
       - echo "✔ {{._PY_NAME}} · py · poetry.lock regenerated"
 

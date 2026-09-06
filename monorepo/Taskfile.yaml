@@ -15,13 +15,19 @@ version: "3"
 # it. Narrow the run by overriding COMPONENTS on the CLI:
 #
 #   task all:deploy COMPONENTS="backend"
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+#   COMPONENTS       whitespace-separated component directories
+#   TARGET           required by `each`: the task to run in each of them
+#   REGISTRY         what `registry:check` probes    (default localhost:5000)
+#   GLOBAL_REGISTRY  a monorepo-wide override; wins over REGISTRY
 # ─────────────────────────────────────────────────────────────────────────────
 
 silent: true
 
 vars:
-  _COMPONENTS: '{{.COMPONENTS | default ""}}'
-  _REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}'
+  _MONO_COMPONENTS: '{{.COMPONENTS | default ""}}'
+  _MONO_REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}'
 
 tasks:
 
@@ -30,7 +36,7 @@ tasks:
     requires:
       vars: [TARGET]
     cmds:
-      - for: { var: _COMPONENTS }
+      - for: { var: _MONO_COMPONENTS }
         task: _run
         vars: { COMPONENT: "{{.ITEM}}", TARGET: "{{.TARGET}}" }
 
@@ -62,15 +68,15 @@ tasks:
     cmds: [{ task: each, vars: { TARGET: deploy } }]
 
   registry:check:
-    desc: "Fail fast when {{._REG}} is not reachable"
+    desc: "Fail fast when {{._MONO_REG}} is not reachable"
     # A misconfigured registry should cost seconds, not a half-finished push
     # chain. 200/401/403 all mean the registry answered.
     preconditions:
       - sh: >-
-          test "$(curl -sk -o /dev/null -w '%{http_code}' https://{{._REG}}/v2/ || echo 000)" != "000"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://{{._MONO_REG}}/v2/ || echo 000)" != "000"
         msg: |-
-          {{._REG}} is not answering on :443.
+          {{._MONO_REG}} is not answering on :443.
           Bring the OCI registry up, or point the run somewhere else with
           GLOBAL_REGISTRY=<host> task …
     cmds:
-      - echo "✔ registry {{._REG}} reachable"
+      - echo "✔ registry {{._MONO_REG}} reachable"

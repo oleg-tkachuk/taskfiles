@@ -20,17 +20,16 @@ version: "3"
 
 silent: true
 
-# `_VERSION` and `_IMAGE` below come from the `release` module: every included
+# `_REL_VERSION` and `_REL_IMAGE` below come from the `release` module: every included
 # file shares one var namespace, so its derived values are readable here. Do
 # NOT shell out to `task release:version` for them — that re-loads the consumer
 # Taskfile, which re-includes this module, which asks again: an infinite fork.
 
 vars:
-  _SVC: '{{.PROJECT_NAME | default "service"}}'
-  _IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
-  _CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
-  _K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
-  _CTX: '{{.K8S_CONTEXT | default "k3d-k3s-default"}}'
+  _RT_SVC: '{{.PROJECT_NAME | default "service"}}'
+  _RT_CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
+  _RT_K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
+  _RT_CTX: '{{.K8S_CONTEXT | default "k3d-k3s-default"}}'
 
 tasks:
 
@@ -42,15 +41,15 @@ tasks:
       - sh: k3d cluster list -o json 2>/dev/null | grep -q '"name"'
         msg: "no k3d cluster exists — `k3d cluster create`"
     cmds:
-      - echo "✔ {{._SVC}} · local · k3d cluster present"
+      - echo "✔ {{._RT_SVC}} · local · k3d cluster present"
 
   image:load:
     desc: "Import the built image into the k3d cluster"
     deps: [check]
     cmds:
-      - echo "▸ {{._SVC}} · local · k3d image import {{._IMAGE}}:{{._VERSION}}"
-      - k3d image import {{._IMAGE}}:{{._VERSION}} {{if .K3D_CLUSTER}}--cluster {{.K3D_CLUSTER}}{{end}}
-      - echo "✔ {{._SVC}} · local · image inside k3d"
+      - echo "▸ {{._RT_SVC}} · local · k3d image import {{._REL_IMAGE}}:{{._REL_VERSION}}"
+      - k3d image import {{._REL_IMAGE}}:{{._REL_VERSION}} {{if .K3D_CLUSTER}}--cluster {{.K3D_CLUSTER}}{{end}}
+      - echo "✔ {{._RT_SVC}} · local · image inside k3d"
 
   install:
     desc: "helm upgrade --install from the chart directory, running the local image"
@@ -59,13 +58,13 @@ tasks:
     deps: [check]
     cmds:
       - task: image:load
-      - echo "▸ {{._SVC}} · local · helm upgrade --install into {{._CTX}}/{{._K8S_NS}}"
+      - echo "▸ {{._RT_SVC}} · local · helm upgrade --install into {{._RT_CTX}}/{{._RT_K8S_NS}}"
       - >-
-        helm upgrade --install {{._SVC}} {{._CHART_DIR}}
-        --kube-context {{._CTX}}
-        --namespace {{._K8S_NS}} --create-namespace
-        --set image.tag={{._VERSION}}
+        helm upgrade --install {{._RT_SVC}} {{._RT_CHART_DIR}}
+        --kube-context {{._RT_CTX}}
+        --namespace {{._RT_K8S_NS}} --create-namespace
+        --set image.tag={{._REL_VERSION}}
         --set image.pullPolicy=IfNotPresent
         {{.HELM_UPGRADE_FLAGS | default ""}}
         {{if .VALUES}}--values {{.VALUES}}{{end}}
-      - echo "✔ {{._SVC}} · local · {{._VERSION}} installed into {{._CTX}}"
+      - echo "✔ {{._RT_SVC}} · local · {{._REL_VERSION}} installed into {{._RT_CTX}}"

@@ -49,10 +49,12 @@ version: "3"
 silent: true
 
 vars:
+  # `_REL_IMAGE` and `_REL_VERSION` come from the release module: every included
+  # file shares one var namespace, so its derived values are readable here.
+  # Declaring them again would shadow the values this is supposed to sign.
   _CS_NAME: '{{.PROJECT_NAME | default "service"}}'
   _CS_CHART: '{{.CHART_NAME | default .PROJECT_NAME | default "service"}}'
   _CS_REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}'
-  _CS_IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
   _CS_CHART_REF: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/charts/{{.CHART_NAME | default .PROJECT_NAME | default "service"}}'
 
   _CS_DIR: '{{.COSIGN_DIR | default "deploy/sigstore"}}'
@@ -68,7 +70,7 @@ vars:
   # derived version is readable here directly. Do NOT shell out to
   # `task release:version`: that re-loads the consumer Taskfile, which
   # re-includes this module, which evaluates this var again — an infinite fork.
-  _CS_VERSION: '{{._VERSION}}'
+  _CS_VERSION: '{{._REL_VERSION}}'
 
 tasks:
 
@@ -113,7 +115,7 @@ tasks:
       - test '{{._CS_ON}}' = '0'
     cmds:
       - task: _sign
-        vars: { REF: "{{._CS_IMAGE}}:{{._CS_VERSION}}" }
+        vars: { REF: "{{._REL_IMAGE}}:{{._CS_VERSION}}" }
 
   chart:
     desc: "Sign the published chart at the release version"
@@ -135,7 +137,7 @@ tasks:
       - test '{{._CS_ON}}' = '0'
     cmds:
       - task: _attest
-        vars: { REF: "{{._CS_IMAGE}}:{{._CS_VERSION}}" }
+        vars: { REF: "{{._REL_IMAGE}}:{{._CS_VERSION}}" }
 
   verify:
     desc: "Verify the signatures on the published image and chart"
@@ -153,7 +155,7 @@ tasks:
     vars:
       # A literal `for:` list is taken verbatim — templates in its items are
       # not expanded — so the refs are built here and split on whitespace.
-      REFS: "{{._CS_IMAGE}}:{{._CS_VERSION}} {{._CS_CHART_REF}}:{{._CS_VERSION}}"
+      REFS: "{{._REL_IMAGE}}:{{._CS_VERSION}} {{._CS_CHART_REF}}:{{._CS_VERSION}}"
     cmds:
       - for: { var: REFS }
         cmd: >-

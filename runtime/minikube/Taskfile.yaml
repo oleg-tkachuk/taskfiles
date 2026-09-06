@@ -20,17 +20,16 @@ version: "3"
 
 silent: true
 
-# `_VERSION` and `_IMAGE` below come from the `release` module: every included
+# `_REL_VERSION` and `_REL_IMAGE` below come from the `release` module: every included
 # file shares one var namespace, so its derived values are readable here. Do
 # NOT shell out to `task release:version` for them — that re-loads the consumer
 # Taskfile, which re-includes this module, which asks again: an infinite fork.
 
 vars:
-  _SVC: '{{.PROJECT_NAME | default "service"}}'
-  _IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
-  _CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
-  _K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
-  _CTX: '{{.K8S_CONTEXT | default "minikube"}}'
+  _RT_SVC: '{{.PROJECT_NAME | default "service"}}'
+  _RT_CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
+  _RT_K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
+  _RT_CTX: '{{.K8S_CONTEXT | default "minikube"}}'
 
 tasks:
 
@@ -42,7 +41,7 @@ tasks:
       - sh: minikube status --format '{{"{{"}}.Host{{"}}"}}' 2>/dev/null | grep -qx Running
         msg: "the minikube cluster is not running — `minikube start`"
     cmds:
-      - echo "✔ {{._SVC}} · local · minikube running"
+      - echo "✔ {{._RT_SVC}} · local · minikube running"
 
   image:load:
     desc: "Copy the built image into minikube's own image store"
@@ -51,9 +50,9 @@ tasks:
     # the build is the other way, and it leaks env into everything that follows.
     deps: [check]
     cmds:
-      - echo "▸ {{._SVC}} · local · minikube image load {{._IMAGE}}:{{._VERSION}}"
-      - minikube image load {{._IMAGE}}:{{._VERSION}}
-      - echo "✔ {{._SVC}} · local · image inside minikube"
+      - echo "▸ {{._RT_SVC}} · local · minikube image load {{._REL_IMAGE}}:{{._REL_VERSION}}"
+      - minikube image load {{._REL_IMAGE}}:{{._REL_VERSION}}
+      - echo "✔ {{._RT_SVC}} · local · image inside minikube"
 
   install:
     desc: "helm upgrade --install from the chart directory, running the local image"
@@ -62,13 +61,13 @@ tasks:
     deps: [check]
     cmds:
       - task: image:load
-      - echo "▸ {{._SVC}} · local · helm upgrade --install into {{._CTX}}/{{._K8S_NS}}"
+      - echo "▸ {{._RT_SVC}} · local · helm upgrade --install into {{._RT_CTX}}/{{._RT_K8S_NS}}"
       - >-
-        helm upgrade --install {{._SVC}} {{._CHART_DIR}}
-        --kube-context {{._CTX}}
-        --namespace {{._K8S_NS}} --create-namespace
-        --set image.tag={{._VERSION}}
+        helm upgrade --install {{._RT_SVC}} {{._RT_CHART_DIR}}
+        --kube-context {{._RT_CTX}}
+        --namespace {{._RT_K8S_NS}} --create-namespace
+        --set image.tag={{._REL_VERSION}}
         --set image.pullPolicy=IfNotPresent
         {{.HELM_UPGRADE_FLAGS | default ""}}
         {{if .VALUES}}--values {{.VALUES}}{{end}}
-      - echo "✔ {{._SVC}} · local · {{._VERSION}} installed into {{._CTX}}"
+      - echo "✔ {{._RT_SVC}} · local · {{._REL_VERSION}} installed into {{._RT_CTX}}"
