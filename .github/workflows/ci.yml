@@ -23,20 +23,16 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # The official Task image, pinned. Bumping is this one line.
+  # Pinned, not floating: remote Taskfiles are only stable from 3.53, and a
+  # silent upgrade under CI is how a green gate stops meaning what it meant.
   #
-  # It is used through `docker run` rather than as a job-level `container:`,
-  # because the image is Alpine with neither git nor Node: a container job
-  # cannot run actions/checkout (a JS action needing Node, and git to clone).
-  # The host does the checkout, the image does the Task.
-  #
-  # NOTE: hub.docker.com/r/taskfile/task last published v3.39.2 (2024-10),
-  # while Task itself is at 3.53.x. The library needs 3.53+ only for the
-  # remote-include path, which CI does not exercise — everything here loads
-  # from a local path — so the gate is sound on this image. It does mean CI
-  # runs an older Task than developers do; when upstream publishes again,
-  # bump this tag deliberately.
-  TASK_IMAGE: taskfile/task:v3.39.2-amd64
+  # Deliberately NOT the official taskfile/task image: Docker Hub last
+  # published it in 2024-10 at v3.39.2, amd64 only, so it would test an older
+  # Task than anyone runs and would never see a regression in anything added
+  # since. (It is also Alpine with neither git nor Node, so it cannot serve as
+  # a job `container:` — actions/checkout needs both.) Revisit if upstream
+  # starts publishing again.
+  TASK_VERSION: 3.53.1
 
 jobs:
   lint:
@@ -49,9 +45,14 @@ jobs:
           # are what make that resolution realistic rather than a fallback.
           fetch-depth: 0
 
+      - name: Install Task
+        uses: go-task/setup-task@v2
+        with:
+          version: ${{ env.TASK_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Lint
-        # The image's entrypoint is `task`, so the argument is the task name.
-        run: docker run --rm -v "$PWD":/w -w /w "$TASK_IMAGE" lint
+        run: task lint
 
   consumer-smoke:
     # A consumer is the only thing that exercises the modules the way they are
@@ -65,9 +66,13 @@ jobs:
         with:
           path: taskfiles
 
+      - name: Install Task
+        uses: go-task/setup-task@v2
+        with:
+          version: ${{ env.TASK_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build a consumer against the library
-        # The consumer's git repo is created on the host, which has git; the
-        # image only runs Task against it.
         run: |
           set -euo pipefail
           mkdir -p consumer && cd consumer
@@ -105,21 +110,16 @@ jobs:
         working-directory: consumer
         # This is the check that catches a module quietly claiming a name
         # another module already uses.
-        run: docker run --rm -v "$PWD/..":/w -w /w/consumer "$TASK_IMAGE" --list-all > /dev/null
+        run: task --list-all > /dev/null
 
       - name: Prove the consumer's vars reach the modules
         working-directory: consumer
         # The scoping rule the whole library is built around: a var declared in
         # a module would shadow this. VERSION_BASE is the cheapest observable
-        # proof that it does not. git is installed into the image for this step
-        # so the version derivation runs for real rather than on its fallbacks.
+        # proof that it does not.
         run: |
           set -euo pipefail
-          version=$(docker run --rm -v "$PWD/..":/w -w /w/consumer --entrypoint sh "$TASK_IMAGE" -c '
-            apk add --no-cache git >/dev/null 2>&1
-            git config --global --add safe.directory /w/consumer
-            task svc:version
-          ')
+          version=$(task svc:version)
           case "$version" in
             9.9.9-dev.*) echo "✔ consumer vars reach the modules ($version)" ;;
             *) echo "✖ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
