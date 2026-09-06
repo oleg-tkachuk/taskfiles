@@ -1,13 +1,14 @@
 # lefthook.yml
 # Git hooks for the shared Task library.
 #
-# These modules are consumed by including them, so the two ways a change breaks
-# a consumer are a module that no longer parses and an invariant that only
-# shows up as wrong behaviour at the call site. Both are seconds to check here
-# and painful to debug wherever the module ends up.
-#
-# The checks themselves live in Taskfile.yaml (`task lint`), so the hooks and
-# the CI workflow run the same code — a rule is written down once.
+# The shape is the same in every repository here: cheap, staged-scoped checks
+# on commit; anything slow, Docker-shaped or repo-wide on push; the commit
+# message gate last. Bypass in an emergency with `git commit -n`, then fix
+# what it would have caught.
+
+# Fail loudly when the hooks are not actually installed, rather than passing
+# every commit silently because nobody ran `lefthook install`.
+assert_lefthook_installed: true
 
 # lefthook 2.x styles output through charm's colorprofile, which probes the
 # terminal (OSC 11 + DA) for color support; on capable terminals that probe's
@@ -28,24 +29,32 @@ pre-commit:
   # find out which one spoke. Everything here is sub-second.
   parallel: false
   jobs:
-    # 1) Block real compiled binaries.
+    # Compiled artefacts do not belong in the history: they bloat every clone
+    # forever and no review can read them.
     - name: forbid-binaries
       tags: [security, hygiene]
-      glob: "*"
       run: |
         set -euo pipefail
         for f in {staged_files}; do
           [ -f "$f" ] || continue
           if file -b "$f" | grep -qE '(^| )ELF( |$)|(^| )Mach-O( |$)'; then
-            echo "ERROR: compiled binary detected: $f"
+            echo "ERROR: compiled binary detected: $f" >&2
             exit 1
           fi
         done
 
-    # 2) Prevent committing secrets.
+    # A secret reaches the remote once and is burned; catching it here is the
+    # only cheap moment. A scan that skips itself when the tool is missing is
+    # not a scan, so this says what to install instead of waving the commit on.
     - name: gitleaks
       tags: [security]
-      run: gitleaks protect --staged --redact --verbose=true
+      run: |
+        set -euo pipefail
+        command -v gitleaks >/dev/null 2>&1 || {
+          echo "ERROR: gitleaks is not installed — brew install gitleaks" >&2
+          exit 1
+        }
+        gitleaks protect --staged --redact --verbose=true
 
     # 3) The library's own gates: every module parses through Task, declares no
     #    var that would shadow a consumer's, runs quiet, and appears in the
