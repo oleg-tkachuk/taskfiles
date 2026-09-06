@@ -49,18 +49,19 @@ First release.
 
 ### Notes for consumers
 
-- An include names the module directory and pins a tag:
+- An include names the module directory, and one variable carries the tag:
 
   ```yaml
   vars:
     TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//'
-    TASKLIB_TAG: v1.0.0
+    TASKLIB_REF: '?ref=v1.0.0'
   includes:
-    release: { taskfile: '{{.TASKLIB}}release?ref={{.TASKLIB_TAG}}', dir: . }
+    release: { taskfile: '{{.TASKLIB}}release{{.TASKLIB_REF}}', dir: . }
   ```
 
-  A checkout beside your repository drops the query:
-  `{ taskfile: '{{.TASKLIB}}/release', dir: . }`.
+  A checkout beside your repository sets `TASKLIB: ../taskfiles/` and leaves
+  `TASKLIB_REF` undefined — an undeclared variable renders as nothing, so the
+  include lines are the same either way.
 - Versions derive from the **committer** timestamp, so a clean tree publishes
   the same version on every run. That is what makes `deploy` idempotent: an
   image already built for this commit is not rebuilt, and a chart version

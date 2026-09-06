@@ -6,7 +6,7 @@ anything that matters.
 
 ```yaml
 includes:
-  auth: { taskfile: '{{.TASKLIB}}auth?ref={{.TASKLIB_TAG}}', dir: . }
+  auth: { taskfile: '{{.TASKLIB}}auth{{.TASKLIB_REF}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -33,7 +33,7 @@ workspace — tasks then read `auth:<task>`.
 ```yaml
 includes:
   auth:
-    taskfile: '{{.TASKLIB}}auth?ref={{.TASKLIB_TAG}}'
+    taskfile: '{{.TASKLIB}}auth{{.TASKLIB_REF}}'
     dir: .
     vars: { JWT_ISS: acme-dev, JWT_AUD: core-api }
 ```

@@ -4,7 +4,7 @@ version: "3"
 # node — pnpm/npm front-ends.
 #
 #   includes:
-#     node: { taskfile: '{{.TASKLIB}}node?ref={{.TASKLIB_TAG}}', dir: . }
+#     node: { taskfile: '{{.TASKLIB}}node{{.TASKLIB_REF}}', dir: . }
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   PROJECT_NAME   label in log lines

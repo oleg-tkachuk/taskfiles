@@ -6,7 +6,7 @@ previous version until the next poll fires — the deploy looks done and is not.
 
 ```yaml
 includes:
-  argocd: { taskfile: '{{.TASKLIB}}argocd?ref={{.TASKLIB_TAG}}', dir: . }
+  argocd: { taskfile: '{{.TASKLIB}}argocd{{.TASKLIB_REF}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -32,7 +32,7 @@ workspace — tasks then read `argocd:<task>`.
 
 ```yaml
 includes:
-  argocd: { taskfile: '{{.TASKLIB}}argocd?ref={{.TASKLIB_TAG}}', dir: . }
+  argocd: { taskfile: '{{.TASKLIB}}argocd{{.TASKLIB_REF}}', dir: . }
 
 tasks:
   deploy:sync:

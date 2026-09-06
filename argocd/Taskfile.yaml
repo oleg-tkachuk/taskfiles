@@ -6,7 +6,7 @@ version: "3"
 #
 #   includes:
 #     argocd:
-#       taskfile: '{{.TASKLIB}}argocd?ref={{.TASKLIB_TAG}}'
+#       taskfile: '{{.TASKLIB}}argocd{{.TASKLIB_REF}}'
 #       dir: .
 #       vars: { APP_PREFIX: "svc-" }
 #

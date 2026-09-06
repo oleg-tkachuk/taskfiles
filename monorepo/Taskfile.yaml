@@ -5,7 +5,7 @@ version: "3"
 #
 #   includes:
 #     all:
-#       taskfile: '{{.TASKLIB}}monorepo?ref={{.TASKLIB_TAG}}'
+#       taskfile: '{{.TASKLIB}}monorepo{{.TASKLIB_REF}}'
 #       dir: .
 #       vars: { COMPONENTS: "backend frontend workers/api" }
 #

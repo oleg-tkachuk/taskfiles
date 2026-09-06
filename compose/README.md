@@ -5,7 +5,7 @@ for health checks, so a task chained after it does not race the seeding.
 
 ```yaml
 includes:
-  dev: { taskfile: '{{.TASKLIB}}compose?ref={{.TASKLIB_TAG}}', dir: . }
+  dev: { taskfile: '{{.TASKLIB}}compose{{.TASKLIB_REF}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -37,7 +37,7 @@ workspace — tasks then read `dev:<task>`.
 ```yaml
 includes:
   dev:
-    taskfile: '{{.TASKLIB}}compose?ref={{.TASKLIB_TAG}}'
+    taskfile: '{{.TASKLIB}}compose{{.TASKLIB_REF}}'
     dir: .
     vars: { COMPOSE_FILE: docker-compose.dev.yaml, PROJECT_NAME: acme }
 ```

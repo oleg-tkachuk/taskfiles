@@ -110,24 +110,24 @@ jobs:
           version: "3"
           silent: true
           vars:
-            TASKLIB: ../taskfiles
+            TASKLIB: ../taskfiles/
             PROJECT_NAME: smoke
             IMAGE_NAMESPACE: acme
             K8S_NAMESPACE: smoke-ns
             REGISTRY: registry.example
             VERSION_BASE: 9.9.9
           includes:
-            release: { taskfile: '{{.TASKLIB}}/release', dir: . }
-            k8s:  { taskfile: '{{.TASKLIB}}/k8s', dir: . }
-            go:   { taskfile: '{{.TASKLIB}}/go', dir: . }
-            py:   { taskfile: '{{.TASKLIB}}/python', dir: . }
-            node: { taskfile: '{{.TASKLIB}}/node', dir: . }
-            dev:  { taskfile: '{{.TASKLIB}}/compose', dir: . }
-            sec:  { taskfile: '{{.TASKLIB}}/security', dir: . }
-            all:  { taskfile: '{{.TASKLIB}}/monorepo', dir: . }
-            argocd: { taskfile: '{{.TASKLIB}}/argocd', dir: . }
-            auth: { taskfile: '{{.TASKLIB}}/auth', dir: . }
-            local: { taskfile: '{{.TASKLIB}}/runtime/orbstack', dir: . }
+            release: { taskfile: '{{.TASKLIB}}release{{.TASKLIB_REF}}', dir: . }
+            k8s:  { taskfile: '{{.TASKLIB}}k8s{{.TASKLIB_REF}}', dir: . }
+            go:   { taskfile: '{{.TASKLIB}}go{{.TASKLIB_REF}}', dir: . }
+            py:   { taskfile: '{{.TASKLIB}}python{{.TASKLIB_REF}}', dir: . }
+            node: { taskfile: '{{.TASKLIB}}node{{.TASKLIB_REF}}', dir: . }
+            dev:  { taskfile: '{{.TASKLIB}}compose{{.TASKLIB_REF}}', dir: . }
+            sec:  { taskfile: '{{.TASKLIB}}security{{.TASKLIB_REF}}', dir: . }
+            all:  { taskfile: '{{.TASKLIB}}monorepo{{.TASKLIB_REF}}', dir: . }
+            argocd: { taskfile: '{{.TASKLIB}}argocd{{.TASKLIB_REF}}', dir: . }
+            auth: { taskfile: '{{.TASKLIB}}auth{{.TASKLIB_REF}}', dir: . }
+            local: { taskfile: '{{.TASKLIB}}runtime/orbstack{{.TASKLIB_REF}}', dir: . }
           tasks: {}
           YAML
 
