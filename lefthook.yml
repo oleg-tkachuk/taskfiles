@@ -1,0 +1,177 @@
+# lefthook.yml
+# Git hooks for the shared Task library.
+#
+# These modules are consumed by including them, so the two ways a change breaks
+# a consumer are a module that no longer parses and an invariant that only
+# shows up as wrong behaviour at the call site. Both are seconds to check here
+# and painful to debug wherever the module ends up.
+
+# lefthook 2.x styles output through charm's colorprofile, which probes the
+# terminal (OSC 11 + DA) for color support; on capable terminals that probe's
+# reply leaks into the console as garbage. Keep it on only where it behaves.
+colors: true
+
+output:
+  # Drop lefthook's own meta and summary banners; keep command output so a
+  # failure still arrives with its stderr intact.
+  - execution
+  - execution_info
+  - execution_out
+  - failure
+
+pre-commit:
+  # Serial. Parallel jobs interleave their output, so a failure arrives
+  # shredded across the other jobs' lines and you re-run them one by one to
+  # find out which one spoke. Everything here is sub-second.
+  parallel: false
+  jobs:
+    # 1) Block real compiled binaries.
+    - name: forbid-binaries
+      tags: [security, hygiene]
+      glob: "*"
+      run: |
+        set -euo pipefail
+        for f in {staged_files}; do
+          [ -f "$f" ] || continue
+          if file -b "$f" | grep -qE '(^| )ELF( |$)|(^| )Mach-O( |$)'; then
+            echo "ERROR: compiled binary detected: $f"
+            exit 1
+          fi
+        done
+
+    # 2) Prevent committing secrets.
+    - name: gitleaks
+      tags: [security]
+      run: gitleaks protect --staged --redact --verbose=true
+
+    # 3) Every module still loads in Task itself.
+    #
+    # The authoritative parse: `task -t <module> --list-all` runs Task's own
+    # loader, so it catches what a YAML parser cannot — an unknown key, a
+    # template that does not compile, a `for:` over something that is not a
+    # list. This is `task lint` in Taskfile.yaml; the hook just calls it.
+    - name: module-parse
+      tags: [task, lint]
+      glob: "*.yaml"
+      run: task lint
+
+    # 4) Modules must not declare a bare knob name.
+    #
+    # A var declared in an included Taskfile SHADOWS the including file's value
+    # of the same name, and every include shares one namespace. So a module
+    # that declares `PROJECT_NAME:` silently overrides the consumer's — and
+    # worse, overrides it for every OTHER module included alongside it. The
+    # convention that avoids it: read inputs inline as `{{.NAME | default …}}`
+    # and prefix every declared var with `_`. This is the check that keeps a
+    # future edit from reintroducing the bug.
+    - name: var-scope
+      tags: [task, lint]
+      glob: "*.yaml"
+      run: |
+        set -euo pipefail
+        command -v yq >/dev/null 2>&1 || { echo "WARN: yq not found, skipping var-scope" >&2; exit 0; }
+        fail=0
+        for f in {staged_files}; do
+          case "$f" in
+            Taskfile.yaml) continue ;;   # the repo's own dev tasks, not a module
+            *.yaml) ;;
+            *) continue ;;
+          esac
+          [ -f "$f" ] || continue
+          bare=$(yq -r '.vars // {} | keys | .[]' "$f" 2>/dev/null | grep -v '^_' || true)
+          if [ -n "$bare" ]; then
+            echo "ERROR: $f declares top-level vars without a leading underscore:" >&2
+            printf '  %s\n' $bare >&2
+            echo "       A var declared here shadows the including Taskfile's value of the" >&2
+            echo "       same name, for every module in the include set. Read the input as" >&2
+            echo "       {{.NAME | default \"…\"}} at the use site and name the derived var _NAME." >&2
+            fail=1
+          fi
+        done
+        exit "$fail"
+
+    # 5) Modules run quiet.
+    #
+    # Without `silent: true` Task echoes every command before running it, so
+    # the deliberate ▸/✔/⚠ log lines drown in a transcript of the commands that
+    # produced them. Every module declares it; a new one that forgets is caught
+    # here rather than by a consumer wondering why their output doubled.
+    - name: silent-flag
+      tags: [task, lint]
+      glob: "*.yaml"
+      run: |
+        set -euo pipefail
+        fail=0
+        for f in {staged_files}; do
+          case "$f" in *.yaml) ;; *) continue ;; esac
+          [ -f "$f" ] || continue
+          if ! grep -qE '^silent: true$' "$f"; then
+            echo "ERROR: $f does not declare 'silent: true' at file scope" >&2
+            fail=1
+          fi
+        done
+        exit "$fail"
+
+    # 6) The README's module table is the map people navigate by.
+    #
+    # A module added without a row is a module nobody finds; a row left behind
+    # after a rename sends someone to a file that is not there. Both are one
+    # line to fix and invisible until they waste somebody's afternoon.
+    - name: readme-modules
+      tags: [docs, lint]
+      glob: "{*.yaml,README.md}"
+      run: |
+        set -euo pipefail
+        fail=0
+        for f in *.yaml; do
+          [ "$f" = "Taskfile.yaml" ] && continue
+          grep -q "\`$f\`" README.md || {
+            echo "ERROR: $f has no row in the README module table" >&2
+            fail=1
+          }
+        done
+        # And the reverse: a documented module that no longer exists.
+        for f in $(grep -oE '`[a-z-]+\.yaml`' README.md | tr -d '`' | sort -u); do
+          [ "$f" = "Taskfile.yaml" ] && continue
+          [ -f "$f" ] || {
+            echo "ERROR: README documents $f, which is not in the repo" >&2
+            fail=1
+          }
+        done
+        exit "$fail"
+
+# Last gate before the change leaves the machine.
+pre-push:
+  parallel: false
+  jobs:
+    # The pre-commit parse only fires when a module is staged, so a push whose
+    # last commit touched only the README never re-checked the modules. This
+    # runs the full set unconditionally — under a second, and it is the check
+    # that decides whether what leaves here can be included at all.
+    - name: modules-load
+      tags: [task, lint]
+      run: task lint
+
+commit-msg:
+  jobs:
+    - name: conventional-commits
+      # {1} is lefthook's template for the hook's first argument — the path to
+      # the message file git is about to use. The fallback covers `lefthook run
+      # commit-msg` invoked by hand with no argument.
+      run: |
+        set -euo pipefail
+        file="{1}"
+        [ -f "$file" ] || file="$(git rev-parse --git-path COMMIT_EDITMSG 2>/dev/null || true)"
+        [ -f "$file" ] || exit 0
+
+        first_line="$(head -n1 "$file" | tr -d '\r')"
+        # Merges and reverts are generated by git, not written by a person.
+        echo "$first_line" | grep -Eq '^(Merge|Revert)\b' && exit 0
+
+        cc_re='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|security)(\([A-Za-z0-9._/-]+\))?(!)?: .+'
+        if ! echo "$first_line" | grep -Eq "$cc_re"; then
+          echo "ERROR: invalid commit message format (Conventional Commits required)." >&2
+          echo "Format: <type>(<scope>)!: <subject>" >&2
+          echo "See:    https://www.conventionalcommits.org/en/v1.0.0/" >&2
+          exit 1
+        fi
