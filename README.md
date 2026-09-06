@@ -56,19 +56,19 @@ own primitives rather than shelling out to a helper.
 
 | Module | Namespace | What it covers |
 |---|---|---|
-| `release/` | `release` | version derivation, image build/push, chart lint/render/package/push, `deploy` |
-| `k8s/` | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward |
-| `go/` | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, dep bumps |
-| `python/` | `py` | poetry install/test/lint/format/typecheck/lock, dep bumps |
-| `uv/` | `py` | the same surface for uv-managed projects — swap the include line |
-| `node/` | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
-| `compose/` | `dev` | local stack up/down/reset/logs |
-| `monorepo/` | `all` | run one target across every component, registry preflight |
-| `security/` | `sec` | govulncheck, golangci-lint, gitleaks, trivy, buf breaking |
-| `cosign/` | `sign` | sign the published image and chart, attest an SBOM, verify both |
-| `argocd/` | `argocd` | hard-refresh the apps a deploy just republished |
-| `auth/` | `auth` | mint a local-dev JWT |
-| `runtime/docker/`, `runtime/orbstack/`, `runtime/minikube/`, `runtime/kind/`, `runtime/k3d/` | `local` | run a locally built image on a local cluster, no registry |
+| [`release/`](release/README.md) | `release` | version derivation, image build/push, chart lint/render/package/push, `deploy` |
+| [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward |
+| [`go/`](go/README.md) | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, dep bumps |
+| [`python/`](python/README.md) | `py` | poetry install/test/lint/format/typecheck/lock, dep bumps |
+| [`uv/`](uv/README.md) | `py` | the same surface for uv-managed projects — swap the include line |
+| [`node/`](node/README.md) | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
+| [`compose/`](compose/README.md) | `dev` | local stack up/down/reset/logs |
+| [`monorepo/`](monorepo/README.md) | `all` | run one target across every component, registry preflight |
+| [`security/`](security/README.md) | `sec` | govulncheck, golangci-lint, gitleaks, trivy, buf breaking |
+| [`cosign/`](cosign/README.md) | `sign` | sign the published image and chart, attest an SBOM, verify both |
+| [`argocd/`](argocd/README.md) | `argocd` | hard-refresh the apps a deploy just republished |
+| [`auth/`](auth/README.md) | `auth` | mint a local-dev JWT |
+| [`runtime/*`](runtime/README.md) — docker, orbstack, minikube, kind, k3d | `local` | run a locally built image on a local cluster, no registry |
 
 ### Local clusters
 
@@ -88,8 +88,10 @@ Include one alongside `service`, not instead of it: `local:image:load` moves
 what `release:image:build` produced, and `local:install` helm-installs the
 chart from disk against it with `pullPolicy=IfNotPresent`.
 
-Each module is a directory holding a `Taskfile.yaml`; an include names the
-directory, so the layout inside a module stays the module's own business.
+Each module is a directory holding a `Taskfile.yaml` and a `README.md` — the
+table above links to them, and each one documents that module's inputs, its
+tasks and a worked example. An include names the directory, so the layout inside
+a module stays the module's own business.
 
 `release` and `k8s` are two modules rather than one for the same reason a
 publish-only CI job has no kubeconfig: neither half needs the other. Include

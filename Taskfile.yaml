@@ -14,7 +14,11 @@ vars:
   # file inside it. The split is by domain, not by file size: `release` never
   # talks to a cluster and `k8s` never publishes anything, so a repository that
   # only does one of the two includes only one of them.
-  MODULES: "release k8s go python uv node compose monorepo security cosign argocd auth
+  # Modules with their own README. The runtime/* family shares one README, so
+  # it is checked separately.
+  MODULES: "release k8s go python uv node compose monorepo security cosign argocd auth"
+  # Everything that must parse, the runtime variants included.
+  PARSE_MODULES: "release k8s go python uv node compose monorepo security cosign argocd auth
     runtime/docker runtime/orbstack runtime/minikube runtime/kind runtime/k3d"
   # Every YAML the modules are made of, for the file-level checks.
   MODULE_FILES:
@@ -42,7 +46,7 @@ tasks:
     # unknown key, a template that does not compile, a `for:` over something
     # that is not a list.
     cmds:
-      - for: { var: MODULES }
+      - for: { var: PARSE_MODULES }
         task: _parse
         vars: { MODULE: "{{.ITEM}}" }
       - echo "✔ taskfiles · every module parses"
@@ -96,21 +100,27 @@ tasks:
           exit "$fail"
 
   check:readme:
-    desc: "Refuse a module missing from the README table, or a table row with no module"
-    # The table is the map people navigate by: a module without a row is a
-    # module nobody finds, and a row left after a rename sends someone to a
-    # file that is not there.
+    desc: "Refuse a module with no README, or one the top-level README does not link"
+    # The table in README.md is the map people navigate by, and a module's own
+    # README is where they land. A module missing from either is a module nobody
+    # finds; a link to a file that is not there sends them nowhere.
     cmds:
       - cmd: |-
           set -eu
           fail=0
-          for f in {{.MODULES}}; do
-            grep -q "\`$f/\`" README.md || { echo "✖ taskfiles · $f has no row in the README module table" >&2; fail=1; }
+          for m in {{.MODULES}}; do
+            [ -f "$m/README.md" ] || { echo "✖ taskfiles · $m/ has no README.md" >&2; fail=1; }
+            grep -q "($m/README.md)" README.md || {
+              echo "✖ taskfiles · README.md does not link $m/README.md" >&2; fail=1; }
           done
-          for f in $(grep -oE '`[a-z-]+(/[a-z0-9-]+)?/`' README.md | tr -d '`' | sed 's|/$||' | sort -u); do
-            [ -d "$f" ] || { echo "✖ taskfiles · README documents $f/, which is not in the repo" >&2; fail=1; }
+          # runtime/* share one README for the family, linked as runtime/.
+          grep -q "(runtime/README.md)" README.md || {
+            echo "✖ taskfiles · README.md does not link runtime/README.md" >&2; fail=1; }
+          # And the reverse: a link to a README that is not on disk.
+          for f in $(grep -oE '\(([a-z0-9-]+/)+README\.md\)' README.md | tr -d '()' | sort -u); do
+            [ -f "$f" ] || { echo "✖ taskfiles · README.md links $f, which is not in the repo" >&2; fail=1; }
           done
-          [ "$fail" = 0 ] && echo "✔ taskfiles · README matches the modules on disk"
+          [ "$fail" = 0 ] && echo "✔ taskfiles · every module has a README and the index links it"
           exit "$fail"
 
   # ─── docs ───────────────────────────────────────────────────────────────────
@@ -118,5 +128,5 @@ tasks:
   surface:
     desc: "Print the task surface of every module — the library's public API"
     cmds:
-      - for: { var: MODULES }
+      - for: { var: PARSE_MODULES }
         cmd: printf '\n── %s\n' '{{.ITEM}}' && task -t {{.ITEM}}/Taskfile.yaml --list-all | tail -n +2
