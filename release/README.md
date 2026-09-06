@@ -157,7 +157,7 @@ stopping at the first, then exits non-zero if any of them is fatal.
 
 ```
 ✔ billing-api · doctor · version 0.1.0-dev.1788728844.g6ec96167
-✔ billing-api · doctor · chart billing-api at ./deploy/chart
+✔ billing-api · doctor · chart ./deploy/chart → oci://registry.example.com/acme/charts/billing-api
 ✔ billing-api · doctor · image registry.example.com/acme/billing-api from ./deploy/Dockerfile (context .)
 ✔ billing-api · doctor · build context proto is passed
 ✔ billing-api · doctor · registry registry.example.com answers
