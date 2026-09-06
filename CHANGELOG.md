@@ -16,28 +16,6 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
-## [2.0.0] — 2026-09-06
-
-### Changed — BREAKING
-
-- The tag is its own variable: `TASKLIB_TAG: v2.0.0` rather than a
-  `TASKLIB_REF` carrying `?ref=v2.0.0`, with the query in the include line:
-
-  ```yaml
-  vars:
-    TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//'
-    TASKLIB_TAG: v2.0.0
-  includes:
-    release: { taskfile: '{{.TASKLIB}}release?ref={{.TASKLIB_TAG}}', dir: . }
-  ```
-
-  A local checkout drops the query instead of emptying a variable:
-  `{ taskfile: '{{.TASKLIB}}/release', dir: . }`.
-
-**Migration.** Rename the variable, drop the `?ref=` from its value, and put it
-in the include line instead. The module names and every task are unchanged —
-this is the include syntax only.
-
 ## [1.0.0] — 2026-09-06
 
 First release.
@@ -71,6 +49,18 @@ First release.
 
 ### Notes for consumers
 
+- An include names the module directory and pins a tag:
+
+  ```yaml
+  vars:
+    TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//'
+    TASKLIB_TAG: v1.0.0
+  includes:
+    release: { taskfile: '{{.TASKLIB}}release?ref={{.TASKLIB_TAG}}', dir: . }
+  ```
+
+  A checkout beside your repository drops the query:
+  `{ taskfile: '{{.TASKLIB}}/release', dir: . }`.
 - Versions derive from the **committer** timestamp, so a clean tree publishes
   the same version on every run. That is what makes `deploy` idempotent: an
   image already built for this commit is not rebuilt, and a chart version
@@ -87,5 +77,4 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
-[2.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.0.0
 [1.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.0.0
