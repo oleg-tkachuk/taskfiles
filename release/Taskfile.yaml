@@ -1,20 +1,21 @@
 version: "3"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# service — the release surface every deployable component shares: version
-# derivation, container image, Helm chart, and the Kubernetes conveniences that
-# go with them.
+# release — everything between a commit and an artifact in a registry: the
+# version this tree publishes as, the container image, the Helm chart, and the
+# one task that does all three in the right order.
 #
-# One file on purpose. The obvious split — image, chart, k8s beside each other —
-# does not work: a module that includes its own parts gives those parts the
-# LIBRARY's directory as their working directory, not the consumer's, so every
-# relative path in them (CHART_DIR, DOCKERFILE, the info file) resolves in the
-# wrong tree. Only the include written by the consumer carries `dir: .`. If this
-# ever has to be split, the consumer has to include each part.
+# Nothing here talks to a cluster. A repository that only publishes — CI with
+# no kubeconfig anywhere near it — needs this module and not the k8s one.
+#
+# The cluster-side half is a separate module, `k8s`, included separately by the
+# consumer. It has to be the consumer that includes it: a module that includes
+# its own parts hands them the LIBRARY's working directory rather than the
+# consumer's, and every relative path in them resolves in the wrong tree.
 #
 #   includes:
-#     svc:
-#       taskfile: '{{.TASKLIB}}/service{{.TASKLIB_REF}}'
+#     release:
+#       taskfile: '{{.TASKLIB}}/release{{.TASKLIB_REF}}'
 #       dir: .
 #
 # `dir: .` is required — it pins every command to the INCLUDING component's
@@ -39,9 +40,7 @@ version: "3"
 #   CHART_APP_VERSION    appVersion when the image is upstream's, not ours
 #   CHART_MIN_RESOURCES  render-gate floor              (default 1)
 #   HELM_FLAGS           extra flags for every helm registry call
-#   K8S_NAMESPACE        default "default"
-#   K8S_DEPLOYMENT_NAME  default PROJECT_NAME
-#   K8S_CONTEXT          pin a cluster                  (default: current)
+#   K8S_NAMESPACE        namespace the chart renders against (default "default")
 #   INFO_ENV_FILE        default ./deploy/info.env
 #   VERSION_BASE         base for untagged builds       (default 0.1.0)
 #   VERSION_TAG_EXCLUDE  tag glob to keep out of the version (e.g. "api/*")
@@ -81,8 +80,6 @@ vars:
   _RENDER: '{{.RENDER_OUT | default ".task/render.yaml"}}'
 
   _K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
-  _DEPLOY: '{{.K8S_DEPLOYMENT_NAME | default .PROJECT_NAME | default "service"}}'
-  _KUBECTL: 'kubectl{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT}}{{end}}'
 
   _INFO_ENV: '{{.INFO_ENV_FILE | default "./deploy/info.env"}}'
 
@@ -346,66 +343,3 @@ tasks:
       - task: chart:verify
       - task: chart:push
       - echo "✔ {{._SVC}} · chart {{._VERSION}} → {{._CHART_REPO}}"
-
-  # ═══ kubernetes ═════════════════════════════════════════════════════════════
-
-  k8s:restart:
-    desc: "Roll the deployment (no-op when the namespace or deployment is absent)"
-    # Skipped rather than failed when there is nothing to roll: this task sits
-    # in chains that must stay green on a laptop with no cluster running — and
-    # it says which of the two happened.
-    cmds:
-      - task: k8s:restart:_do
-      - task: k8s:restart:_skipped
-
-  k8s:restart:_skipped:
-    internal: true
-    status:
-      - "{{._KUBECTL}} -n {{._K8S_NS}} get deploy/{{._DEPLOY}} >/dev/null 2>&1"
-    cmds:
-      - echo "⚠ {{._SVC}} · k8s · deploy/{{._DEPLOY}} not found in {{._K8S_NS}} — skipping restart"
-
-  k8s:restart:_do:
-    internal: true
-    status:
-      - "! {{._KUBECTL}} -n {{._K8S_NS}} get deploy/{{._DEPLOY}} >/dev/null 2>&1"
-    cmds:
-      - echo "▸ {{._SVC}} · k8s · roll deploy/{{._DEPLOY}} in {{._K8S_NS}}"
-      - "{{._KUBECTL}} -n {{._K8S_NS}} rollout restart deploy/{{._DEPLOY}}"
-      - "{{._KUBECTL}} -n {{._K8S_NS}} rollout status deploy/{{._DEPLOY}} --timeout={{.ROLLOUT_TIMEOUT | default \"2m\"}}"
-      - echo "✔ {{._SVC}} · k8s · rolled {{._DEPLOY}}"
-
-  k8s:upgrade:
-    desc: "helm upgrade --install the release from the local chart directory"
-    cmds:
-      - echo "▸ {{._SVC}} · k8s · helm upgrade --install {{._DEPLOY}} ({{._K8S_NS}})"
-      - >-
-        helm upgrade --install {{._DEPLOY}} {{._CHART_DIR}}
-        --namespace {{._K8S_NS}} --create-namespace
-        {{if .K8S_CONTEXT}}--kube-context {{.K8S_CONTEXT}}{{end}}
-        {{.HELM_UPGRADE_FLAGS | default ""}}
-      - echo "✔ {{._SVC}} · k8s · release {{._DEPLOY}} upgraded"
-
-  k8s:logs:
-    desc: "Tail the deployment's logs (Ctrl-C to stop)"
-    interactive: true
-    cmds:
-      - "{{._KUBECTL}} -n {{._K8S_NS}} logs deploy/{{._DEPLOY}} -f --tail={{.TAIL | default \"100\"}}"
-
-  k8s:status:
-    desc: "Show the deployment and its pods"
-    cmds:
-      - "{{._KUBECTL}} -n {{._K8S_NS}} get deploy/{{._DEPLOY}} -o wide"
-      - "{{._KUBECTL}} -n {{._K8S_NS}} get pods -l app.kubernetes.io/name={{._DEPLOY}} -o wide"
-
-  k8s:port-forward:
-    desc: "Port-forward the deployment (PORT local, TARGET_PORT in the pod)"
-    interactive: true
-    vars:
-      PORT: '{{.PORT | default "8080"}}'
-      # Defaults to PORT, so a service listening on the same number needs no
-      # second knob; TEI-style containers on :80 set TARGET_PORT.
-      TARGET: '{{.TARGET_PORT | default .PORT | default "8080"}}'
-    cmds:
-      - echo "▸ {{._SVC}} · k8s · localhost:{{.PORT}} → deploy/{{._DEPLOY}}:{{.TARGET}}"
-      - "{{._KUBECTL}} -n {{._K8S_NS}} port-forward deploy/{{._DEPLOY}} {{.PORT}}:{{.TARGET}}"

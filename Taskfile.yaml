@@ -10,10 +10,11 @@ version: "3"
 silent: true
 
 vars:
-  # One directory per module. A module is a directory rather than a single file
-  # so it can be split when it outgrows one — `service` is — and so an include
-  # reads `{{.TASKLIB}}/service` instead of naming a file inside it.
-  MODULES: "service go python node compose monorepo security argocd auth
+  # One directory per module, and an include names the directory rather than a
+  # file inside it. The split is by domain, not by file size: `release` never
+  # talks to a cluster and `k8s` never publishes anything, so a repository that
+  # only does one of the two includes only one of them.
+  MODULES: "release k8s go python node compose monorepo security argocd auth
     runtime/docker runtime/orbstack runtime/minikube runtime/kind runtime/k3d"
   # Every YAML the modules are made of, for the file-level checks.
   MODULE_FILES:

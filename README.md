@@ -20,12 +20,14 @@ vars:
   K8S_NAMESPACE: acme
 
 includes:
-  svc: { taskfile: '{{.TASKLIB}}/service{{.TASKLIB_REF}}', dir: . }
-  go:  { taskfile: '{{.TASKLIB}}/go{{.TASKLIB_REF}}', dir: . }
+  release: { taskfile: '{{.TASKLIB}}/release{{.TASKLIB_REF}}', dir: . }
+  k8s:     { taskfile: '{{.TASKLIB}}/k8s{{.TASKLIB_REF}}', dir: . }
+  go:      { taskfile: '{{.TASKLIB}}/go{{.TASKLIB_REF}}', dir: . }
 
 tasks:
-  deploy: { cmds: [{ task: svc:deploy }] }
-  test:   { cmds: [{ task: go:test }] }
+  deploy:  { cmds: [{ task: release:deploy }] }
+  restart: { cmds: [{ task: k8s:restart }] }
+  test:    { cmds: [{ task: go:test }] }
 ```
 
 `dir: .` is required on every include — it pins the module's commands to the
@@ -54,7 +56,8 @@ own primitives rather than shelling out to a helper.
 
 | Module | Namespace | What it covers |
 |---|---|---|
-| `service/` | `svc` | version derivation, image build/push, chart lint/render/package/push, `deploy`, k8s restart/logs/status/upgrade/port-forward |
+| `release/` | `release` | version derivation, image build/push, chart lint/render/package/push, `deploy` |
+| `k8s/` | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward |
 | `go/` | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, dep bumps |
 | `python/` | `py` | poetry install/test/lint/format/typecheck/lock, dep bumps |
 | `node/` | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
@@ -80,17 +83,21 @@ includes:
 ```
 
 Include one alongside `service`, not instead of it: `local:image:load` moves
-what `svc:image:build` produced, and `local:install` helm-installs the chart
-from disk against it with `pullPolicy=IfNotPresent`.
+what `release:image:build` produced, and `local:install` helm-installs the
+chart from disk against it with `pullPolicy=IfNotPresent`.
 
 Each module is a directory holding a `Taskfile.yaml`; an include names the
 directory, so the layout inside a module stays the module's own business.
 
-One caveat if you split a module into several files: a module that includes its
-own parts hands those parts the *library's* working directory, not the
-consumer's, because only the consumer's include carries `dir: .`. Relative
-paths inside them then resolve in the wrong tree. Parts that need the
-consumer's directory have to be included by the consumer. Each module's header documents its inputs. Run `task --list-all` in a consumer
+`release` and `k8s` are two modules rather than one for the same reason a
+publish-only CI job has no kubeconfig: neither half needs the other. Include
+whichever the component actually does.
+
+That split has to happen at *your* include, not inside a module. A module that
+includes its own parts hands those parts the **library's** working directory
+rather than yours — only the include you write carries `dir: .` — so every
+relative path in them (`CHART_DIR`, `DOCKERFILE`, the info file) resolves in
+the wrong tree. Each module's header documents its inputs. Run `task --list-all` in a consumer
 to see the full surface.
 
 ## Conventions

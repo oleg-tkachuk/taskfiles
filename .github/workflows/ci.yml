@@ -94,7 +94,8 @@ jobs:
             REGISTRY: registry.example
             VERSION_BASE: 9.9.9
           includes:
-            svc:  { taskfile: '{{.TASKLIB}}/service{{.TASKLIB_REF}}', dir: . }
+            release: { taskfile: '{{.TASKLIB}}/release{{.TASKLIB_REF}}', dir: . }
+            k8s:  { taskfile: '{{.TASKLIB}}/k8s{{.TASKLIB_REF}}', dir: . }
             go:   { taskfile: '{{.TASKLIB}}/go{{.TASKLIB_REF}}', dir: . }
             py:   { taskfile: '{{.TASKLIB}}/python{{.TASKLIB_REF}}', dir: . }
             node: { taskfile: '{{.TASKLIB}}/node{{.TASKLIB_REF}}', dir: . }
@@ -120,7 +121,7 @@ jobs:
         # proof that it does not.
         run: |
           set -euo pipefail
-          version=$(task svc:version)
+          version=$(task release:version)
           case "$version" in
             9.9.9-dev.*) echo "✔ consumer vars reach the modules ($version)" ;;
             *) echo "✖ expected a 9.9.9 base, got $version" >&2; exit 1 ;;

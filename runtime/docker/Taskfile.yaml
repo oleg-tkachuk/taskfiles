@@ -12,10 +12,10 @@ version: "3"
 # change in the consumer's includes and nothing else.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
-# The same vars the `service` module reads: PROJECT_NAME, REGISTRY,
+# The same vars the `release` module reads: PROJECT_NAME, REGISTRY,
 # IMAGE_NAMESPACE, CHART_DIR, K8S_NAMESPACE, K8S_CONTEXT. Include this
-# alongside `service`, not instead of it: `image:load` moves what
-# `svc:image:build` produced.
+# alongside `release`, not instead of it: `image:load` moves what
+# `release:image:build` produced.
 # ─────────────────────────────────────────────────────────────────────────────
 
 silent: true
@@ -24,7 +24,7 @@ vars:
   _SVC: '{{.PROJECT_NAME | default "service"}}'
   _IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
   _VERSION:
-    sh: task svc:version
+    sh: task release:version
   _CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
   _K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
   _CTX: '{{.K8S_CONTEXT | default "docker-desktop"}}'
