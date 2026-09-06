@@ -19,7 +19,7 @@ silent: true
 
 vars:
   TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//'
-  TASKLIB_REF: '?ref=v1.1.1'
+  TASKLIB_REF: '?ref=v1.1.2'
   PROJECT_NAME: billing-api
   IMAGE_NAMESPACE: acme
   K8S_NAMESPACE: acme

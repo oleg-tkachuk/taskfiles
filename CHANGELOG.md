@@ -16,6 +16,32 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [1.1.2] — 2026-09-07
+
+Documentation, with one user-visible string. Nothing a consumer includes
+behaves differently.
+
+### Changed
+
+- Every module is now documented under its own directory name. `compose`,
+  `monorepo`, `security` and `cosign` were shown as `dev`, `all`, `sec` and
+  `sign` — aliases from before the modules were directories — so `sign:keygen`
+  came from a module called cosign. `runtime/*` keeps `local`, because its five
+  modules share one surface and the alias names the role rather than the
+  implementation; the Conventions section now says so.
+- `cosign`'s preconditions name the task by that documented alias: they now
+  point at `cosign:keygen` where they pointed at `sign:keygen`. The only string
+  in this release that reaches a terminal.
+- The module table lists what each module is called today, and the versioning
+  note points at `release/` rather than `service.yaml` — a file that stopped
+  existing when the modules became directories.
+
+### Internal
+
+- A release is refused when the README does not pin the tag being cut. Nothing
+  templates a README on GitHub, so the quickstart stays true by being checked
+  rather than substituted.
+
 ## [1.1.1] — 2026-09-07
 
 Nothing in the modules changed. A consumer moving the ref from `v1.1.0` gets
@@ -136,6 +162,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[1.1.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.2
 [1.1.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.1
 [1.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.0
 [1.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.0.0
