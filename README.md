@@ -139,11 +139,21 @@ implementation; they are not the current one.
 
 ## Releasing
 
+Trunk-based: `main` is the only long-lived branch, work lands on it in small
+commits, and a release is a tag. There is no `develop` — consumers pin
+`?ref=vX.Y.Z`, so what is on `main` cannot reach anyone who has not chosen it.
+
 ```bash
-task lint          # parse every module
-git tag -a v1.1.0 -m "…" && git push --tags
+task lint                                   # the gate, also run by the hooks
+git tag -a v1.2.0 -m "…" && git push --tags # release.yml takes it from here
 ```
 
-Consumers pin a tag, so a change here reaches them only when they move their
-`TASKLIB_REF`. Renaming or removing a task is a major bump: these files are a
-public API.
+Pushing the tag runs `.github/workflows/release.yml`, which lints the tagged
+tree, refuses a tag that is not `vMAJOR.MINOR.PATCH`, includes the published
+tag **over the network** the way a consumer does — the only check that proves
+the tag is actually fetchable — and then creates the GitHub release with notes
+generated from the commits.
+
+Renaming or removing a task is a major bump: these modules are a public API,
+and `?ref=` is the only thing standing between a rename here and forty broken
+Taskfiles.

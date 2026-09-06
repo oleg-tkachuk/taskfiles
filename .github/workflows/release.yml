@@ -1,0 +1,146 @@
+# Cutting a tag is the only thing consumers actually see: they pin
+# `?ref=vX.Y.Z`, so a tag is a promise that this exact tree can be included and
+# works. This workflow checks that promise before publishing the release, and
+# it checks it the way a consumer would — over the network, through the git
+# include path, not from a local checkout.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to verify and release"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  # Remote Taskfiles are only stable from 3.53; keep this in step with ci.yml.
+  TASK_VERSION: 3.53.1
+
+jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Install Task
+        uses: go-task/setup-task@v2
+        with:
+          version: ${{ env.TASK_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint
+        run: task lint
+
+      - name: Refuse a tag that is not SemVer
+        # Helm and OCI both reject a chart version that is not SemVer-2, and
+        # the modules mint chart versions from these tags. A tag that cannot be
+        # a chart version is a tag no consumer can use.
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.tag || github.ref_name }}"
+          case "$tag" in
+            v[0-9]*.[0-9]*.[0-9]*) echo "✔ $tag is SemVer-shaped" ;;
+            *) echo "✖ $tag is not vMAJOR.MINOR.PATCH" >&2; exit 1 ;;
+          esac
+
+  consumable:
+    name: consumable over git
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Task
+        uses: go-task/setup-task@v2
+        with:
+          version: ${{ env.TASK_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Let git fetch this repository over HTTPS
+        # Task shells out to the system git for a remote include, so the token
+        # goes in through git's own config rather than into the Taskfile.
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Include the tag the way a consumer does
+        # Deliberately NOT a local checkout: this is the only step that proves
+        # the published tag can be fetched, that every module resolves through
+        # the git include path, and that the trust prompt does not block CI.
+        run: |
+          set -euo pipefail
+          mkdir consumer && cd consumer
+          git init -q
+          git config user.email ci@example.invalid
+          git config user.name CI
+          echo placeholder > README.md
+          git add -A && git commit -qm "chore: seed"
+
+          cat > Taskfile.yaml <<'YAML'
+          version: "3"
+          silent: true
+          vars:
+            TASKLIB: 'https://github.com/OWNER_REPO.git/'
+            TASKLIB_REF: '?ref=TAG'
+            PROJECT_NAME: smoke
+            IMAGE_NAMESPACE: acme
+            K8S_NAMESPACE: smoke-ns
+            REGISTRY: registry.example
+            VERSION_BASE: 9.9.9
+          includes:
+            release: { taskfile: '{{.TASKLIB}}/release{{.TASKLIB_REF}}', dir: . }
+            k8s:     { taskfile: '{{.TASKLIB}}/k8s{{.TASKLIB_REF}}', dir: . }
+            go:      { taskfile: '{{.TASKLIB}}/go{{.TASKLIB_REF}}', dir: . }
+            py:      { taskfile: '{{.TASKLIB}}/python{{.TASKLIB_REF}}', dir: . }
+            node:    { taskfile: '{{.TASKLIB}}/node{{.TASKLIB_REF}}', dir: . }
+            dev:     { taskfile: '{{.TASKLIB}}/compose{{.TASKLIB_REF}}', dir: . }
+            sec:     { taskfile: '{{.TASKLIB}}/security{{.TASKLIB_REF}}', dir: . }
+            all:     { taskfile: '{{.TASKLIB}}/monorepo{{.TASKLIB_REF}}', dir: . }
+            argocd:  { taskfile: '{{.TASKLIB}}/argocd{{.TASKLIB_REF}}', dir: . }
+            auth:    { taskfile: '{{.TASKLIB}}/auth{{.TASKLIB_REF}}', dir: . }
+            local:   { taskfile: '{{.TASKLIB}}/runtime/orbstack{{.TASKLIB_REF}}', dir: . }
+          tasks: {}
+          YAML
+          sed -i "s|OWNER_REPO|${{ github.repository }}|; s|TAG|${{ inputs.tag || github.ref_name }}|" Taskfile.yaml
+
+          # --yes accepts the first-fetch trust prompt; unattended, that prompt
+          # is a hang rather than a question.
+          task --yes --list-all > /dev/null
+          version=$(task --yes release:version)
+          case "$version" in
+            9.9.9-dev.*) echo "✔ the published tag includes and resolves ($version)" ;;
+            *) echo "✖ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
+          esac
+
+  publish:
+    name: publish
+    needs: [gate, consumable]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        # Notes come from the commits since the previous tag, which is why the
+        # commit messages are written the way they are.
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "✔ release $TAG already exists"
+            exit 0
+          fi
+          gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
+          echo "✔ released $TAG"
