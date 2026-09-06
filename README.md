@@ -2,8 +2,7 @@
 
 Shared [Task](https://taskfile.dev) modules for every service in this
 workspace — one implementation of the release chain, the language gates and
-the Kubernetes conveniences that were previously copy-pasted into 39
-Taskfiles across six repositories.
+the Kubernetes conveniences, instead of a copy per repository.
 
 Requires Task **3.53+** (remote Taskfiles are stable there; no experiment flag).
 
@@ -39,7 +38,7 @@ Once this repo is pushed, switch the two vars and nothing else changes:
 ```yaml
 vars:
   TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git/'
-  TASKLIB_REF: '?ref=v1.0.0'
+  TASKLIB_REF: '?ref=v1.1.0'
 ```
 
 Task caches the fetched files under `.task/remote/` and asks for confirmation
