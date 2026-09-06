@@ -45,9 +45,15 @@ jobs:
         # the curated half, and the only place an upgrading consumer is told
         # which names changed and what to set instead. A tag published without
         # it is a tag nobody can act on.
+        #
+        # The tag arrives through env, never through `${{ }}` inside the script:
+        # an expression is substituted as text before bash parses the line, so a
+        # tag named `v1.0.0$(…)` — git allows that — would run as a command.
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          tag="${{ inputs.tag || github.ref_name }}"
+          tag="$TAG"
           version="${tag#v}"
           if ! grep -qF "## [$version]" CHANGELOG.md; then
             echo "✖ CHANGELOG.md has no '## [$version]' section" >&2
@@ -61,9 +67,11 @@ jobs:
         # Helm and OCI both reject a chart version that is not SemVer-2, and
         # the modules mint chart versions from these tags. A tag that cannot be
         # a chart version is a tag no consumer can use.
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          tag="${{ inputs.tag || github.ref_name }}"
+          tag="$TAG"
           case "$tag" in
             v[0-9]*.[0-9]*.[0-9]*) echo "✔ $tag is SemVer-shaped" ;;
             *) echo "✖ $tag is not vMAJOR.MINOR.PATCH" >&2; exit 1 ;;
@@ -82,11 +90,18 @@ jobs:
 
       - name: Let git fetch this repository over HTTPS
         # Task shells out to the system git for a remote include, so the token
-        # goes in through git's own config rather than into the Taskfile.
+        # goes in through git's own config rather than into the Taskfile — and
+        # through env rather than `${{ }}`, so it is never substituted into the
+        # rendered script.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Include the tag the way a consumer does
+        env:
+          REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         # Deliberately NOT a local checkout: this is the only step that proves
         # the published tag can be fetched, that every module resolves through
         # the git include path, and that the trust prompt does not block CI.
@@ -124,7 +139,14 @@ jobs:
             local:   { taskfile: '{{.TASKLIB}}/runtime/orbstack{{.TASKLIB_REF}}', dir: . }
           tasks: {}
           YAML
-          sed -i "s|OWNER_REPO|${{ github.repository }}|; s|TAG|${{ inputs.tag || github.ref_name }}|" Taskfile.yaml
+          # python rather than sed: the substitution is literal, so a tag
+          # carrying a `|`, a `&` or a backslash cannot rewrite the expression
+          # or leak into the shell.
+          python3 - "$REPO" "$TAG" <<'SUBST'
+          import sys, pathlib
+          p = pathlib.Path("Taskfile.yaml")
+          p.write_text(p.read_text().replace("OWNER_REPO", sys.argv[1]).replace("TAG", sys.argv[2]))
+          SUBST
 
           # --yes accepts the first-fetch trust prompt; unattended, that prompt
           # is a hang rather than a question.
