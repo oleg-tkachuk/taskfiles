@@ -4,7 +4,7 @@ version: "3"
 # monorepo — run one target across every component of a monorepo.
 #
 #   includes:
-#     all:
+#     monorepo:
 #       taskfile: '{{.TASKLIB}}monorepo{{.TASKLIB_REF}}'
 #       dir: .
 #       vars: { COMPONENTS: "backend frontend workers/api" }
@@ -14,7 +14,7 @@ version: "3"
 # half-shipped registry is worse than a failed command with a name attached to
 # it. Narrow the run by overriding COMPONENTS on the CLI:
 #
-#   task all:deploy COMPONENTS="backend"
+#   task monorepo:deploy COMPONENTS="backend"
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   COMPONENTS       whitespace-separated component directories

@@ -85,10 +85,10 @@ own primitives rather than shelling out to a helper.
 | [`python/`](python/README.md) | `python` | poetry install/test/lint/format/typecheck/lock, dep bumps |
 | [`uv/`](uv/README.md) | `uv` | the same surface for uv-managed projects — swap the include line |
 | [`node/`](node/README.md) | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
-| [`compose/`](compose/README.md) | `dev` | local stack up/down/reset/logs |
-| [`monorepo/`](monorepo/README.md) | `all` | run one target across every component, registry preflight |
-| [`security/`](security/README.md) | `sec` | govulncheck, golangci-lint, gitleaks, trivy, buf breaking |
-| [`cosign/`](cosign/README.md) | `sign` | sign the published image and chart, attest an SBOM, verify both |
+| [`compose/`](compose/README.md) | `compose` | local stack up/down/reset/logs |
+| [`monorepo/`](monorepo/README.md) | `monorepo` | run one target across every component, registry preflight |
+| [`security/`](security/README.md) | `security` | govulncheck, golangci-lint, gitleaks, trivy, buf breaking |
+| [`cosign/`](cosign/README.md) | `cosign` | sign the published image and chart, attest an SBOM, verify both |
 | [`argocd/`](argocd/README.md) | `argocd` | hard-refresh the apps a deploy just republished |
 | [`auth/`](auth/README.md) | `auth` | mint a local-dev JWT |
 | [`runtime/*`](runtime/README.md) — docker, orbstack, minikube, kind, k3d | `local` | run a locally built image on a local cluster, no registry |
@@ -148,13 +148,20 @@ shadow the very values they are supposed to act on.
 a public task — the complementary `image:build:_do` / `image:build:_skipped`
 pair, for instance, where exactly one of the two runs.
 
+**Include naming.** A module is included under its own directory name, because
+the include alias is what names every task it brings in — `python:test` says
+which of the two Python modules answered. `runtime/*` is the one exception: its
+five modules expose the same three tasks and differ only in which local cluster
+they target, so they are included as `local` and swapping one for another is a
+single line.
+
 **Logging.** Component-scoped modules print `<marker> <component> · <area> ·
 <what happened>`; repo-scoped ones (`security`, `monorepo`, `argocd`) print
 `<marker> <module> · <what happened>`, because there is no one component to
 name. The markers are `▸` starting work, `✔` done, `⚠` skipped on purpose, `✖`
 failed.
 
-**Versioning.** One scheme, in `service.yaml`:
+**Versioning.** One scheme, in [`release/`](release/README.md):
 
 ```
 exact tag, clean tree  →  X.Y.Z

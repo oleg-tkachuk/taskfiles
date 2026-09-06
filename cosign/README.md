@@ -5,7 +5,7 @@ alongside `release` and chain it after — the release publishes, this signs.
 
 ```yaml
 includes:
-  sign: { taskfile: '{{.TASKLIB}}cosign{{.TASKLIB_REF}}', dir: . }
+  cosign: { taskfile: '{{.TASKLIB}}cosign{{.TASKLIB_REF}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -45,17 +45,17 @@ same way `release` reads them.
 ```yaml
 includes:
   release: { taskfile: '{{.TASKLIB}}release{{.TASKLIB_REF}}', dir: . }
-  sign:    { taskfile: '{{.TASKLIB}}cosign{{.TASKLIB_REF}}', dir: . }
+  cosign:    { taskfile: '{{.TASKLIB}}cosign{{.TASKLIB_REF}}', dir: . }
 
 tasks:
   deploy:
     cmds:
       - task: release:deploy
-      - task: sign:all          # image + chart + SBOM attestation
+      - task: cosign:all          # image + chart + SBOM attestation
 ```
 
 ```console
-$ task sign:keygen              # once, then commit cosign.pub only
+$ task cosign:keygen              # once, then commit cosign.pub only
 ✔ billing · cosign · wrote deploy/sigstore/cosign.{key,pub} + signing-config.json
 ⚠ billing · cosign · commit cosign.pub, keep cosign.key out of the repo
 
@@ -64,7 +64,7 @@ $ task deploy
 ✔ billing · cosign · signed registry.example.com/acme/charts/billing:1.4.0
 ✔ billing · cosign · SBOM attested to registry.example.com/acme/billing:1.4.0
 
-$ task sign:verify
+$ task cosign:verify
 ✔ billing · cosign · verified registry.example.com/acme/billing:1.4.0
 ```
 

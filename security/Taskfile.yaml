@@ -4,7 +4,7 @@ version: "3"
 # security — the scans that are worth running before a release.
 #
 #   includes:
-#     sec:
+#     security:
 #       taskfile: '{{.TASKLIB}}security{{.TASKLIB_REF}}'
 #       dir: .
 #       vars: { GO_MODULES: "backend/api backend/worker" }

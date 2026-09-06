@@ -5,7 +5,7 @@ for health checks, so a task chained after it does not race the seeding.
 
 ```yaml
 includes:
-  dev: { taskfile: '{{.TASKLIB}}compose{{.TASKLIB_REF}}', dir: . }
+  compose: { taskfile: '{{.TASKLIB}}compose{{.TASKLIB_REF}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -36,19 +36,19 @@ workspace — tasks then read `dev:<task>`.
 
 ```yaml
 includes:
-  dev:
+  compose:
     taskfile: '{{.TASKLIB}}compose{{.TASKLIB_REF}}'
     dir: .
     vars: { COMPOSE_FILE: docker-compose.dev.yaml, PROJECT_NAME: acme }
 ```
 
 ```console
-$ task dev:up
+$ task compose:up
 ▸ acme · compose · up (docker-compose.dev.yaml)
 ✔ acme · compose · stack healthy
 
-$ task dev:logs SERVICE=postgres
-$ task dev:reset          # asks first: this deletes the volumes
+$ task compose:logs SERVICE=postgres
+$ task compose:reset          # asks first: this deletes the volumes
 ```
 
 ## Everything here is idempotent

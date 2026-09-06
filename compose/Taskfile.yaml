@@ -4,7 +4,7 @@ version: "3"
 # compose — the local dependency stack (Postgres, Redis, queues, …).
 #
 #   includes:
-#     dev:
+#     compose:
 #       taskfile: '{{.TASKLIB}}compose{{.TASKLIB_REF}}'
 #       dir: .
 #       vars: { COMPOSE_FILE: docker-compose.dev.yaml }

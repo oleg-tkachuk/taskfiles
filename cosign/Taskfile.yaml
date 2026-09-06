@@ -4,7 +4,7 @@ version: "3"
 # cosign — signing what a release pushed, and attesting what is inside it.
 #
 #   includes:
-#     sign:
+#     cosign:
 #       taskfile: '{{.TASKLIB}}cosign{{.TASKLIB_REF}}'
 #       dir: .
 #
@@ -17,7 +17,7 @@ version: "3"
 #     deploy:
 #       cmds:
 #         - task: release:deploy
-#         - task: sign:all
+#         - task: cosign:all
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   PROJECT_NAME       image and chart name, as in the release module
@@ -36,7 +36,7 @@ version: "3"
 #
 # The default configuration signs with a local key pair and no transparency
 # log, because that is what a private registry can actually verify against.
-# `task sign:keygen` writes both the keys and a signing config that has no
+# `task cosign:keygen` writes both the keys and a signing config that has no
 # Rekor, Fulcio, TSA or OIDC in it. Publishing to a public registry instead?
 # Drop COSIGN_KEY, pass keyless flags through COSIGN_SIGN_FLAGS, and take
 # `--insecure-ignore-tlog` back out of COSIGN_VERIFY_FLAGS.
@@ -149,7 +149,7 @@ tasks:
       - sh: command -v cosign >/dev/null
         msg: "cosign is not installed — brew install cosign"
       - sh: test -f {{._CS_PUB}}
-        msg: "{{._CS_PUB}} not found — nothing to verify against (run `task sign:keygen`)"
+        msg: "{{._CS_PUB}} not found — nothing to verify against (run `task cosign:keygen`)"
       - sh: test -n '{{._CS_VERSION}}'
         msg: "no version resolved — include the shared `release` module under the name `release` beside this one"
     vars:
@@ -175,7 +175,7 @@ tasks:
       - sh: command -v cosign >/dev/null
         msg: "cosign is not installed — brew install cosign (or set COSIGN_SIGN=0)"
       - sh: test -f {{._CS_KEY}}
-        msg: "{{._CS_KEY}} not found — run `task sign:keygen`, or set COSIGN_SIGN=0 to publish unsigned"
+        msg: "{{._CS_KEY}} not found — run `task cosign:keygen`, or set COSIGN_SIGN=0 to publish unsigned"
     cmds:
       - >-
         COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign sign --yes
@@ -195,7 +195,7 @@ tasks:
       - sh: command -v cosign >/dev/null
         msg: "cosign is not installed — brew install cosign (or set COSIGN_SIGN=0)"
       - sh: test -f {{._CS_KEY}}
-        msg: "{{._CS_KEY}} not found — run `task sign:keygen`, or set COSIGN_SIGN=0"
+        msg: "{{._CS_KEY}} not found — run `task cosign:keygen`, or set COSIGN_SIGN=0"
     cmds:
       # The SBOM is a build artifact of this task, not of the repository: it is
       # written to a temp file, attached to the image, and dropped.

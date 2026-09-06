@@ -6,7 +6,7 @@ always fatal: a scan that can be silently skipped is a scan that does not exist.
 
 ```yaml
 includes:
-  sec: { taskfile: '{{.TASKLIB}}security{{.TASKLIB_REF}}', dir: . }
+  security: { taskfile: '{{.TASKLIB}}security{{.TASKLIB_REF}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -35,7 +35,7 @@ workspace — tasks then read `sec:<task>`.
 
 ```yaml
 includes:
-  sec:
+  security:
     taskfile: '{{.TASKLIB}}security{{.TASKLIB_REF}}'
     dir: .
     vars:
@@ -44,9 +44,9 @@ includes:
 ```
 
 ```console
-$ task sec:all           # vuln · lint · secrets · trivy
-$ task sec:secrets       # gitleaks over the whole history
-$ task sec:proto:breaking
+$ task security:all           # vuln · lint · secrets · trivy
+$ task security:secrets       # gitleaks over the whole history
+$ task security:proto:breaking
 ```
 
 ## Why lint is new-findings-only

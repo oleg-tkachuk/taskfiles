@@ -184,17 +184,17 @@ jobs:
             REGISTRY: registry.example.com
             VERSION_BASE: 9.9.9
           includes:
-            release: { taskfile: '{{.TASKLIB}}release{{.TASKLIB_REF}}', dir: . }
-            k8s:     { taskfile: '{{.TASKLIB}}k8s{{.TASKLIB_REF}}', dir: . }
-            go:      { taskfile: '{{.TASKLIB}}go{{.TASKLIB_REF}}', dir: . }
-            python:      { taskfile: '{{.TASKLIB}}python{{.TASKLIB_REF}}', dir: . }
-            node:    { taskfile: '{{.TASKLIB}}node{{.TASKLIB_REF}}', dir: . }
-            dev:     { taskfile: '{{.TASKLIB}}compose{{.TASKLIB_REF}}', dir: . }
-            sec:     { taskfile: '{{.TASKLIB}}security{{.TASKLIB_REF}}', dir: . }
-            all:     { taskfile: '{{.TASKLIB}}monorepo{{.TASKLIB_REF}}', dir: . }
-            argocd:  { taskfile: '{{.TASKLIB}}argocd{{.TASKLIB_REF}}', dir: . }
-            auth:    { taskfile: '{{.TASKLIB}}auth{{.TASKLIB_REF}}', dir: . }
-            local:   { taskfile: '{{.TASKLIB}}runtime/orbstack{{.TASKLIB_REF}}', dir: . }
+            release:  { taskfile: '{{.TASKLIB}}release{{.TASKLIB_REF}}', dir: . }
+            k8s:      { taskfile: '{{.TASKLIB}}k8s{{.TASKLIB_REF}}', dir: . }
+            go:       { taskfile: '{{.TASKLIB}}go{{.TASKLIB_REF}}', dir: . }
+            python:   { taskfile: '{{.TASKLIB}}python{{.TASKLIB_REF}}', dir: . }
+            node:     { taskfile: '{{.TASKLIB}}node{{.TASKLIB_REF}}', dir: . }
+            compose:  { taskfile: '{{.TASKLIB}}compose{{.TASKLIB_REF}}', dir: . }
+            security: { taskfile: '{{.TASKLIB}}security{{.TASKLIB_REF}}', dir: . }
+            monorepo: { taskfile: '{{.TASKLIB}}monorepo{{.TASKLIB_REF}}', dir: . }
+            argocd:   { taskfile: '{{.TASKLIB}}argocd{{.TASKLIB_REF}}', dir: . }
+            auth:     { taskfile: '{{.TASKLIB}}auth{{.TASKLIB_REF}}', dir: . }
+            local:    { taskfile: '{{.TASKLIB}}runtime/orbstack{{.TASKLIB_REF}}', dir: . }
           tasks: {}
           YAML
           # python rather than sed: the substitution is literal, so a tag
