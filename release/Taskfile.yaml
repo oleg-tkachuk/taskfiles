@@ -180,7 +180,12 @@ tasks:
       - sh: command -v docker >/dev/null
         msg: "docker is not installed"
       - sh: test -f {{._REL_DOCKERFILE}}
-        msg: "{{._REL_DOCKERFILE}} not found — set DOCKERFILE"
+        msg: |-
+          {{._REL_DOCKERFILE}} not found.
+          DOCKERFILE is resolved from the component directory, not from
+          DOCKER_CONTEXT — `docker build --file` reads it relative to the
+          working directory. A component that builds from the repo root still
+          names its own Dockerfile: DOCKER_CONTEXT ../.., DOCKERFILE ./Dockerfile.
     cmds:
       - echo "▸ {{._REL_SVC}} · image · build {{._REL_IMAGE}}:{{._REL_VERSION}}"
       # --load is required under the docker-container buildx driver: without it

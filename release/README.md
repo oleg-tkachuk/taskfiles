@@ -43,7 +43,7 @@ workspace — tasks then read `release:<task>`.
 | `REGISTRY` | `localhost:5000` | OCI host |
 | `GLOBAL_REGISTRY` | — | a monorepo-wide override; wins over `REGISTRY` |
 | `IMAGE_NAMESPACE` | — | path between host and name |
-| `DOCKERFILE` | `./Dockerfile` | resolved from the component directory |
+| `DOCKERFILE` | `./Dockerfile` | resolved from the component directory, **not** from `DOCKER_CONTEXT` |
 | `DOCKER_CONTEXT` | `.` | build context, when it is not the component directory |
 | `DOCKER_BUILD_FLAGS` | — | verbatim extra buildx flags |
 | `CHART_DIR` | `./deploy/chart` | |
@@ -109,9 +109,14 @@ tasks:
 
 ```yaml
 vars:
-  DOCKERFILE: ./Dockerfile     # relative to this component
+  DOCKERFILE: ./Dockerfile     # resolved from THIS directory, not the context
   DOCKER_CONTEXT: ../..        # go.mod `replace` points at sibling modules
 ```
+
+The two are resolved differently and it is easy to get wrong: `docker build`
+reads `--file` relative to the working directory and only the final argument is
+the context. A component whose image needs the repo root sets the context to
+`../..` and still names its own `./Dockerfile`.
 
 ## The version scheme
 
