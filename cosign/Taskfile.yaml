@@ -201,12 +201,18 @@ tasks:
       # written to a temp file, attached to the image, and dropped.
       - cmd: |-
           set -eu
-          # An explicit template rather than `mktemp -t`: BSD reads that flag as
-          # a filename prefix and GNU as a directory hint. Naming the path
-          # outright also means the file trapped is the file written — the
-          # earlier `$(mktemp …).json` form left the mktemp'd file behind.
-          sb="${TMPDIR:-/tmp}/sbom-$$-$(date +%s).json"
-          trap 'rm -f "$sb"' EXIT
+          # A temp DIRECTORY, then the file inside it. mktemp creates the
+          # directory atomically with 0700, so the SBOM path is neither
+          # predictable nor pre-creatable by anyone else — a name built from
+          # $$ and a timestamp in a world-writable /tmp is both.
+          #
+          # The template is spelled out rather than passed to `-t`, which BSD
+          # reads as a filename prefix and GNU as a directory hint. And the
+          # path that is trapped is the path that is written: the earlier
+          # `$(mktemp …).json` form cleaned up a different file than syft wrote.
+          d="$(mktemp -d "${TMPDIR:-/tmp}/sbom-XXXXXX")"
+          trap 'rm -rf "$d"' EXIT
+          sb="$d/sbom.json"
           {{if eq (.SBOM_INSECURE | default "0") "1"}}SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY=true {{end}}syft '{{.REF}}' -q -o {{._CS_SBOM_FORMAT}}="$sb"
           COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign attest --yes \
             {{if ._CS_CONFIG}}--signing-config {{._CS_CONFIG}} {{end}}--key {{._CS_KEY}} \
