@@ -16,6 +16,30 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [1.1.1] — 2026-09-07
+
+Nothing in the modules changed. A consumer moving the ref from `v1.1.0` gets
+byte-identical behaviour and has nothing to do; the tag exists so the docs and
+the release tooling below have a version that names them.
+
+### Changed
+
+- The documented include alias is now the module's own name — `python:` for the
+  python module, `uv:` for uv, where both examples said `py:`. The alias is what
+  names the tasks it brings in, so `py:` produced a `py:test` that no module of
+  that name defines, and meant two different modules in two different examples.
+  Only the samples changed; nothing constrains what a consumer calls an include.
+- One example registry hostname across the documentation, `registry.example.com`
+  — RFC 2606 reserves it for this, so a sample can never resolve to something
+  real.
+
+### Internal
+
+- A release is refused when `main` does not contain the tagged commit, so a tag
+  cut on a side branch cannot publish a tree that CI on main never saw.
+- Generated release notes are shaped by `.github/release.yml`, and workflow step
+  names now say whether each one sets up, guards, verifies or publishes.
+
 ## [1.1.0] — 2026-09-07
 
 ### Added
@@ -112,5 +136,6 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[1.1.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.1
 [1.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.0
 [1.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.0.0
