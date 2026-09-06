@@ -4,7 +4,7 @@ version: "3"
 # python — Poetry-managed Python projects.
 #
 #   includes:
-#     py: { taskfile: '{{.TASKLIB}}python{{.TASKLIB_REF}}', dir: . }
+#     python: { taskfile: '{{.TASKLIB}}python{{.TASKLIB_REF}}', dir: . }
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   PROJECT_NAME           label in log lines

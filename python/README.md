@@ -5,7 +5,7 @@ project. For uv, include [`uv/`](../uv/README.md) instead — same task names.
 
 ```yaml
 includes:
-  py: { taskfile: '{{.TASKLIB}}python{{.TASKLIB_REF}}', dir: . }
+  python: { taskfile: '{{.TASKLIB}}python{{.TASKLIB_REF}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -45,12 +45,12 @@ vars:
   PY: python3.13
 
 includes:
-  py: { taskfile: '{{.TASKLIB}}python{{.TASKLIB_REF}}', dir: . }
+  python: { taskfile: '{{.TASKLIB}}python{{.TASKLIB_REF}}', dir: . }
 
 tasks:
-  build: { cmds: [{ task: py:install }] }
-  test:  { cmds: [{ task: py:test }] }
-  lint:  { cmds: [{ task: py:lint }] }
+  build: { cmds: [{ task: python:install }] }
+  test:  { cmds: [{ task: python:test }] }
+  lint:  { cmds: [{ task: python:lint }] }
 ```
 
 A worker that ships its entry point as a script rather than an installable

@@ -171,7 +171,7 @@ jobs:
             release: { taskfile: '{{.TASKLIB}}release{{.TASKLIB_REF}}', dir: . }
             k8s:     { taskfile: '{{.TASKLIB}}k8s{{.TASKLIB_REF}}', dir: . }
             go:      { taskfile: '{{.TASKLIB}}go{{.TASKLIB_REF}}', dir: . }
-            py:      { taskfile: '{{.TASKLIB}}python{{.TASKLIB_REF}}', dir: . }
+            python:      { taskfile: '{{.TASKLIB}}python{{.TASKLIB_REF}}', dir: . }
             node:    { taskfile: '{{.TASKLIB}}node{{.TASKLIB_REF}}', dir: . }
             dev:     { taskfile: '{{.TASKLIB}}compose{{.TASKLIB_REF}}', dir: . }
             sec:     { taskfile: '{{.TASKLIB}}security{{.TASKLIB_REF}}', dir: . }
