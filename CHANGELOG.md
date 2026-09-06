@@ -14,21 +14,29 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
-### Changed
+Nothing yet.
 
-- The tag is its own variable: `TASKLIB_TAG: v1.0.0` rather than a
-  `TASKLIB_REF` carrying `?ref=v1.0.0`, with the query in the include line:
+## [2.0.0] — 2026-09-06
+
+### Changed — BREAKING
+
+- The tag is its own variable: `TASKLIB_TAG: v2.0.0` rather than a
+  `TASKLIB_REF` carrying `?ref=v2.0.0`, with the query in the include line:
 
   ```yaml
   vars:
     TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//'
-    TASKLIB_TAG: v1.0.0
+    TASKLIB_TAG: v2.0.0
   includes:
     release: { taskfile: '{{.TASKLIB}}release?ref={{.TASKLIB_TAG}}', dir: . }
   ```
 
   A local checkout drops the query instead of emptying a variable:
   `{ taskfile: '{{.TASKLIB}}/release', dir: . }`.
+
+**Migration.** Rename the variable, drop the `?ref=` from its value, and put it
+in the include line instead. The module names and every task are unchanged —
+this is the include syntax only.
 
 ## [1.0.0] — 2026-09-06
 
@@ -79,4 +87,5 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[2.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.0.0
 [1.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.0.0
