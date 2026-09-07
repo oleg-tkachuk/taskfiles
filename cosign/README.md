@@ -35,6 +35,7 @@ workspace — tasks then read `sign:<task>`.
 | `COSIGN_SIGN_FLAGS` | — | extra flags for sign and attest |
 | `COSIGN_VERIFY_FLAGS` | `--insecure-ignore-tlog=true` | the default matches signing without a transparency log |
 | `SBOM_FORMAT` | `spdx-json` | syft output format |
+| `SYFT_FLAGS` | — | verbatim extra syft flags |
 | `SBOM_INSECURE` | `0` | `1` when the registry's certificate is one syft rejects |
 
 Plus `PROJECT_NAME`, `REGISTRY`, `IMAGE_NAMESPACE` and `CHART_NAME`, read the

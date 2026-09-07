@@ -41,6 +41,9 @@ version: "3"
 #   CHART_APP_VERSION    appVersion when the image is upstream's, not ours
 #   CHART_MIN_RESOURCES  render-gate floor              (default 1)
 #   HELM_FLAGS           extra flags for every helm registry call
+#   HELM_LINT_FLAGS      extra flags for `helm lint`
+#   HELM_TEMPLATE_FLAGS  extra flags for `helm template`
+#   HELM_PACKAGE_FLAGS   extra flags for `helm package`
 #   K8S_NAMESPACE        namespace the chart renders against (default "default")
 #   INFO_ENV_FILE        default ./deploy/info.env
 #   VERSION_BASE         base for untagged builds       (default 0.1.0)
@@ -124,6 +127,9 @@ vars:
       {{if .VERSION_TAG_EXCLUDE}}--exclude '{{.VERSION_TAG_EXCLUDE}}'{{end}}
       HEAD 2>/dev/null || true
   _REL_TAG: '{{._REL_TAG_RAW | trimPrefix "v"}}'
+  _REL_HELM_LINT_FLAGS: '{{.HELM_LINT_FLAGS | default ""}}'
+  _REL_HELM_TPL_FLAGS: '{{.HELM_TEMPLATE_FLAGS | default ""}}'
+  _REL_HELM_PKG_FLAGS: '{{.HELM_PACKAGE_FLAGS | default ""}}'
   _REL_LATEST: '{{.IMAGE_LATEST | default "0"}}'
   _REL_DIRTY:
     sh: git status --porcelain 2>/dev/null | head -c1
@@ -384,7 +390,7 @@ tasks:
       - sh: test -f {{._REL_CHART_DIR}}/Chart.yaml
         msg: "{{._REL_CHART_DIR}}/Chart.yaml not found — set CHART_DIR"
     cmds:
-      - helm lint {{._REL_CHART_DIR}}
+      - helm lint {{._REL_HELM_LINT_FLAGS}} {{._REL_CHART_DIR}}
 
   chart:render:
     desc: "Render the chart and fail on glued separators, unparseable YAML, or a resource drop"
@@ -425,7 +431,7 @@ tasks:
         msg: "helm is not installed — https://helm.sh/docs/intro/install/"
     cmds:
       - mkdir -p {{dir ._REL_RENDER}}
-      - helm template {{._REL_SVC}} {{._REL_CHART_DIR}} --namespace {{._REL_K8S_NS}} > {{._REL_RENDER}}
+      - helm template {{._REL_HELM_TPL_FLAGS}} {{._REL_SVC}} {{._REL_CHART_DIR}} --namespace {{._REL_K8S_NS}} > {{._REL_RENDER}}
 
   chart:package:
     desc: "helm package the chart at the derived version"
@@ -436,7 +442,7 @@ tasks:
       - "{{._REL_CHART}}-{{._REL_VERSION}}.tgz"
     cmds:
       - >-
-        helm package {{._REL_CHART_DIR}} --version {{._REL_VERSION}}
+        helm package {{._REL_HELM_PKG_FLAGS}} {{._REL_CHART_DIR}} --version {{._REL_VERSION}}
         --app-version {{.CHART_APP_VERSION | default ._REL_VERSION}} >/dev/null
       - echo "{{._REL_RUN}} {{._REL_SVC}} · chart · packaged {{._REL_CHART}}-{{._REL_VERSION}}.tgz"
 

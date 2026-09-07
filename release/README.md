@@ -53,6 +53,9 @@ workspace — tasks then read `release:<task>`.
 | `CHART_APP_VERSION` | derived version | pin it when the image is upstream's |
 | `CHART_MIN_RESOURCES` | `1` | render-gate floor |
 | `HELM_FLAGS` | — | e.g. `--insecure-skip-tls-verify` for a self-signed registry |
+| `HELM_LINT_FLAGS` | — | extra flags for `helm lint` |
+| `HELM_TEMPLATE_FLAGS` | — | extra flags for `helm template` |
+| `HELM_PACKAGE_FLAGS` | — | extra flags for `helm package` |
 | `INFO_ENV_FILE` | `./deploy/info.env` | where the build metadata is written |
 | `VERSION_BASE` | `0.1.0` | base for untagged builds |
 | `VERSION_TAG_EXCLUDE` | — | tag glob to keep out of the version, e.g. `api/*` |

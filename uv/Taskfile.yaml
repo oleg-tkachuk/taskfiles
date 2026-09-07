@@ -44,6 +44,7 @@ vars:
   _UV_TC_CMD: '{{.TYPECHECK_CMD | default "mypy"}}'
   _UV_TC_MOD: '{{.TYPECHECK_MODULE | default "mypy"}}'
   _UV_TEST_FLAGS: '{{.PY_TEST_FLAGS | default "-q"}}'
+  _UV_LOCK_FLAGS: '{{.UV_LOCK_FLAGS | default ""}}'
   _UV_SYNC: '{{.UV_SYNC_FLAGS | default "--group dev"}}'
   # uv picks an interpreter from .python-version or the pyproject constraint
   # unless one is named; pin PY to the version the deployed image runs.
@@ -106,14 +107,14 @@ tasks:
   lock:
     desc: "Regenerate uv.lock without changing any version"
     cmds:
-      - uv lock
+      - uv lock {{._UV_LOCK_FLAGS}}
       - echo "{{._UV_OK}} {{._UV_NAME}} · uv · uv.lock regenerated"
 
   deps:update:
     desc: "Bump dependencies within their pyproject constraints, then refresh the lock"
     cmds:
       - echo "{{._UV_RUN}} {{._UV_NAME}} · uv · lock --upgrade"
-      - uv lock --upgrade
+      - uv lock --upgrade {{._UV_LOCK_FLAGS}}
       - uv sync {{._UV_SYNC}}
       - echo "{{._UV_OK}} {{._UV_NAME}} · uv · deps bumped — review uv.lock, then lint + test"
 

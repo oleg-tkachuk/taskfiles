@@ -40,6 +40,9 @@ component's directory.
 | `GENERATED_DIRS` | — | directories to normalise with goimports |
 | `PROTO_PATH` | — | directories prepended to `PATH` before buf runs; evaluated by the shell, so `$(pnpm -C ../web bin)` works |
 | `GENERATE_CMD` | `go generate ./...` | what `generate` runs |
+| `BUF_FLAGS` | — | verbatim extra flags for every `buf generate` |
+| `SQLC_FLAGS` | — | verbatim extra sqlc flags |
+| `GOIMPORTS_FLAGS` | — | verbatim extra goimports flags |
 | `SQLC_MODULE` | — | run sqlc through `go run` at a pinned version instead of from PATH |
 | `MOCKS_PATHSPEC` | `internal` | git pathspec the mock gate watches |
 | `SQLC_DIR` | — | directory the sqlc gate watches; required by `sqlc:check` |

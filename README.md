@@ -26,6 +26,7 @@ Taskfiles are stable from that version, with no experiment flag to set.
   - [Include naming](#include-naming)
   - [Logging](#logging)
   - [Versioning](#versioning)
+  - [Every tool invocation takes flags](#every-tool-invocation-takes-flags)
   - [Commit the remote lock](#commit-the-remote-lock)
   - [Idempotency](#idempotency)
 - [License](#license)
@@ -37,7 +38,7 @@ version: "3"
 silent: true
 
 vars:
-  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v3.5.0'
+  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v3.6.0'
   PROJECT_NAME: billing-api
   IMAGE_NAMESPACE: acme
   K8S_NAMESPACE: acme
@@ -287,6 +288,28 @@ Timestamp before sha, so SemVer's left-to-right pre-release comparison orders
 builds chronologically and ArgoCD's `>=0.0.0-0` resolver always picks the
 newest push.
 
+### Every tool invocation takes flags
+
+A module wraps a tool; it does not own it. So every external command here
+accepts a verbatim pass-through, named after the tool and ending in `_FLAGS`:
+
+```yaml
+sec:
+  taskfile: '{{printf .TASKLIB "security"}}'
+  dir: .
+  vars: { TRIVY_FLAGS: '--severity HIGH,CRITICAL', GITLEAKS_FLAGS: '--log-opts=-n50' }
+```
+
+The value is spliced into the command unquoted, which is what makes several
+flags in one string work — and what makes it the wrong place for a value that
+came from outside the repository. These are for the person writing the
+Taskfile, not for user input.
+
+Where one module runs the same tool several ways, each call gets its own input
+rather than one shared bag: `HELM_LINT_FLAGS`, `HELM_TEMPLATE_FLAGS`,
+`HELM_PACKAGE_FLAGS` and `HELM_FLAGS` (registry calls) in `release`. A single
+`HELM_FLAGS` would put `--dry-run` on a `helm package` that has no such flag.
+
 ### Commit the remote lock
 
 A module pulled over the network — `?ref=vX.Y.Z` rather than a checkout beside
@@ -299,7 +322,7 @@ you — leaves a lock in `.task/remote/`:
 Task refuses to run when the content behind that ref no longer matches it:
 
 ```
-task: Taskfile "…//go?ref=v3.5.0" not trusted by user
+task: Taskfile "…//go?ref=v3.6.0" not trusted by user
 ```
 
 That is the only thing standing between a moved tag and your build, so commit

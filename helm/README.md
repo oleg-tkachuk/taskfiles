@@ -21,6 +21,7 @@ includes:
 | `K8S_CONTEXT` | current | pin a cluster |
 | `HELM_NS` | every namespace | limit the scope to one namespace |
 | `CONFIRM` | — | required by `uninstall-all`; must name the context being emptied |
+| `HELM_UNINSTALL_FLAGS` | — | verbatim extra flags for `helm uninstall` |
 
 ## Examples
 

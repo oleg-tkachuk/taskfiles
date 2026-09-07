@@ -43,6 +43,8 @@ vars:
   _PY_TC_CMD: '{{.TYPECHECK_CMD | default "mypy"}}'
   _PY_TC_MOD: '{{.TYPECHECK_MODULE | default "mypy"}}'
   _PY_TEST_FLAGS: '{{.PY_TEST_FLAGS | default "-q"}}'
+  _PY_UPDATE_FLAGS: '{{.POETRY_UPDATE_FLAGS | default ""}}'
+  _PY_LOCK_FLAGS: '{{.POETRY_LOCK_FLAGS | default ""}}'
   _PY_INSTALL_FLAGS: '{{.POETRY_INSTALL_FLAGS | default "--no-interaction"}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
@@ -105,7 +107,7 @@ tasks:
     desc: "Regenerate poetry.lock"
     cmds:
       - poetry env use {{._PY_BIN}} >/dev/null
-      - poetry lock
+      - poetry lock {{._PY_LOCK_FLAGS}}
       - echo "{{._PY_OK}} {{._PY_NAME}} · py · poetry.lock regenerated"
 
   deps:update:
@@ -114,7 +116,7 @@ tasks:
     # Widening those is deps:update:latest.
     cmds:
       - echo "{{._PY_RUN}} {{._PY_NAME}} · py · poetry update"
-      - poetry update --no-interaction
+      - poetry update --no-interaction {{._PY_UPDATE_FLAGS}}
       - echo "{{._PY_OK}} {{._PY_NAME}} · py · deps bumped — review poetry.lock, then lint + test"
 
   deps:update:latest:

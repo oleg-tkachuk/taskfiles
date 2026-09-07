@@ -28,6 +28,7 @@ workspace — tasks then read `auth:<task>`.
 | `JWT_ISS` / `JWT_AUD` / `JWT_SUB` | `local-dev` / `local-api` / `dev-user` | claims |
 | `JWT_TTL_SECONDS` | `86400` | lifetime, in seconds |
 | `JWT_CLAIMS` | `{}` | extra claims, as a JSON object |
+| `STEP_FLAGS` | — | verbatim extra flags for `step crypto jwt sign` |
 
 ## Examples
 

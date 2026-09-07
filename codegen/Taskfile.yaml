@@ -21,6 +21,9 @@ version: "3"
 #                     module — a JS one out of a pnpm tree, say. Evaluated by
 #                     the shell, so `$(pnpm -C ../web bin)` works.
 #   GENERATE_CMD      what `generate` runs (default `go generate ./...`)
+#   BUF_FLAGS         verbatim extra flags for every buf generate
+#   SQLC_FLAGS        verbatim extra sqlc flags
+#   GOIMPORTS_FLAGS   verbatim extra goimports flags
 #   CODEGEN_BIN_DIR   where those plugins land            (default ./bin)
 #   GENERATED_DIRS    directories to normalise with goimports after generating
 #   SQLC_MODULE       run sqlc through `go run <module>` instead of from PATH
@@ -80,6 +83,9 @@ vars:
   _CG_MOCK_SPEC: '{{.MOCKS_PATHSPEC | default "internal"}}'
   _CG_SQLC_DIR: '{{.SQLC_DIR | default ""}}'
   _CG_GEN_CMD: '{{.GENERATE_CMD | default "go generate ./..."}}'
+  _CG_BUF_FLAGS: '{{.BUF_FLAGS | default ""}}'
+  _CG_SQLC_FLAGS: '{{.SQLC_FLAGS | default ""}}'
+  _CG_GOIMPORTS_FLAGS: '{{.GOIMPORTS_FLAGS | default ""}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _CG_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -147,7 +153,7 @@ tasks:
           go install {{._CG_PLUGINS}}
           {{end}}
           {{if ._CG_BUF_PATH}}export PATH="{{._CG_BUF_PATH}}:$PATH"{{end}}
-          buf generate {{._CG_BUF_IN}} --template {{.ITEM}}
+          buf generate {{._CG_BUF_FLAGS}} {{._CG_BUF_IN}} --template {{.ITEM}}
       - task: _normalise
 
   generate:
@@ -166,7 +172,7 @@ tasks:
       - sh: '{{if ._CG_SQLC_MOD}}true{{else}}command -v sqlc >/dev/null{{end}}'
         msg: "sqlc is not installed — https://docs.sqlc.dev/en/latest/overview/install.html, or set SQLC_MODULE to run it through `go run`"
     cmds:
-      - '{{if ._CG_SQLC_MOD}}go run {{._CG_SQLC_MOD}} generate{{else}}sqlc generate{{end}}'
+      - '{{if ._CG_SQLC_MOD}}go run {{._CG_SQLC_MOD}} generate{{else}}sqlc generate{{end}} {{._CG_SQLC_FLAGS}}'
 
   check:
     desc: "Fail when any committed generated output is stale"
@@ -215,5 +221,5 @@ tasks:
     cmds:
       - cmd: |-
           if command -v goimports >/dev/null 2>&1; then
-            goimports -w {{._CG_DIRS}}
+            goimports {{._CG_GOIMPORTS_FLAGS}} -w {{._CG_DIRS}}
           fi

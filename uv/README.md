@@ -34,6 +34,7 @@ workspace — tasks then read `py:<task>`.
 | `PY_SRC` | `src` | what lint and format target |
 | `PY_TEST_FLAGS` | `-q` | flags for the test run |
 | `UV_SYNC_FLAGS` | `--group dev` | which dependency sets to install |
+| `UV_LOCK_FLAGS` | — | extra flags for `uv lock` |
 | `TEST_CMD` | `pytest` | which runner each task invokes |
 | `LINT_CMD` | `ruff check` | what `lint` runs |
 | `FORMAT_CMD` | `ruff format` | what `fmt` runs |

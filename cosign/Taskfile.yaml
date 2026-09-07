@@ -33,6 +33,7 @@ version: "3"
 #   COSIGN_SIGN_FLAGS  extra flags for sign/attest
 #   COSIGN_VERIFY_FLAGS  extra flags for verify   (default --insecure-ignore-tlog)
 #   SBOM_FORMAT        syft output format             (default spdx-json)
+#   SYFT_FLAGS         verbatim extra syft flags
 #   SBOM_INSECURE      "1" when the registry serves a certificate syft rejects
 #
 # The default configuration signs with a local key pair and no transparency
@@ -58,6 +59,7 @@ vars:
   _CS_REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}'
   _CS_CHART_REF: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/charts/{{.CHART_NAME | default .PROJECT_NAME | default "service"}}'
 
+  _CS_SYFT_FLAGS: '{{.SYFT_FLAGS | default ""}}'
   _CS_DIR: '{{.COSIGN_DIR | default "deploy/sigstore"}}'
   _CS_KEY: '{{.COSIGN_KEY | default (printf "%s/cosign.key" (.COSIGN_DIR | default "deploy/sigstore"))}}'
   _CS_PUB: '{{.COSIGN_PUB | default (printf "%s/cosign.pub" (.COSIGN_DIR | default "deploy/sigstore"))}}'
@@ -219,7 +221,7 @@ tasks:
           d="$(mktemp -d "${TMPDIR:-/tmp}/sbom-XXXXXX")"
           trap 'rm -rf "$d"' EXIT
           sb="$d/sbom.json"
-          {{if eq (.SBOM_INSECURE | default "0") "1"}}SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY=true {{end}}syft '{{.REF}}' -q -o {{._CS_SBOM_FORMAT}}="$sb"
+          {{if eq (.SBOM_INSECURE | default "0") "1"}}SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY=true {{end}}syft {{._CS_SYFT_FLAGS}} '{{.REF}}' -q -o {{._CS_SBOM_FORMAT}}="$sb"
           COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign attest --yes \
             {{if ._CS_CONFIG}}--signing-config {{._CS_CONFIG}} {{end}}--key {{._CS_KEY}} \
             --predicate "$sb" --type spdxjson {{._CS_SIGN_FLAGS}} '{{.REF}}' >/dev/null

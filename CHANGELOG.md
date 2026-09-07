@@ -16,6 +16,35 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [3.6.0] — 2026-09-07
+
+### Added
+
+- **Every external tool invocation now takes a verbatim pass-through.** The
+  convention already existed for a dozen tools; these were the ones still
+  hard-coded:
+
+  | Module | New input |
+  | --- | --- |
+  | `sealed-secrets` | `KUBESEAL_FLAGS` |
+  | `codegen` | `BUF_FLAGS`, `SQLC_FLAGS`, `GOIMPORTS_FLAGS` |
+  | `release` | `HELM_LINT_FLAGS`, `HELM_TEMPLATE_FLAGS`, `HELM_PACKAGE_FLAGS` |
+  | `cosign` | `SYFT_FLAGS` |
+  | `helm` | `HELM_UNINSTALL_FLAGS` |
+  | `auth` | `STEP_FLAGS` |
+  | `python` | `POETRY_UPDATE_FLAGS`, `POETRY_LOCK_FLAGS` |
+  | `uv` | `UV_LOCK_FLAGS` |
+
+  Where a module runs one tool several ways, each call gets its own input
+  rather than one shared bag — a single `HELM_FLAGS` would put `--dry-run` on
+  a `helm package` that has no such flag.
+
+### Documentation
+
+- Conventions gained **Every tool invocation takes flags**, including the
+  caveat that the value is spliced in unquoted and so is for the person writing
+  the Taskfile, not for user input.
+
 ## [3.5.0] — 2026-09-07
 
 ### Added
@@ -648,6 +677,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[3.6.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.6.0
 [3.5.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.5.0
 [3.4.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.4.0
 [3.3.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.3.1

@@ -35,6 +35,7 @@ tasks:
       SUB: '{{.JWT_SUB | default "dev-user"}}'
       TTL: '{{.JWT_TTL_SECONDS | default "86400"}}'
       CLAIMS: '{{.JWT_CLAIMS | default "{}"}}'
+      STEP_FLAGS: '{{.STEP_FLAGS | default ""}}'
     preconditions:
       - sh: command -v step >/dev/null
         msg: "the smallstep CLI is not installed — https://smallstep.com/docs/step-cli/installation/"
@@ -43,7 +44,7 @@ tasks:
       # so it never lands in the process table.
       - >-
         printf '%s' {{.CLAIMS | q}} |
-        step crypto jwt sign --alg {{.ALG | q}}
+        step crypto jwt sign {{.STEP_FLAGS}} --alg {{.ALG | q}}
         --key <(printf '%s' {{.SECRET | q}})
         --iss {{.ISS | q}} --aud {{.AUD | q}} --sub {{.SUB | q}}
         --exp $(($(date +%s) + {{.TTL}}))

@@ -23,6 +23,7 @@ includes:
 | Var | Default | Meaning |
 |---|---|---|
 | `SEALED_SECRETS_NS` | `sealed-secrets` | controller namespace |
+| `KUBESEAL_FLAGS` | — | verbatim extra kubeseal flags |
 | `SEALED_SECRETS_CONTROLLER` | `sealed-secrets-controller` | controller name |
 | `K8S_CONTEXT` | current | pin a cluster |
 

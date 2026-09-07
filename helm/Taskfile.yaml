@@ -28,6 +28,7 @@ vars:
   _HELM_CTX: '{{if .K8S_CONTEXT}} --kube-context {{.K8S_CONTEXT}}{{end}}'
   _HELM_KCTX: '{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT}}{{end}}'
   _HELM_SCOPE: '{{if .HELM_NS}}--namespace {{.HELM_NS}}{{else}}--all-namespaces{{end}}'
+  _HELM_UNINSTALL_FLAGS: '{{.HELM_UNINSTALL_FLAGS | default ""}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _HELM_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -81,7 +82,7 @@ tasks:
           helm list{{._HELM_CTX}} {{._HELM_SCOPE}} \
             | awk 'NR > 1 { print $1, $2 }' \
             | while read -r name ns; do
-                helm uninstall{{._HELM_CTX}} "$name" --namespace "$ns" >/dev/null \
+                helm uninstall{{._HELM_CTX}} {{._HELM_UNINSTALL_FLAGS}} "$name" --namespace "$ns" >/dev/null \
                   && echo "{{._HELM_OK}} helm · uninstalled $ns/$name"
               done
       - echo "{{._HELM_OK}} helm · nothing left in scope"

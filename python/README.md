@@ -35,6 +35,8 @@ workspace — tasks then read `py:<task>`.
 | `PY_SRC` | `src` | what lint and format target |
 | `PY_TEST_FLAGS` | `-q` | flags for the test run |
 | `POETRY_INSTALL_FLAGS` | `--no-interaction` | e.g. add `--no-root` |
+| `POETRY_UPDATE_FLAGS` | — | extra flags for `poetry update` |
+| `POETRY_LOCK_FLAGS` | — | extra flags for `poetry lock` |
 | `TEST_CMD` | `pytest` | which runner each task invokes |
 | `LINT_CMD` | `ruff check` | what `lint` runs |
 | `FORMAT_CMD` | `ruff format` | what `fmt` runs |
