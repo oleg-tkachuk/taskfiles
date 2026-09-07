@@ -44,6 +44,11 @@ SHA with that flag. The tag above is an example; the current one is on the
 [releases page](https://github.com/oleg-tkachuk/taskfiles/releases), and
 [CHANGELOG.md](CHANGELOG.md) says what moving to it costs.
 
+A rename or a removal is a major bump — these modules are a public API, and
+`?ref=` is the only thing between a rename here and your Taskfile. Adding a
+task or an input is a minor; everything else is a patch. How a release is cut
+is in [RELEASE.md](RELEASE.md).
+
 ### Working on the library itself
 
 Point `TASKLIB` at a checkout beside your repository and leave `TASKLIB_REF`
@@ -230,33 +235,6 @@ a tag is mutable, and a pin nobody updates is its own problem.
 skips are `status`, cleanup is `defer`, iteration is `for`, and required
 inputs are `requires`. Multi-line bash blocks were the previous
 implementation; they are not the current one.
-
-## Releasing
-
-Trunk-based: `main` is the only long-lived branch, work lands on it in small
-commits, and a release is a tag. There is no `develop` — consumers pin
-`?ref=vX.Y.Z`, so what is on `main` cannot reach anyone who has not chosen it.
-
-```bash
-task lint                                   # the gate, also run by the hooks
-git tag -a v1.2.0 -m "…" && git push --tags # release.yml takes it from here
-```
-
-Pushing the tag runs `.github/workflows/release.yml`, which lints the tagged
-tree, refuses a tag that is not `vMAJOR.MINOR.PATCH` or has no
-[CHANGELOG](CHANGELOG.md) entry, includes the published tag **over the network**
-the way a consumer does — the only check that proves the tag is actually
-fetchable — and then creates the GitHub release with notes generated from the
-commits.
-
-The release notes and the changelog are deliberately different things. The
-notes list what changed; the changelog says what to do about it. Write the
-entry under `## [Unreleased]` as you go, and move it under the version when you
-cut the tag.
-
-Renaming or removing a task is a major bump: these modules are a public API,
-and `?ref=` is the only thing standing between a rename here and forty broken
-Taskfiles.
 
 ## License
 
