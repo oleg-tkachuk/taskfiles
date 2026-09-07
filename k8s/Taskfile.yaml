@@ -53,28 +53,28 @@ tasks:
     status:
       - "{{._K8S_KUBECTL}} -n {{._K8S_NS}} get deploy/{{._K8S_DEPLOY}} >/dev/null 2>&1"
     cmds:
-      - echo "⚠ {{._K8S_SVC}} · k8s · deploy/{{._K8S_DEPLOY}} not found in {{._K8S_NS}} — skipping restart"
+      - echo "🟡 {{._K8S_SVC}} · k8s · deploy/{{._K8S_DEPLOY}} not found in {{._K8S_NS}} — skipping restart"
 
   restart:_do:
     internal: true
     status:
       - "! {{._K8S_KUBECTL}} -n {{._K8S_NS}} get deploy/{{._K8S_DEPLOY}} >/dev/null 2>&1"
     cmds:
-      - echo "▸ {{._K8S_SVC}} · k8s · roll deploy/{{._K8S_DEPLOY}} in {{._K8S_NS}}"
+      - echo "🔵 {{._K8S_SVC}} · k8s · roll deploy/{{._K8S_DEPLOY}} in {{._K8S_NS}}"
       - "{{._K8S_KUBECTL}} -n {{._K8S_NS}} rollout restart deploy/{{._K8S_DEPLOY}}"
       - "{{._K8S_KUBECTL}} -n {{._K8S_NS}} rollout status deploy/{{._K8S_DEPLOY}} --timeout={{.ROLLOUT_TIMEOUT | default \"2m\"}}"
-      - echo "✔ {{._K8S_SVC}} · k8s · rolled {{._K8S_DEPLOY}}"
+      - echo "✅ {{._K8S_SVC}} · k8s · rolled {{._K8S_DEPLOY}}"
 
   upgrade:
     desc: "helm upgrade --install the release from the local chart directory"
     cmds:
-      - echo "▸ {{._K8S_SVC}} · k8s · helm upgrade --install {{._K8S_DEPLOY}} ({{._K8S_NS}})"
+      - echo "🔵 {{._K8S_SVC}} · k8s · helm upgrade --install {{._K8S_DEPLOY}} ({{._K8S_NS}})"
       - >-
         helm upgrade --install {{._K8S_DEPLOY}} {{._K8S_CHART_DIR}}
         --namespace {{._K8S_NS}} --create-namespace
         {{if .K8S_CONTEXT}}--kube-context {{.K8S_CONTEXT}}{{end}}
         {{.HELM_UPGRADE_FLAGS | default ""}}
-      - echo "✔ {{._K8S_SVC}} · k8s · release {{._K8S_DEPLOY}} upgraded"
+      - echo "✅ {{._K8S_SVC}} · k8s · release {{._K8S_DEPLOY}} upgraded"
 
   logs:
     desc: "Tail the deployment's logs (Ctrl-C to stop)"
@@ -97,5 +97,5 @@ tasks:
       # second knob; TEI-style containers on :80 set TARGET_PORT.
       TARGET: '{{.TARGET_PORT | default .PORT | default "8080"}}'
     cmds:
-      - echo "▸ {{._K8S_SVC}} · k8s · localhost:{{.PORT}} → deploy/{{._K8S_DEPLOY}}:{{.TARGET}}"
+      - echo "🔵 {{._K8S_SVC}} · k8s · localhost:{{.PORT}} → deploy/{{._K8S_DEPLOY}}:{{.TARGET}}"
       - "{{._K8S_KUBECTL}} -n {{._K8S_NS}} port-forward deploy/{{._K8S_DEPLOY}} {{.PORT}}:{{.TARGET}}"

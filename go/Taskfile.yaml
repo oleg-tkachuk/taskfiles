@@ -58,30 +58,30 @@ tasks:
       - sh: command -v go >/dev/null
         msg: "go is not installed"
     cmds:
-      - echo "▸ {{._GO_NAME}} · go · build {{._GO_MAIN}}"
+      - echo "🔵 {{._GO_NAME}} · go · build {{._GO_MAIN}}"
       - go build {{._GO_BUILD_FLAGS}} -o {{._GO_BIN}}/ {{._GO_MAIN}}
-      - echo "✔ {{._GO_NAME}} · go · built → {{._GO_BIN}}"
+      - echo "✅ {{._GO_NAME}} · go · built → {{._GO_BIN}}"
 
   compile:
     desc: "Type-check every package without writing a binary (for library modules)"
     cmds:
-      - echo "▸ {{._GO_NAME}} · go · compile {{._GO_PKG}}"
+      - echo "🔵 {{._GO_NAME}} · go · compile {{._GO_PKG}}"
       # -o /dev/null compiles every package but writes nothing, so a main under
       # ./cmd cannot collide with the cmd/ directory itself.
       - go build -o /dev/null {{._GO_PKG}}
-      - echo "✔ {{._GO_NAME}} · go · compiles clean"
+      - echo "✅ {{._GO_NAME}} · go · compiles clean"
 
   test:
     desc: "Run the unit suite"
     cmds:
-      - echo "▸ {{._GO_NAME}} · go · test {{._GO_PKG}}"
+      - echo "🔵 {{._GO_NAME}} · go · test {{._GO_PKG}}"
       # gotestsum when it is installed (one line per package), plain go test
       # otherwise — neither is worth a hard dependency.
       - >-
         command -v gotestsum >/dev/null 2>&1 &&
         gotestsum --format pkgname --hide-summary skipped -- {{._GO_TEST_FLAGS}} {{._GO_PKG}} ||
         go test {{._GO_TEST_FLAGS}} {{._GO_PKG}}
-      - echo "✔ {{._GO_NAME}} · go · tests pass"
+      - echo "✅ {{._GO_NAME}} · go · tests pass"
 
   test:coverage:
     desc: "Run the unit suite with coverage; HTML report lands in coverage/"
@@ -89,14 +89,14 @@ tasks:
       - mkdir -p coverage
       - go test -coverprofile=coverage/cover.out {{._GO_PKG}}
       - go tool cover -html=coverage/cover.out -o coverage/cover.html
-      - echo "✔ {{._GO_NAME}} · go · coverage report → coverage/cover.html"
+      - echo "✅ {{._GO_NAME}} · go · coverage report → coverage/cover.html"
 
   test:integration:
     desc: "Run the integration suite (build tag, needs Docker)"
     cmds:
-      - echo "▸ {{._GO_NAME}} · go · integration tests"
+      - echo "🔵 {{._GO_NAME}} · go · integration tests"
       - go test -race -tags={{._GO_TAGS}} {{._GO_PKG}}
-      - echo "✔ {{._GO_NAME}} · go · integration tests pass"
+      - echo "✅ {{._GO_NAME}} · go · integration tests pass"
 
   test:tagged:compile:
     desc: "Type-check build-tagged suites that the default test run never compiles"
@@ -104,9 +104,9 @@ tasks:
     # does not run, and nothing notices it has rotted until someone needs it.
     # `go vet` with the tag takes seconds and catches exactly that.
     cmds:
-      - echo "▸ {{._GO_NAME}} · go · vet -tags={{._GO_TAGS}}"
+      - echo "🔵 {{._GO_NAME}} · go · vet -tags={{._GO_TAGS}}"
       - go vet -tags={{._GO_TAGS}} {{._GO_PKG}}
-      - echo "✔ {{._GO_NAME}} · go · tagged suites compile"
+      - echo "✅ {{._GO_NAME}} · go · tagged suites compile"
 
   lint:
     desc: "golangci-lint over the module"
@@ -114,22 +114,22 @@ tasks:
       - sh: command -v golangci-lint >/dev/null
         msg: "golangci-lint is not installed — brew install golangci-lint"
     cmds:
-      - echo "▸ {{._GO_NAME}} · go · golangci-lint"
+      - echo "🔵 {{._GO_NAME}} · go · golangci-lint"
       - golangci-lint run {{._GO_LINT_FLAGS}} {{._GO_PKG}}
-      - echo "✔ {{._GO_NAME}} · go · lint clean"
+      - echo "✅ {{._GO_NAME}} · go · lint clean"
 
   fmt:
     desc: "gofmt -s -w, plus goimports when it is installed"
     cmds:
       - gofmt -s -w .
       - command -v goimports >/dev/null 2>&1 && goimports -w . || true
-      - echo "✔ {{._GO_NAME}} · go · formatted"
+      - echo "✅ {{._GO_NAME}} · go · formatted"
 
   tidy:
     desc: "go mod tidy the way CI resolves the module — standalone"
     cmds:
       - go mod tidy
-      - echo "✔ {{._GO_NAME}} · go · go.mod tidy"
+      - echo "✅ {{._GO_NAME}} · go · go.mod tidy"
 
   vuln:
     desc: "govulncheck — vulnerabilities this module's code actually reaches"
@@ -137,7 +137,7 @@ tasks:
       - sh: command -v govulncheck >/dev/null
         msg: "govulncheck is not installed — go install golang.org/x/vuln/cmd/govulncheck@latest"
     cmds:
-      - echo "▸ {{._GO_NAME}} · go · govulncheck"
+      - echo "🔵 {{._GO_NAME}} · go · govulncheck"
       - govulncheck {{._GO_PKG}}
 
   deps:update:
@@ -145,16 +145,16 @@ tasks:
     # Majors are deliberately not crossed: they need an import-path /vN edit and
     # a read of the upstream CHANGELOG.
     cmds:
-      - echo "▸ {{._GO_NAME}} · go · go get -u ./..."
+      - echo "🔵 {{._GO_NAME}} · go · go get -u ./..."
       - go get -u ./...
       - go mod tidy
       - go build -o /dev/null {{._GO_PKG}}
-      - echo "✔ {{._GO_NAME}} · go · deps bumped — review git diff go.mod go.sum"
+      - echo "✅ {{._GO_NAME}} · go · deps bumped — review git diff go.mod go.sum"
 
   deps:outdated:
     desc: "List dependencies with a newer version available (read-only)"
     cmds:
-      - go list -u -m all 2>/dev/null | grep '\[' || echo "✔ {{._GO_NAME}} · go · every dependency current"
+      - go list -u -m all 2>/dev/null | grep '\[' || echo "✅ {{._GO_NAME}} · go · every dependency current"
 
   bench:
     desc: "Run the benchmarks — no unit tests, just the measurements"
@@ -164,7 +164,7 @@ tasks:
     # Benchmarks that need a database sit behind a build tag, which is why the
     # tags the tagged-compile gate already knows about are passed here too.
     cmds:
-      - echo "▸ {{._GO_NAME}} · go · benchmarks in {{._GO_BENCH_PKG}}"
+      - echo "🔵 {{._GO_NAME}} · go · benchmarks in {{._GO_BENCH_PKG}}"
       - >-
         go test -tags={{._GO_TAGS}} -run='^$' -bench={{.BENCH | default "."}}
         {{._GO_BENCH_FLAGS}} {{._GO_BENCH_PKG}}

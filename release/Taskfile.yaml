@@ -146,7 +146,7 @@ tasks:
       - >-
         printf 'APP_VERSION=%s\nGIT_COMMIT_HASH=%s\nBUILD_TIME=%s\n'
         '{{._REL_VERSION}}' '{{._REL_SHA}}' '{{._REL_BUILD_TIME}}' > {{._REL_INFO_ENV}}
-      - echo "▸ {{._REL_SVC}} · version · {{._REL_VERSION}} → {{._REL_INFO_ENV}}"
+      - echo "🔵 {{._REL_SVC}} · version · {{._REL_VERSION}} → {{._REL_INFO_ENV}}"
 
   doctor:
     desc: "Check that everything this component declares actually resolves"
@@ -164,7 +164,7 @@ tasks:
           fail=0
 
           say() { printf '%s %s · doctor · %s\n' "$1" '{{._REL_SVC}}' "$2"; }
-          bad() { say '✖' "$1" >&2; fail=1; }
+          bad() { say '❌' "$1" >&2; fail=1; }
 
           # ─── tools ────────────────────────────────────────────────────────
           for t in git helm; do
@@ -177,11 +177,11 @@ tasks:
           elif [ '{{._REL_SHA}}' = "00000000" ]; then
             bad "no git history — every build would publish the same version"
           else
-            say '✔' "version {{._REL_VERSION}}"
+            say '✅' "version {{._REL_VERSION}}"
             # `cond && say …` would end the script here under Task's errexit
             # shell whenever cond is false, silently truncating the report.
             if [ -n '{{._REL_DIRTY}}' ]; then
-              say '⚠' "tree is dirty — this version is not reproducible"
+              say '🟡' "tree is dirty — this version is not reproducible"
             fi
           fi
 
@@ -199,7 +199,7 @@ tasks:
               # The full OCI path, not just the name: two components can carry
               # the same chart name safely, and only the path says whether they
               # actually land on top of each other.
-              say '✔' "chart {{._REL_CHART_DIR}} → {{._REL_CHART_REPO}}/{{._REL_CHART}}"
+              say '✅' "chart {{._REL_CHART_DIR}} → {{._REL_CHART_REPO}}/{{._REL_CHART}}"
             fi
           fi
 
@@ -210,7 +210,7 @@ tasks:
           if [ -f '{{._REL_DOCKERFILE}}' ]; then
             command -v docker >/dev/null 2>&1 || bad "docker is not installed"
             [ -d '{{._REL_CONTEXT}}' ] || bad "DOCKER_CONTEXT {{._REL_CONTEXT}} is not a directory"
-            say '✔' "image {{._REL_IMAGE}} from {{._REL_DOCKERFILE}} (context {{._REL_CONTEXT}})"
+            say '✅' "image {{._REL_IMAGE}} from {{._REL_DOCKERFILE}} (context {{._REL_CONTEXT}})"
 
             # `COPY --from=NAME` resolves to a build stage, an earlier stage
             # index, or an external tree passed as `--build-context NAME=path`.
@@ -234,7 +234,7 @@ tasks:
             for name in $external; do
               case " {{._REL_BUILD_FLAGS}} " in
                 *" --build-context $name="*|*" --build-context=$name="*)
-                  say '✔' "build context $name is passed" ;;
+                  say '✅' "build context $name is passed" ;;
                 *)
                   bad "COPY --from=$name names no build stage and no build context — BuildKit would pull docker.io/library/$name:latest; add --build-context $name=<path> to DOCKER_BUILD_FLAGS" ;;
               esac
@@ -242,7 +242,7 @@ tasks:
           elif [ -n '{{.DOCKERFILE | default ""}}' ]; then
             bad "DOCKERFILE {{._REL_DOCKERFILE}} not found — it is resolved from this directory, not from DOCKER_CONTEXT"
           else
-            say '⚠' "no {{._REL_DOCKERFILE}} — chart-only, publish with deploy:chart-only"
+            say '🟡' "no {{._REL_DOCKERFILE}} — chart-only, publish with deploy:chart-only"
           fi
 
           # ─── registry ─────────────────────────────────────────────────────
@@ -250,12 +250,12 @@ tasks:
           # waiting, and an unreachable registry must cost seconds, not a hang.
           code=$(curl -sk --max-time 10 -o /dev/null -w '%{http_code}' 'https://{{._REL_REG}}/v2/' 2>/dev/null || echo 000)
           case "$code" in
-            200|401|403) say '✔' "registry {{._REL_REG}} answers" ;;
-            *) say '⚠' "registry {{._REL_REG}} did not answer (got $code) — a push would fail" ;;
+            200|401|403) say '✅' "registry {{._REL_REG}} answers" ;;
+            *) say '🟡' "registry {{._REL_REG}} did not answer (got $code) — a push would fail" ;;
           esac
 
           if [ "$fail" = 0 ]; then
-            say '✔' "ready to publish"
+            say '✅' "ready to publish"
           fi
           exit "$fail"
 
@@ -283,7 +283,7 @@ tasks:
     status:
       - test -n '{{._REL_DIRTY}}' || ! docker image inspect {{._REL_IMAGE}}:{{._REL_VERSION}} >/dev/null 2>&1
     cmds:
-      - echo "⚠ {{._REL_SVC}} · image · {{._REL_VERSION}} already built — skipping"
+      - echo "🟡 {{._REL_SVC}} · image · {{._REL_VERSION}} already built — skipping"
 
   image:build:_do:
     internal: true
@@ -305,7 +305,7 @@ tasks:
           working directory. A component that builds from the repo root still
           names its own Dockerfile: DOCKER_CONTEXT ../.., DOCKERFILE ./Dockerfile.
     cmds:
-      - echo "▸ {{._REL_SVC}} · image · build {{._REL_IMAGE}}:{{._REL_VERSION}}"
+      - echo "🔵 {{._REL_SVC}} · image · build {{._REL_IMAGE}}:{{._REL_VERSION}}"
       # --load is required under the docker-container buildx driver: without it
       # the result stays in the build cache and the next push fails with "tag
       # does not exist". Harmless no-op under the plain docker driver.
@@ -317,7 +317,7 @@ tasks:
         --build-arg GIT_COMMIT_HASH={{._REL_SHA}}
         --build-arg BUILD_TIME={{._REL_BUILD_TIME}}
         {{._REL_BUILD_FLAGS}} {{._REL_CONTEXT}}
-      - echo "✔ {{._REL_SVC}} · image · built {{._REL_VERSION}}"
+      - echo "✅ {{._REL_SVC}} · image · built {{._REL_VERSION}}"
 
   image:push:
     desc: "Push the component image to the registry"
@@ -326,9 +326,9 @@ tasks:
       - sh: docker image inspect {{._REL_IMAGE}}:{{._REL_VERSION}} >/dev/null 2>&1
         msg: "{{._REL_IMAGE}}:{{._REL_VERSION}} is not in the local image store — run `task svc:image:build`"
     cmds:
-      - echo "▸ {{._REL_SVC}} · image · push {{._REL_IMAGE}}:{{._REL_VERSION}}"
+      - echo "🔵 {{._REL_SVC}} · image · push {{._REL_IMAGE}}:{{._REL_VERSION}}"
       - docker push {{._REL_IMAGE}}:{{._REL_VERSION}}
-      - echo "✔ {{._REL_SVC}} · image · pushed {{._REL_VERSION}}"
+      - echo "✅ {{._REL_SVC}} · image · pushed {{._REL_VERSION}}"
 
   image:gc:
     desc: "Trim the BuildKit cache to the keep floor and drop dangling images"
@@ -340,7 +340,7 @@ tasks:
         docker buildx prune {{if ._REL_BUILDER}}--builder {{._REL_BUILDER}} {{end}}--keep-storage={{._REL_KEEP}} -f >/dev/null 2>&1 ||
         docker buildx prune --keep-storage={{._REL_KEEP}} -f >/dev/null 2>&1 || true
       - docker image prune -f >/dev/null 2>&1 || true
-      - echo "✔ {{._REL_SVC}} · image · build cache trimmed to {{._REL_KEEP}}"
+      - echo "✅ {{._REL_SVC}} · image · build cache trimmed to {{._REL_KEEP}}"
 
   # ═══ helm chart ═════════════════════════════════════════════════════════════
 
@@ -388,8 +388,8 @@ tasks:
       # file was written for, and a missing tool should not turn a checkout red.
       - >-
         command -v yq >/dev/null 2>&1 && yq ea '.' {{._REL_RENDER}} >/dev/null ||
-        echo "⚠ {{._REL_SVC}} · chart · yq absent, YAML parse gate skipped"
-      - echo "✔ {{._REL_SVC}} · chart · renders $(grep -c '^kind:' {{._REL_RENDER}}) resources cleanly"
+        echo "🟡 {{._REL_SVC}} · chart · yq absent, YAML parse gate skipped"
+      - echo "✅ {{._REL_SVC}} · chart · renders $(grep -c '^kind:' {{._REL_RENDER}}) resources cleanly"
       - rm -f {{._REL_RENDER}}
 
   chart:render:_write:
@@ -412,7 +412,7 @@ tasks:
       - >-
         helm package {{._REL_CHART_DIR}} --version {{._REL_VERSION}}
         --app-version {{.CHART_APP_VERSION | default ._REL_VERSION}} >/dev/null
-      - echo "▸ {{._REL_SVC}} · chart · packaged {{._REL_CHART}}-{{._REL_VERSION}}.tgz"
+      - echo "🔵 {{._REL_SVC}} · chart · packaged {{._REL_CHART}}-{{._REL_VERSION}}.tgz"
 
   chart:push:
     desc: "Package and push the chart (skipped when that version is already published)"
@@ -428,7 +428,7 @@ tasks:
     status:
       - "! helm show chart {{._REL_CHART_REPO}}/{{._REL_CHART}} --version {{._REL_VERSION}} {{._REL_HELM_FLAGS}} >/dev/null 2>&1"
     cmds:
-      - echo "⚠ {{._REL_SVC}} · chart · {{._REL_VERSION}} already in the registry — skipping"
+      - echo "🟡 {{._REL_SVC}} · chart · {{._REL_VERSION}} already in the registry — skipping"
 
   chart:push:_do:
     internal: true
@@ -442,9 +442,9 @@ tasks:
       # Runs whether the push succeeds or fails — a stray .tgz in the component
       # directory is how the next `helm package` picks up the wrong file.
       - defer: rm -f {{._REL_CHART}}-{{._REL_VERSION}}.tgz
-      - echo "▸ {{._REL_SVC}} · chart · push {{._REL_CHART}}:{{._REL_VERSION}} → {{._REL_CHART_REPO}}"
+      - echo "🔵 {{._REL_SVC}} · chart · push {{._REL_CHART}}:{{._REL_VERSION}} → {{._REL_CHART_REPO}}"
       - helm push {{._REL_CHART}}-{{._REL_VERSION}}.tgz {{._REL_CHART_REPO}} {{._REL_HELM_FLAGS}} >/dev/null
-      - echo "✔ {{._REL_SVC}} · chart · pushed {{._REL_VERSION}}"
+      - echo "✅ {{._REL_SVC}} · chart · pushed {{._REL_VERSION}}"
 
   chart:clean:
     desc: "Remove packaged chart tarballs from the component directory"
@@ -461,11 +461,11 @@ tasks:
       - task: chart:verify
       - task: image:push
       - task: chart:push
-      - echo "✔ {{._REL_SVC}} · deploy · {{._REL_VERSION}} → {{._REL_REG}}"
+      - echo "✅ {{._REL_SVC}} · deploy · {{._REL_VERSION}} → {{._REL_REG}}"
 
   deploy:chart-only:
     desc: "Publish the chart alone — for components running an upstream image"
     cmds:
       - task: chart:verify
       - task: chart:push
-      - echo "✔ {{._REL_SVC}} · deploy · chart {{._REL_VERSION}} → {{._REL_CHART_REPO}}"
+      - echo "✅ {{._REL_SVC}} · deploy · chart {{._REL_VERSION}} → {{._REL_CHART_REPO}}"

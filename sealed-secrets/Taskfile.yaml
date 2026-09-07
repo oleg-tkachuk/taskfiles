@@ -55,7 +55,7 @@ tasks:
         --from-literal={{ printf "%s=%s" .key .value | q }}
         --dry-run=client -o yaml
         | {{._SS_SEAL}} > {{.output | q}}
-      - echo "✔ sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
+      - echo "✅ sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
 
   seal:file:
     desc: "Seal every key in an env file into one SealedSecret manifest"
@@ -74,7 +74,7 @@ tasks:
         --from-env-file={{.file | q}}
         --dry-run=client -o yaml
         | {{._SS_SEAL}} > {{.output | q}}
-      - echo "✔ sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
+      - echo "✅ sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
 
   pubkey:
     desc: "Print the controller's public certificate, for sealing without a cluster"

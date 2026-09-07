@@ -39,29 +39,29 @@ tasks:
       - sh: test -f {{._CMP_FILE}}
         msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     cmds:
-      - echo "▸ {{._CMP_NAME}} · compose · up ({{._CMP_FILE}})"
+      - echo "🔵 {{._CMP_NAME}} · compose · up ({{._CMP_FILE}})"
       - "{{._CMP_CMD}} up -d --wait"
       - task: ps
-      - echo "✔ {{._CMP_NAME}} · compose · stack healthy"
+      - echo "✅ {{._CMP_NAME}} · compose · stack healthy"
 
   build:
     desc: "Rebuild the images the stack is composed of, then start it"
     cmds:
       - "{{._CMP_CMD}} up -d --build --wait"
-      - echo "✔ {{._CMP_NAME}} · compose · rebuilt and healthy"
+      - echo "✅ {{._CMP_NAME}} · compose · rebuilt and healthy"
 
   down:
     desc: "Stop the stack. Volumes are preserved."
     cmds:
       - "{{._CMP_CMD}} down"
-      - echo "✔ {{._CMP_NAME}} · compose · stopped (volumes kept)"
+      - echo "✅ {{._CMP_NAME}} · compose · stopped (volumes kept)"
 
   reset:
     desc: "Stop the stack and DELETE its volumes — local data is lost"
     prompt: "Delete every volume of {{._CMP_FILE}}? Local database contents are lost."
     cmds:
       - "{{._CMP_CMD}} down -v"
-      - echo "✔ {{._CMP_NAME}} · compose · torn down, volumes dropped"
+      - echo "✅ {{._CMP_NAME}} · compose · torn down, volumes dropped"
 
   ps:
     desc: "Show what is running"

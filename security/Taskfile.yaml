@@ -94,12 +94,12 @@ tasks:
       - sh: command -v gitleaks >/dev/null
         msg: "gitleaks is not installed — brew install gitleaks"
     cmds:
-      - echo "▸ sec · gitleaks"
+      - echo "🔵 sec · gitleaks"
       # A repository with accepted historical findings passes a baseline; without
       # one every old finding is reported again on every run, and a gate that
       # always fails is a gate nobody reads.
       - gitleaks git . --no-banner --redact{{if ._SEC_GL_BASE}} --baseline-path {{._SEC_GL_BASE}}{{end}} {{._SEC_GL_FLAGS}}
-      - echo "✔ sec · no secrets in history"
+      - echo "✅ sec · no secrets in history"
 
   trivy:
     desc: "trivy — vulnerable dependencies and secrets (blocking) plus IaC misconfig (report-only)"
@@ -107,12 +107,12 @@ tasks:
       - sh: command -v trivy >/dev/null
         msg: "trivy is not installed — brew install trivy"
     cmds:
-      - echo "▸ sec · trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_TARGET}}"
+      - echo "🔵 sec · trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_TARGET}}"
       - trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_SCAN}} --exit-code 1 --quiet {{._SEC_TRIVY_FLAGS}} {{._SEC_TRIVY_TARGET}}
       # Misconfiguration findings are informational: they are dense, noisy, and
       # blocking on them would stop every release for a Kubernetes default.
       - trivy config --exit-code 0 --quiet .
-      - echo "✔ sec · trivy clean"
+      - echo "✅ sec · trivy clean"
 
   proto:breaking:
     desc: "buf breaking — refuse incompatible proto changes against {{._SEC_BASE}}"
@@ -120,15 +120,15 @@ tasks:
       - sh: command -v buf >/dev/null
         msg: "buf is not installed — brew install bufbuild/buf/buf"
     cmds:
-      - echo "▸ sec · buf breaking vs {{._SEC_BASE}}"
+      - echo "🔵 sec · buf breaking vs {{._SEC_BASE}}"
       - buf breaking --against '.git#branch={{._SEC_BASE}}' {{._SEC_BUF_FLAGS}}
-      - echo "✔ sec · proto contract compatible"
+      - echo "✅ sec · proto contract compatible"
 
   _in-module:
     internal: true
     dir: "{{.MODULE}}"
     cmds:
-      - echo "▸ sec · {{.LABEL}} · {{.MODULE}}"
+      - echo "🔵 sec · {{.LABEL}} · {{.MODULE}}"
       - "{{.CMD}}"
 
 
@@ -144,4 +144,4 @@ tasks:
         cmd: >-
           cd {{.ITEM}} &&
           gosec {{._SEC_GOSEC_FLAGS}} ./... &&
-          echo "✔ security · gosec · {{.ITEM}} clean"
+          echo "✅ security · gosec · {{.ITEM}} clean"

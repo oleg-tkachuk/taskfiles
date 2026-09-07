@@ -79,19 +79,19 @@ tasks:
 
 ```console
 $ task deploy
-▸ core-api · version 1.4.0 → ./deploy/info.env
-▸ core-api · image · build registry.example.com/acme/core-api:1.4.0
-✔ core-api · chart · renders 10 resources cleanly
-✔ core-api · image · pushed 1.4.0
-✔ core-api · chart · pushed 1.4.0
+🔵 core-api · version 1.4.0 → ./deploy/info.env
+🔵 core-api · image · build registry.example.com/acme/core-api:1.4.0
+✅ core-api · chart · renders 10 resources cleanly
+✅ core-api · image · pushed 1.4.0
+✅ core-api · chart · pushed 1.4.0
 ```
 
 Run it again on the same commit and it does nothing:
 
 ```console
 $ task deploy
-⚠ core-api · image · 1.4.0 already built — skipping
-⚠ core-api · chart · 1.4.0 already in the registry — skipping
+🟡 core-api · image · 1.4.0 already built — skipping
+🟡 core-api · chart · 1.4.0 already in the registry — skipping
 ```
 
 ### A component whose image comes from upstream
@@ -156,12 +156,12 @@ and the registry. It is a report, not a gate: it prints every problem instead of
 stopping at the first, then exits non-zero if any of them is fatal.
 
 ```
-✔ billing-api · doctor · version 0.1.0-dev.1788728844.g6ec96167
-✔ billing-api · doctor · chart ./deploy/chart → oci://registry.example.com/acme/charts/billing-api
-✔ billing-api · doctor · image registry.example.com/acme/billing-api from ./deploy/Dockerfile (context .)
-✔ billing-api · doctor · build context proto is passed
-✔ billing-api · doctor · registry registry.example.com answers
-✔ billing-api · doctor · ready to publish
+✅ billing-api · doctor · version 0.1.0-dev.1788728844.g6ec96167
+✅ billing-api · doctor · chart ./deploy/chart → oci://registry.example.com/acme/charts/billing-api
+✅ billing-api · doctor · image registry.example.com/acme/billing-api from ./deploy/Dockerfile (context .)
+✅ billing-api · doctor · build context proto is passed
+✅ billing-api · doctor · registry registry.example.com answers
+✅ billing-api · doctor · ready to publish
 ```
 
 It checks the mistakes that have actually happened here:

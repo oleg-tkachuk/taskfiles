@@ -41,15 +41,15 @@ tasks:
       - sh: k3d cluster list -o json 2>/dev/null | grep -q '"name"'
         msg: "no k3d cluster exists — `k3d cluster create`"
     cmds:
-      - echo "✔ {{._RT_SVC}} · local · k3d cluster present"
+      - echo "✅ {{._RT_SVC}} · local · k3d cluster present"
 
   image:load:
     desc: "Import the built image into the k3d cluster"
     deps: [check]
     cmds:
-      - echo "▸ {{._RT_SVC}} · local · k3d image import {{._REL_IMAGE}}:{{._REL_VERSION}}"
+      - echo "🔵 {{._RT_SVC}} · local · k3d image import {{._REL_IMAGE}}:{{._REL_VERSION}}"
       - k3d image import {{._REL_IMAGE}}:{{._REL_VERSION}} {{if .K3D_CLUSTER}}--cluster {{.K3D_CLUSTER}}{{end}}
-      - echo "✔ {{._RT_SVC}} · local · image inside k3d"
+      - echo "✅ {{._RT_SVC}} · local · image inside k3d"
 
   install:
     desc: "helm upgrade --install from the chart directory, running the local image"
@@ -58,7 +58,7 @@ tasks:
     deps: [check]
     cmds:
       - task: image:load
-      - echo "▸ {{._RT_SVC}} · local · helm upgrade --install into {{._RT_CTX}}/{{._RT_K8S_NS}}"
+      - echo "🔵 {{._RT_SVC}} · local · helm upgrade --install into {{._RT_CTX}}/{{._RT_K8S_NS}}"
       - >-
         helm upgrade --install {{._RT_SVC}} {{._RT_CHART_DIR}}
         --kube-context {{._RT_CTX}}
@@ -67,4 +67,4 @@ tasks:
         --set image.pullPolicy=IfNotPresent
         {{.HELM_UPGRADE_FLAGS | default ""}}
         {{if .VALUES}}--values {{.VALUES}}{{end}}
-      - echo "✔ {{._RT_SVC}} · local · {{._REL_VERSION}} installed into {{._RT_CTX}}"
+      - echo "✅ {{._RT_SVC}} · local · {{._REL_VERSION}} installed into {{._RT_CTX}}"

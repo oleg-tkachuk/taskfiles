@@ -91,8 +91,8 @@ tasks:
       - >-
         cosign signing-config create --no-default-rekor --no-default-fulcio
         --no-default-tsa --no-default-oidc --out {{._CS_CONFIG}}
-      - echo "✔ {{._CS_NAME}} · cosign · wrote {{._CS_DIR}}/cosign.{key,pub} + signing-config.json"
-      - echo "⚠ {{._CS_NAME}} · cosign · commit cosign.pub, keep cosign.key out of the repo"
+      - echo "✅ {{._CS_NAME}} · cosign · wrote {{._CS_DIR}}/cosign.{key,pub} + signing-config.json"
+      - echo "🟡 {{._CS_NAME}} · cosign · commit cosign.pub, keep cosign.key out of the repo"
 
   all:
     desc: "Sign the image and the chart, then attest the image's SBOM"
@@ -160,8 +160,8 @@ tasks:
       - for: { var: REFS }
         cmd: >-
           cosign verify {{._CS_VERIFY_FLAGS}} --key {{._CS_PUB}} '{{.ITEM}}' >/dev/null 2>&1
-          && echo "✔ {{._CS_NAME}} · cosign · verified {{.ITEM}}"
-          || { echo "✖ {{._CS_NAME}} · cosign · unsigned or bad signature: {{.ITEM}}" >&2; exit 1; }
+          && echo "✅ {{._CS_NAME}} · cosign · verified {{.ITEM}}"
+          || { echo "❌ {{._CS_NAME}} · cosign · unsigned or bad signature: {{.ITEM}}" >&2; exit 1; }
 
   # ─── internals ──────────────────────────────────────────────────────────────
 
@@ -181,7 +181,7 @@ tasks:
         COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign sign --yes
         {{if ._CS_CONFIG}}--signing-config {{._CS_CONFIG}} {{end}}--key {{._CS_KEY}}
         {{._CS_SIGN_FLAGS}} '{{.REF}}' >/dev/null
-      - echo "✔ {{._CS_NAME}} · cosign · signed {{.REF}}"
+      - echo "✅ {{._CS_NAME}} · cosign · signed {{.REF}}"
 
   _attest:
     internal: true
@@ -217,4 +217,4 @@ tasks:
           COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign attest --yes \
             {{if ._CS_CONFIG}}--signing-config {{._CS_CONFIG}} {{end}}--key {{._CS_KEY}} \
             --predicate "$sb" --type spdxjson {{._CS_SIGN_FLAGS}} '{{.REF}}' >/dev/null
-      - echo "✔ {{._CS_NAME}} · cosign · SBOM attested to {{.REF}}"
+      - echo "✅ {{._CS_NAME}} · cosign · SBOM attested to {{.REF}}"

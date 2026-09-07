@@ -100,7 +100,7 @@ jobs:
           if [ "$latest" != "$PINNED" ]; then
             echo "::notice::Task $latest is out; this repository pins $PINNED. Bump TASK_VERSION in both workflows after reading the changelog."
           else
-            echo "✔ TASK_VERSION $PINNED is the current release"
+            echo "✅ TASK_VERSION $PINNED is the current release"
           fi
 
       - name: 'Guard: every module lints'
@@ -233,7 +233,7 @@ jobs:
           task codegen:go
           test -f generated.go
           grep -q 'const Generated = true' generated.go
-          echo "✔ codegen:go wrote the file its directive asks for"
+          echo "✅ codegen:go wrote the file its directive asks for"
 
       - name: 'Verify: the go module compiles, tests and builds'
         working-directory: consumer
@@ -247,7 +247,7 @@ jobs:
           task go:compile
           task go:test
           task go:tidy
-          echo "✔ the go module's tasks run against a real module"
+          echo "✅ the go module's tasks run against a real module"
 
       - name: "Verify: the consumer's vars reach the modules"
         working-directory: consumer
@@ -258,6 +258,6 @@ jobs:
           set -euo pipefail
           version=$(task release:version)
           case "$version" in
-            9.9.9-dev.*) echo "✔ consumer vars reach the modules ($version)" ;;
-            *) echo "✖ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
+            9.9.9-dev.*) echo "✅ consumer vars reach the modules ($version)" ;;
+            *) echo "❌ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
           esac

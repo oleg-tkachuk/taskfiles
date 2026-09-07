@@ -245,8 +245,8 @@ single line.
 Component-scoped modules print `<marker> <component> · <area> ·
 <what happened>`; repo-scoped ones (`security`, `monorepo`, `argocd`) print
 `<marker> <module> · <what happened>`, because there is no one component to
-name. The markers are `▸` starting work, `✔` done, `⚠` skipped on purpose, `✖`
-failed.
+name. The markers are `🔵` starting work, `✅` done, `🟡` skipped on purpose and
+`❌` failed — one codepoint each, so every line starts the same width.
 
 ### Versioning
 

@@ -55,8 +55,8 @@ tasks:
 
 ```console
 $ task k8s:restart
-▸ core-api · k8s · roll deploy/core-api in acme
-✔ core-api · k8s · rolled core-api
+🔵 core-api · k8s · roll deploy/core-api in acme
+✅ core-api · k8s · rolled core-api
 
 $ task k8s:port-forward PORT=8080
 $ task k8s:port-forward PORT=8081 TARGET_PORT=80    # container listens on :80
@@ -69,7 +69,7 @@ $ task k8s:logs TAIL=500
 
 ```console
 $ task k8s:restart
-⚠ core-api · k8s · deploy/core-api not found in acme — skipping restart
+🟡 core-api · k8s · deploy/core-api not found in acme — skipping restart
 ```
 
 That is deliberate. These tasks sit in chains that have to stay green on a laptop

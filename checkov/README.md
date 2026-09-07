@@ -39,7 +39,7 @@ includes:
 
 ```console
 $ task checkov:scan
-✔ checkov · no findings outside the baseline
+✅ checkov · no findings outside the baseline
 
 $ task checkov:all          # everything, baselined findings included
 $ task checkov:baseline     # after fixing some, accept what is left
@@ -61,7 +61,7 @@ count is the only thing that tells them apart.
 
 ```console
 $ task checkov:baseline
-▸ checkov · baselined findings: 41 → 38
+🔵 checkov · baselined findings: 41 → 38
 ```
 
 A number that went up is reported as a warning: something new was accepted

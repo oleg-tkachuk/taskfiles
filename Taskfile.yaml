@@ -51,13 +51,13 @@ tasks:
       - for: { var: PARSE_MODULES }
         task: _parse
         vars: { MODULE: "{{.ITEM}}" }
-      - echo "✔ taskfiles · every module parses"
+      - echo "✅ taskfiles · every module parses"
 
   _parse:
     internal: true
     cmds:
       - task -t {{.MODULE}}/Taskfile.yaml --list-all >/dev/null
-      - echo "  ✔ {{.MODULE}}"
+      - echo "  ✅ {{.MODULE}}"
 
   check:vars:
     desc: "Refuse a module var that is not prefixed, or a module that uses two prefixes"
@@ -85,33 +85,33 @@ tasks:
 
             bare=$(printf '%s\n' "$vars" | grep -vE '^_[A-Z0-9]+_' || true)
             if [ -n "$bare" ]; then
-              echo "✖ taskfiles · $f declares vars that are not <_PREFIX_>-scoped:" >&2
+              echo "❌ taskfiles · $f declares vars that are not <_PREFIX_>-scoped:" >&2
               printf '    %s\n' $bare >&2
               fail=1
             fi
 
             prefixes=$(printf '%s\n' "$vars" | sed -nE 's/^(_[A-Z0-9]+_).*/\1/p' | sort -u)
             if [ "$(printf '%s\n' "$prefixes" | grep -c .)" -gt 1 ]; then
-              echo "✖ taskfiles · $f mixes prefixes: $(printf '%s ' $prefixes)" >&2
+              echo "❌ taskfiles · $f mixes prefixes: $(printf '%s ' $prefixes)" >&2
               fail=1
             fi
           done
-          [ "$fail" = 0 ] && echo "✔ taskfiles · every module var is scoped to its own module"
+          [ "$fail" = 0 ] && echo "✅ taskfiles · every module var is scoped to its own module"
           exit "$fail"
 
   check:silent:
     desc: "Refuse a module that does not run quiet"
     # Without `silent: true` Task echoes every command before running it, and
-    # the deliberate ▸/✔/⚠ lines drown in a transcript of the commands that
+    # the deliberate 🔵/✅/🟡 lines drown in a transcript of the commands that
     # produced them.
     cmds:
       - cmd: |-
           set -eu
           fail=0
           for f in {{.MODULE_FILES}}; do
-            grep -qE '^silent: true$' "$f" || { echo "✖ taskfiles · $f does not declare 'silent: true'" >&2; fail=1; }
+            grep -qE '^silent: true$' "$f" || { echo "❌ taskfiles · $f does not declare 'silent: true'" >&2; fail=1; }
           done
-          [ "$fail" = 0 ] && echo "✔ taskfiles · every module runs quiet"
+          [ "$fail" = 0 ] && echo "✅ taskfiles · every module runs quiet"
           exit "$fail"
 
   check:readme:
@@ -124,18 +124,18 @@ tasks:
           set -eu
           fail=0
           for m in {{.MODULES}}; do
-            [ -f "$m/README.md" ] || { echo "✖ taskfiles · $m/ has no README.md" >&2; fail=1; }
+            [ -f "$m/README.md" ] || { echo "❌ taskfiles · $m/ has no README.md" >&2; fail=1; }
             grep -q "($m/README.md)" README.md || {
-              echo "✖ taskfiles · README.md does not link $m/README.md" >&2; fail=1; }
+              echo "❌ taskfiles · README.md does not link $m/README.md" >&2; fail=1; }
           done
           # runtime/* share one README for the family, linked as runtime/.
           grep -q "(runtime/README.md)" README.md || {
-            echo "✖ taskfiles · README.md does not link runtime/README.md" >&2; fail=1; }
+            echo "❌ taskfiles · README.md does not link runtime/README.md" >&2; fail=1; }
           # And the reverse: a link to a README that is not on disk.
           for f in $(grep -oE '\(([a-z0-9-]+/)+README\.md\)' README.md | tr -d '()' | sort -u); do
-            [ -f "$f" ] || { echo "✖ taskfiles · README.md links $f, which is not in the repo" >&2; fail=1; }
+            [ -f "$f" ] || { echo "❌ taskfiles · README.md links $f, which is not in the repo" >&2; fail=1; }
           done
-          [ "$fail" = 0 ] && echo "✔ taskfiles · every module has a README and the index links it"
+          [ "$fail" = 0 ] && echo "✅ taskfiles · every module has a README and the index links it"
           exit "$fail"
 
   # ─── docs ───────────────────────────────────────────────────────────────────

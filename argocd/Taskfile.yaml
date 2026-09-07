@@ -65,8 +65,8 @@ tasks:
         cmd: >-
           {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} patch application.argoproj.io {{.ITEM}} --type merge
           -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' >/dev/null
-          && echo "✔ argocd · hard-refreshed {{.ITEM}}"
-      - '{{if not ._ARGO_APPS}}echo "⚠ argocd · no application matches {{._ARGO_PREFIX}}* in {{._ARGO_NS}}"{{end}}'
+          && echo "✅ argocd · hard-refreshed {{.ITEM}}"
+      - '{{if not ._ARGO_APPS}}echo "🟡 argocd · no application matches {{._ARGO_PREFIX}}* in {{._ARGO_NS}}"{{end}}'
 
   list:
     desc: "Show the sync + health state of every application matching APP_PREFIX"
@@ -90,7 +90,7 @@ tasks:
     status:
       - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
     cmds:
-      - echo "▸ argocd · server · https://localhost:{{._ARGO_PORT}}"
+      - echo "🔵 argocd · server · https://localhost:{{._ARGO_PORT}}"
       - >-
         {{._ARGO_KUBECTL}} -n {{._ARGO_NS}}
         port-forward svc/{{._ARGO_SERVER}} {{._ARGO_PORT}}:443
@@ -108,7 +108,7 @@ tasks:
           if [ -n "$pw" ]; then
             printf '%s\n' "$pw"
           else
-            echo "⚠ argocd · server · no initial password secret — it is removed once the password is changed"
+            echo "🟡 argocd · server · no initial password secret — it is removed once the password is changed"
           fi
 
   server:set-password:
@@ -129,7 +129,7 @@ tasks:
           {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} patch secret argocd-secret \
             -p "{\"stringData\":{\"admin.password\":\"${hash}\",\"admin.passwordMtime\":\"$(date -u +%FT%TZ)\"}}" >/dev/null
       - task: server:restart
-      - echo "✔ argocd · server · admin password set"
+      - echo "✅ argocd · server · admin password set"
 
   server:restart:
     desc: "Roll the Argo server deployment"
@@ -138,7 +138,7 @@ tasks:
     cmds:
       - "{{._ARGO_KUBECTL}} -n {{._ARGO_NS}} rollout restart deploy/{{._ARGO_SERVER}} >/dev/null"
       - "{{._ARGO_KUBECTL}} -n {{._ARGO_NS}} rollout status deploy/{{._ARGO_SERVER}} --timeout={{.ROLLOUT_TIMEOUT | default \"2m\"}}"
-      - echo "✔ argocd · server · rolled"
+      - echo "✅ argocd · server · rolled"
 
   server:status:
     desc: "Show the Argo pods"

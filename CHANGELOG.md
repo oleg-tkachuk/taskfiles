@@ -106,7 +106,7 @@ sees no difference.
 
 - Banners name the tool that runs. Making the Python toolchain configurable had
   left six of them announcing the default while a different command executed —
-  `▸ py · mypy` above a pyright run. `node:test:e2e` had the deeper version:
+  `🔵 py · mypy` above a pyright run. `node:test:e2e` had the deeper version:
   it ran `playwright install` regardless, so `SCRIPT_E2E` promised a choice the
   task did not honour.
 

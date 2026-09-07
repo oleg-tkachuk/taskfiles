@@ -41,7 +41,7 @@ tasks:
       - sh: kubectl config get-contexts -o name | grep -qx '{{._RT_CTX}}'
         msg: "there is no '{{._RT_CTX}}' kube context — enable Kubernetes in Docker Desktop, or set K8S_CONTEXT"
     cmds:
-      - echo "✔ {{._RT_SVC}} · local · Docker Desktop ready ({{._RT_CTX}})"
+      - echo "✅ {{._RT_SVC}} · local · Docker Desktop ready ({{._RT_CTX}})"
 
   image:load:
     desc: "No-op — Docker Desktop runs containers from the same image store the build wrote to"
@@ -49,7 +49,7 @@ tasks:
     # image is already visible. The task exists so a consumer can call
     # `local:image:load` without caring which runtime is underneath.
     cmds:
-      - echo "✔ {{._RT_SVC}} · local · {{._REL_VERSION}} already visible to Docker Desktop"
+      - echo "✅ {{._RT_SVC}} · local · {{._REL_VERSION}} already visible to Docker Desktop"
 
   install:
     desc: "helm upgrade --install from the chart directory, running the local image"
@@ -58,7 +58,7 @@ tasks:
     deps: [check]
     cmds:
       - task: image:load
-      - echo "▸ {{._RT_SVC}} · local · helm upgrade --install into {{._RT_CTX}}/{{._RT_K8S_NS}}"
+      - echo "🔵 {{._RT_SVC}} · local · helm upgrade --install into {{._RT_CTX}}/{{._RT_K8S_NS}}"
       - >-
         helm upgrade --install {{._RT_SVC}} {{._RT_CHART_DIR}}
         --kube-context {{._RT_CTX}}
@@ -67,4 +67,4 @@ tasks:
         --set image.pullPolicy=IfNotPresent
         {{.HELM_UPGRADE_FLAGS | default ""}}
         {{if .VALUES}}--values {{.VALUES}}{{end}}
-      - echo "✔ {{._RT_SVC}} · local · {{._REL_VERSION}} installed into {{._RT_CTX}}"
+      - echo "✅ {{._RT_SVC}} · local · {{._REL_VERSION}} installed into {{._RT_CTX}}"

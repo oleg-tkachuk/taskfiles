@@ -75,12 +75,12 @@ tasks:
   all:
     desc: "Regenerate everything this component ships generated"
     cmds:
-      - echo "▸ {{._CG_NAME}} · gen · mocks → proto → go generate → sqlc"
+      - echo "🔵 {{._CG_NAME}} · gen · mocks → proto → go generate → sqlc"
       - task: mocks
       - task: proto
       - task: go
       - task: sqlc
-      - echo "✔ {{._CG_NAME}} · gen · regenerated"
+      - echo "✅ {{._CG_NAME}} · gen · regenerated"
 
   mocks:
     desc: "Regenerate the interface mocks"
@@ -159,11 +159,11 @@ tasks:
       # clean.
       - cmd: |-
           if [ -n "$(git status --porcelain -- {{._CG_MOCK_SPEC | q}})" ]; then
-            echo "✖ {{._CG_NAME}} · gen · mocks are stale — run the generator and commit:" >&2
+            echo "❌ {{._CG_NAME}} · gen · mocks are stale — run the generator and commit:" >&2
             git status --porcelain -- {{._CG_MOCK_SPEC | q}} >&2
             exit 1
           fi
-          echo "✔ {{._CG_NAME}} · gen · mocks match their interfaces"
+          echo "✅ {{._CG_NAME}} · gen · mocks match their interfaces"
 
   sqlc:check:
     desc: "Fail when the committed sqlc output is stale"
@@ -174,11 +174,11 @@ tasks:
       - task: sqlc
       - cmd: |-
           if ! git diff --quiet -- {{._CG_SQLC_DIR | q}}; then
-            echo "✖ {{._CG_NAME}} · gen · sqlc output is stale — run the generator and commit:" >&2
+            echo "❌ {{._CG_NAME}} · gen · sqlc output is stale — run the generator and commit:" >&2
             git --no-pager diff --stat -- {{._CG_SQLC_DIR | q}} >&2
             exit 1
           fi
-          echo "✔ {{._CG_NAME}} · gen · sqlc bindings match their queries"
+          echo "✅ {{._CG_NAME}} · gen · sqlc bindings match their queries"
 
   _normalise:
     internal: true

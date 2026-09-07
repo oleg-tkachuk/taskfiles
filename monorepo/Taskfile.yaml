@@ -79,4 +79,4 @@ tasks:
           Bring the OCI registry up, or point the run somewhere else with
           GLOBAL_REGISTRY=<host> task …
     cmds:
-      - echo "✔ registry {{._MONO_REG}} reachable"
+      - echo "✅ registry {{._MONO_REG}} reachable"
