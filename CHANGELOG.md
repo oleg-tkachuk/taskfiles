@@ -16,6 +16,27 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [2.1.1] — 2026-09-07
+
+Documentation only. No module changed.
+
+### Changed
+
+- The release procedure moved to [RELEASE.md](RELEASE.md) — one person cuts
+  releases and it sat where every consumer read past it. What a version number
+  promises did not move: a rename or a removal is a major bump, and that
+  sentence now sits beside **Pin a tag**, where someone choosing a version is
+  already reading. The procedure had also fallen behind — the release workflow
+  refuses four things now, and the section listed two.
+- The module table is sorted alphabetically. Its order had been thematic and
+  stopped being so as modules were added, and nothing above it explained an
+  order a reader could otherwise predict.
+- Conventions records that an empty value turns nothing off: `default` fires on
+  an empty variable as well as an unset one, so every opt-out here is a value a
+  consumer names — `COSIGN_SIGN=0`, `E2E_SETUP=none`.
+- The `argocd` row in the module table describes the whole module; it had
+  mentioned only the application refresh since the `server:` tasks arrived.
+
 ## [2.1.0] — 2026-09-07
 
 Additive. Every default is what it was, so a consumer that sets none of this
@@ -388,6 +409,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[2.1.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.1.1
 [2.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.1.0
 [2.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.0.0
 [1.3.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.3.2
