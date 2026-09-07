@@ -27,6 +27,7 @@ workspace — tasks then read `auth:<task>`.
 | `JWT_SECRET` | `dev-secret-change-me-32-bytes-min` | |
 | `JWT_ISS` / `JWT_AUD` / `JWT_SUB` | `local-dev` / `local-api` / `dev-user` | claims |
 | `JWT_TTL_SECONDS` | `86400` | |
+| `JWT_CLAIMS` | `{}` | extra claims, as a JSON object |
 
 ## Examples
 
@@ -37,6 +38,18 @@ includes:
     dir: .
     vars: { JWT_ISS: acme-dev, JWT_AUD: core-api }
 ```
+
+Claims beyond the registered ones go in as JSON. `step` reads the claims set
+from stdin and merges the registered claims over it, so anything the
+application needs — roles, a tenant, a scope — is one variable:
+
+```yaml
+vars:
+  JWT_CLAIMS: '{"roles":["platform.admin"],"tenant":"3a823fd4-…"}'
+```
+
+Overriding it replaces the whole set rather than merging into it, so a caller
+that needs a different tenant passes the object it wants.
 
 ```console
 $ task auth:mint-token

@@ -14,6 +14,7 @@ version: "3"
 #   JWT_ALG           default HS256
 #   JWT_ISS/AUD/SUB   claims
 #   JWT_TTL_SECONDS   default 86400
+#   JWT_CLAIMS        extra claims as a JSON object   (default {})
 #
 # Dev only. The default secret is deliberately a self-describing placeholder:
 # a token minted here must never be accepted by anything that matters.
@@ -33,6 +34,7 @@ tasks:
       AUD: '{{.JWT_AUD | default "local-api"}}'
       SUB: '{{.JWT_SUB | default "dev-user"}}'
       TTL: '{{.JWT_TTL_SECONDS | default "86400"}}'
+      CLAIMS: '{{.JWT_CLAIMS | default "{}"}}'
     preconditions:
       - sh: command -v step >/dev/null
         msg: "the smallstep CLI is not installed — brew install step"
@@ -40,6 +42,7 @@ tasks:
       # The key goes in through a process substitution rather than an argument,
       # so it never lands in the process table.
       - >-
+        printf '%s' '{{.CLAIMS}}' |
         step crypto jwt sign --alg '{{.ALG}}'
         --key <(printf '%s' '{{.SECRET}}')
         --iss '{{.ISS}}' --aud '{{.AUD}}' --sub '{{.SUB}}'
