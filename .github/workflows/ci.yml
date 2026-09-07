@@ -57,7 +57,14 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    strategy:
+      # Both, always: a divergence between BSD and GNU userland is exactly the
+      # kind of thing one green check would hide, and knowing which of the two
+      # broke is the whole value of running both.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - name: 'Setup: check out the repository'
@@ -105,7 +112,14 @@ jobs:
     # defaults. This builds a throwaway one rather than depending on any other
     # repository being present.
     name: Consumer smoke
-    runs-on: ubuntu-latest
+    strategy:
+      # Both, always: a divergence between BSD and GNU userland is exactly the
+      # kind of thing one green check would hide, and knowing which of the two
+      # broke is the whole value of running both.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - name: 'Setup: check out the repository'
@@ -121,6 +135,15 @@ jobs:
         with:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 'Setup: Go'
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: stable
+          # The fixture has no dependencies, so a module cache saves nothing —
+          # and this workflow runs on tag pushes, where a writable cache is a
+          # path from a pull request into a release build.
+          cache: false
 
       - name: 'Setup: a consumer that includes the library'
         run: |
@@ -153,15 +176,78 @@ jobs:
             monorepo: { taskfile: '{{.TASKLIB}}monorepo{{.TASKLIB_REF}}', dir: . }
             argocd:   { taskfile: '{{.TASKLIB}}argocd{{.TASKLIB_REF}}', dir: . }
             auth:     { taskfile: '{{.TASKLIB}}auth{{.TASKLIB_REF}}', dir: . }
+            codegen:  { taskfile: '{{.TASKLIB}}codegen{{.TASKLIB_REF}}', dir: . }
             local:    { taskfile: '{{.TASKLIB}}runtime/orbstack{{.TASKLIB_REF}}', dir: . }
           tasks: {}
           YAML
+
+          # A module, so the tasks that compile and generate have something to
+          # act on. Loading a module proves it parses; running one is the only
+          # thing that proves it works, and the two bugs this job exists to
+          # catch — a generator whose output is never normalised, a paired skip
+          # that reports the wrong branch — both parse cleanly.
+          cat > go.mod <<'GOMOD'
+          module example.com/smoke
+
+          go 1.21
+          GOMOD
+
+          cat > smoke.go <<'GOFILE'
+          package smoke
+
+          //go:generate sh -c "printf 'package smoke\n\nconst Generated = true\n' > generated.go"
+
+          // Greeting is what the fixture's test asserts on.
+          func Greeting() string { return "hi" }
+          GOFILE
+
+          cat > smoke_test.go <<'GOTEST'
+          package smoke
+
+          import "testing"
+
+          func TestGreeting(t *testing.T) {
+            if Greeting() != "hi" {
+              t.Fatal("unexpected greeting")
+            }
+          }
+          GOTEST
+
+          git add -A && git commit -qm "chore: fixture"
 
       - name: 'Verify: every module loads side by side'
         working-directory: consumer
         # This is the check that catches a module quietly claiming a name
         # another module already uses.
         run: task --list-all > /dev/null
+
+      - name: 'Verify: codegen actually generates'
+        working-directory: consumer
+        # `go generate` is the one step of the chain that needs no external
+        # tool, so it is the one the library can prove end to end. It also
+        # exercises the module's GOWORK=off, which is what made generation fail
+        # for a real consumer before it was set.
+        run: |
+          set -euo pipefail
+          test ! -f generated.go
+          task codegen:go
+          test -f generated.go
+          grep -q 'const Generated = true' generated.go
+          echo "✔ codegen:go wrote the file its directive asks for"
+
+      - name: 'Verify: the go module compiles, tests and builds'
+        working-directory: consumer
+        # Four tasks that do work rather than report it. `build` is left out
+        # deliberately: GO_MAIN defaults to ./cmd/..., which this fixture does
+        # not have, and a package with no main is the shape most consumers of
+        # the other three tasks actually are.
+        run: |
+          set -euo pipefail
+          task go:fmt
+          task go:compile
+          task go:test
+          task go:tidy
+          echo "✔ the go module's tasks run against a real module"
 
       - name: "Verify: the consumer's vars reach the modules"
         working-directory: consumer
