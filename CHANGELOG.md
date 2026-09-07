@@ -14,7 +14,27 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- The documented way to include a module is now one variable instead of two.
+  `TASKLIB` carries the whole path with a `%s` where the module goes, and each
+  include fills it in with `printf`:
+
+  ```yaml
+  vars:
+    TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v2.2.0'
+  includes:
+    release: { taskfile: '{{printf .TASKLIB "release"}}', dir: . }
+  ```
+
+  `TASKLIB_REF` is gone. Switching between a checkout and a tag was two edits
+  and is now one, and the version is written once instead of once per form.
+  `printf` here is Task's own template function, evaluated while the include
+  graph is built — not a shell call, which an include path cannot make.
+
+  Nothing was removed from any module, so the old
+  `{{.TASKLIB}}release{{.TASKLIB_REF}}` spelling keeps working; this is a change
+  of convention, not of contract.
 
 ## [2.2.0] — 2026-09-07
 

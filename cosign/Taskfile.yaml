@@ -5,7 +5,7 @@ version: "3"
 #
 #   includes:
 #     cosign:
-#       taskfile: '{{.TASKLIB}}cosign{{.TASKLIB_REF}}'
+#       taskfile: '{{printf .TASKLIB "cosign"}}'
 #       dir: .
 #
 # Include it alongside `release` and chain it after: the release publishes, this

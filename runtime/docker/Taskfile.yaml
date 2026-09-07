@@ -5,7 +5,7 @@ version: "3"
 # with no registry in the loop.
 #
 #   includes:
-#     local: { taskfile: '{{.TASKLIB}}runtime/docker{{.TASKLIB_REF}}', dir: . }
+#     local: { taskfile: '{{printf .TASKLIB "runtime/docker"}}', dir: . }
 #
 # Every runtime under runtime/ exposes the same three tasks — `check`,
 # `image:load`, `install` — so switching from one to another is a one-line

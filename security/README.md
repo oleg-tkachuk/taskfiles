@@ -6,7 +6,7 @@ always fatal: a scan that can be silently skipped is a scan that does not exist.
 
 ```yaml
 includes:
-  security: { taskfile: '{{.TASKLIB}}security{{.TASKLIB_REF}}', dir: . }
+  security: { taskfile: '{{printf .TASKLIB "security"}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -52,7 +52,7 @@ accident, and everything else is theirs to add.
 ```yaml
 includes:
   security:
-    taskfile: '{{.TASKLIB}}security{{.TASKLIB_REF}}'
+    taskfile: '{{printf .TASKLIB "security"}}'
     dir: .
     vars:
       GO_MODULES: "backend/api backend/worker"

@@ -9,7 +9,7 @@ no kubeconfig anywhere near it — needs this module and not `k8s`.
 
 ```yaml
 includes:
-  release: { taskfile: '{{.TASKLIB}}release{{.TASKLIB_REF}}', dir: . }
+  release: { taskfile: '{{printf .TASKLIB "release"}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -71,7 +71,7 @@ vars:
   HELM_FLAGS: --insecure-skip-tls-verify
 
 includes:
-  release: { taskfile: '{{.TASKLIB}}release{{.TASKLIB_REF}}', dir: . }
+  release: { taskfile: '{{printf .TASKLIB "release"}}', dir: . }
 
 tasks:
   deploy: { cmds: [{ task: release:deploy }] }

@@ -6,7 +6,7 @@ version: "3"
 #
 #   includes:
 #     k8s:
-#       taskfile: '{{.TASKLIB}}k8s{{.TASKLIB_REF}}'
+#       taskfile: '{{printf .TASKLIB "k8s"}}'
 #       dir: .
 #
 # Independent of the `release` module and usable without it — a repository that

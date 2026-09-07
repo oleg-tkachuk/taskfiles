@@ -36,16 +36,15 @@ version: "3"
 silent: true
 
 vars:
-  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//'
-  TASKLIB_REF: '?ref=v2.2.0'
+  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v2.2.0'
   PROJECT_NAME: billing-api
   IMAGE_NAMESPACE: acme
   K8S_NAMESPACE: acme
 
 includes:
-  release: { taskfile: '{{.TASKLIB}}release{{.TASKLIB_REF}}', dir: . }
-  k8s:     { taskfile: '{{.TASKLIB}}k8s{{.TASKLIB_REF}}', dir: . }
-  go:      { taskfile: '{{.TASKLIB}}go{{.TASKLIB_REF}}', dir: . }
+  release: { taskfile: '{{printf .TASKLIB "release"}}', dir: . }
+  k8s:     { taskfile: '{{printf .TASKLIB "k8s"}}', dir: . }
+  go:      { taskfile: '{{printf .TASKLIB "go"}}', dir: . }
 
 tasks:
   deploy:  { cmds: [{ task: release:deploy }] }
@@ -69,21 +68,25 @@ is in [RELEASE.md](RELEASE.md).
 
 ### Working on the library itself
 
-Point `TASKLIB` at a checkout beside your repository and leave `TASKLIB_REF`
-undefined. An undeclared variable renders as nothing, so the include lines are
-identical either way and an edit is visible without cutting a tag:
+Point `TASKLIB` at a checkout beside your repository. The `%s` stays; only
+what surrounds it changes, so the include lines are identical either way and an
+edit to the library is visible without cutting a tag:
 
 ```yaml
 vars:
-  TASKLIB: ../taskfiles/
+  TASKLIB: '../taskfiles/%s'
 ```
 
-`TASKLIB_REF` carries the whole query rather than the tag alone because Task
-has no `ref:` field on an include — the ref exists only as a URL query — and an
-include path substitutes plain `{{.VAR}}` references and evaluates nothing else
-there: no `{{if}}`, and no variable whose value is itself a template. The query
-has to be literal somewhere, and once in a variable beats once per include
-line.
+`TASKLIB` holds the whole path with a `%s` where the module goes, and each
+include fills it in with `printf` — Task's own template function, evaluated
+while the include graph is built, not a shell call. One variable rather than a
+base and a suffix, and the version written once.
+
+It has to work this way because an include path substitutes plain `{{.VAR}}`
+references and evaluates nothing else there: no `{{if}}`, and no variable whose
+value is itself a template. So `TASKLIB: '…//%s?ref={{.V | default "v2.2.0"}}'`
+does not resolve — it reaches git as a literal ref and fails. The version is a
+constant in the file, which is what pinning means anyway.
 
 `task surface` prints every module's tasks from this checkout, which is the one
 view a consumer cannot get: `task --list-all` there shows what that repository
@@ -140,7 +143,7 @@ tasks — `check`, `image:load`, `install` — so moving between them is one lin
 
 ```yaml
 includes:
-  local: { taskfile: '{{.TASKLIB}}runtime/orbstack{{.TASKLIB_REF}}', dir: . }
+  local: { taskfile: '{{printf .TASKLIB "runtime/orbstack"}}', dir: . }
 ```
 
 Include one alongside `release`, not instead of it: `local:image:load` moves
@@ -189,7 +192,7 @@ task's own `vars:` and nowhere else.
 
 ```yaml
 # configures the module — the include carries the value
-k8s: { taskfile: '{{.TASKLIB}}k8s{{.TASKLIB_REF}}', dir: ., vars: { K8S_NAMESPACE: billing } }
+k8s: { taskfile: '{{printf .TASKLIB "k8s"}}', dir: ., vars: { K8S_NAMESPACE: billing } }
 
 # does not — the module derived its namespace when it loaded
 - task: k8s:restart

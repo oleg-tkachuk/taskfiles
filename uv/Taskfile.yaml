@@ -4,7 +4,7 @@ version: "3"
 # uv — Python projects managed by uv rather than Poetry.
 #
 #   includes:
-#     uv: { taskfile: '{{.TASKLIB}}uv{{.TASKLIB_REF}}', dir: . }
+#     uv: { taskfile: '{{printf .TASKLIB "uv"}}', dir: . }
 #
 # Same task names as the `python` module, so a project that moves between the
 # two changes one include line and nothing else.

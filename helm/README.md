@@ -4,7 +4,7 @@ What is installed on a cluster, and removing it.
 
 ```yaml
 includes:
-  helm: { taskfile: '{{.TASKLIB}}helm{{.TASKLIB_REF}}', dir: . }
+  helm: { taskfile: '{{printf .TASKLIB "helm"}}', dir: . }
 ```
 
 ## Tasks
@@ -26,7 +26,7 @@ includes:
 
 ```yaml
 includes:
-  helm: { taskfile: '{{.TASKLIB}}helm{{.TASKLIB_REF}}', dir: . }
+  helm: { taskfile: '{{printf .TASKLIB "helm"}}', dir: . }
 ```
 
 ```console

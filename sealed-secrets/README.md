@@ -5,7 +5,7 @@ without a cluster.
 
 ```yaml
 includes:
-  sealed-secrets: { taskfile: '{{.TASKLIB}}sealed-secrets{{.TASKLIB_REF}}', dir: . }
+  sealed-secrets: { taskfile: '{{printf .TASKLIB "sealed-secrets"}}', dir: . }
 ```
 
 ## Tasks
@@ -32,7 +32,7 @@ Per call: `namespace`, `name`, `output` for both sealing tasks; `key` and
 ```yaml
 includes:
   sealed-secrets:
-    taskfile: '{{.TASKLIB}}sealed-secrets{{.TASKLIB_REF}}'
+    taskfile: '{{printf .TASKLIB "sealed-secrets"}}'
     dir: .
     vars: { SEALED_SECRETS_NS: kube-system }
 ```

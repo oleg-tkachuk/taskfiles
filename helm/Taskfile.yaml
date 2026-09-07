@@ -4,7 +4,7 @@ version: "3"
 # helm — what is installed on a cluster, and removing it.
 #
 #   includes:
-#     helm: { taskfile: '{{.TASKLIB}}helm{{.TASKLIB_REF}}', dir: . }
+#     helm: { taskfile: '{{printf .TASKLIB "helm"}}', dir: . }
 #
 # Cluster-wide, not component-scoped: `list` answers "what is on this cluster"
 # and `uninstall-all` empties it. That is why they are not in `k8s`, which acts

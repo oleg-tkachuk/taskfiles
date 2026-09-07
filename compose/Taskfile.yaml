@@ -5,7 +5,7 @@ version: "3"
 #
 #   includes:
 #     compose:
-#       taskfile: '{{.TASKLIB}}compose{{.TASKLIB_REF}}'
+#       taskfile: '{{printf .TASKLIB "compose"}}'
 #       dir: .
 #       vars: { COMPOSE_FILE: docker-compose.dev.yaml }
 #

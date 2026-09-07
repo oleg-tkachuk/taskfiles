@@ -5,7 +5,7 @@ version: "3"
 # and workflows.
 #
 #   includes:
-#     checkov: { taskfile: '{{.TASKLIB}}checkov{{.TASKLIB_REF}}', dir: . }
+#     checkov: { taskfile: '{{printf .TASKLIB "checkov"}}', dir: . }
 #
 # Separate from `security` because it asks a different question of a different
 # tree. `security` scans a repository's code and the artifacts built from it —

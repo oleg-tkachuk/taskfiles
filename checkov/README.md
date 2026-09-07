@@ -5,7 +5,7 @@ findings already accepted.
 
 ```yaml
 includes:
-  checkov: { taskfile: '{{.TASKLIB}}checkov{{.TASKLIB_REF}}', dir: . }
+  checkov: { taskfile: '{{printf .TASKLIB "checkov"}}', dir: . }
 ```
 
 ## Tasks
@@ -31,7 +31,7 @@ includes:
 ```yaml
 includes:
   checkov:
-    taskfile: '{{.TASKLIB}}checkov{{.TASKLIB_REF}}'
+    taskfile: '{{printf .TASKLIB "checkov"}}'
     dir: .
     vars:
       CHECKOV_FRAMEWORKS: terraform kubernetes helm

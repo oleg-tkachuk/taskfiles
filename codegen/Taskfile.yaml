@@ -5,7 +5,7 @@ version: "3"
 # where the committed output no longer matches its source.
 #
 #   includes:
-#     codegen: { taskfile: '{{.TASKLIB}}codegen{{.TASKLIB_REF}}', dir: . }
+#     codegen: { taskfile: '{{printf .TASKLIB "codegen"}}', dir: . }
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   PROJECT_NAME      label in log lines

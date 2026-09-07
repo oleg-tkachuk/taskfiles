@@ -6,7 +6,7 @@ failed command with a name attached to it.
 
 ```yaml
 includes:
-  monorepo: { taskfile: '{{.TASKLIB}}monorepo{{.TASKLIB_REF}}', dir: . }
+  monorepo: { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -37,7 +37,7 @@ workspace — tasks then read `all:<task>`.
 ```yaml
 includes:
   monorepo:
-    taskfile: '{{.TASKLIB}}monorepo{{.TASKLIB_REF}}'
+    taskfile: '{{printf .TASKLIB "monorepo"}}'
     dir: .
     vars:
       COMPONENTS: "backend/api backend/worker frontend/console"

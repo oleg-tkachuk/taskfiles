@@ -6,7 +6,7 @@ committed output no longer matches the source it came from.
 
 ```yaml
 includes:
-  codegen: { taskfile: '{{.TASKLIB}}codegen{{.TASKLIB_REF}}', dir: . }
+  codegen: { taskfile: '{{printf .TASKLIB "codegen"}}', dir: . }
 ```
 
 `dir: .` is required: it pins the module's commands to the including
@@ -48,7 +48,7 @@ component's directory.
 ```yaml
 includes:
   codegen:
-    taskfile: '{{.TASKLIB}}codegen{{.TASKLIB_REF}}'
+    taskfile: '{{printf .TASKLIB "codegen"}}'
     dir: .
     vars:
       PROJECT_NAME: core-api
