@@ -14,6 +14,8 @@ Taskfiles are stable from that version, with no experiment flag to set.
 
 - [Using it](#using-it)
   - [Working on the library itself](#working-on-the-library-itself)
+    - [Workflows are audited](#workflows-are-audited)
+    - [How a module is written](#how-a-module-is-written)
 - [Modules](#modules)
   - [Local clusters](#local-clusters)
 - [Conventions](#conventions)
@@ -25,8 +27,6 @@ Taskfiles are stable from that version, with no experiment flag to set.
   - [Logging](#logging)
   - [Versioning](#versioning)
   - [Idempotency](#idempotency)
-  - [Workflows are audited](#workflows-are-audited)
-  - [Less shell](#less-shell)
 - [License](#license)
 
 ## Using it
@@ -92,6 +92,20 @@ included, not what the library offers.
 Only the YAML is fetched. Sibling scripts in this repo are **not** downloaded,
 which is why every module is self-contained and expresses its logic in Task's
 own primitives rather than shelling out to a helper.
+
+#### Workflows are audited
+
+`zizmor` runs over `.github/workflows/` in CI and in
+the pre-commit hook, in its `auditor` persona. Actions are pinned to commit
+SHAs with the version in a trailing comment, and Dependabot moves the pins —
+a tag is mutable, and a pin nobody updates is its own problem.
+
+#### How a module is written
+
+Guards are `preconditions` (with an explanatory `msg`),
+skips are `status`, cleanup is `defer`, iteration is `for`, and required
+inputs are `requires`. Multi-line bash blocks were the previous
+implementation; they are not the current one.
 
 ## Modules
 
@@ -260,19 +274,6 @@ registry. A dirty tree always rebuilds — it is not reproducible by definition.
 Everything runs under `silent: true`, so what you see is these lines plus
 whatever the underlying tool prints.
 
-### Workflows are audited
-
-`zizmor` runs over `.github/workflows/` in CI and in
-the pre-commit hook, in its `auditor` persona. Actions are pinned to commit
-SHAs with the version in a trailing comment, and Dependabot moves the pins —
-a tag is mutable, and a pin nobody updates is its own problem.
-
-### Less shell
-
-Guards are `preconditions` (with an explanatory `msg`),
-skips are `status`, cleanup is `defer`, iteration is `for`, and required
-inputs are `requires`. Multi-line bash blocks were the previous
-implementation; they are not the current one.
 
 ## License
 
