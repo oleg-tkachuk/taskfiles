@@ -12,6 +12,23 @@ instead of copied into every repository.
 Requires [Task](https://taskfile.dev/docs/installation) **3.53+** — remote
 Taskfiles are stable from that version, with no experiment flag to set.
 
+- [Using it](#using-it)
+  - [Working on the library itself](#working-on-the-library-itself)
+- [Modules](#modules)
+  - [Local clusters](#local-clusters)
+- [Conventions](#conventions)
+  - [Variable scoping](#variable-scoping)
+  - [When a module's values are decided](#when-a-modules-values-are-decided)
+  - [Task naming](#task-naming)
+  - [An empty value turns nothing off](#an-empty-value-turns-nothing-off)
+  - [Include naming](#include-naming)
+  - [Logging](#logging)
+  - [Versioning](#versioning)
+  - [Idempotency](#idempotency)
+  - [Workflows are audited](#workflows-are-audited)
+  - [Less shell](#less-shell)
+- [License](#license)
+
 ## Using it
 
 ```yaml
@@ -134,7 +151,9 @@ to see the full surface.
 
 ## Conventions
 
-**Variable scoping.** A var declared in an included file *shadows* the
+### Variable scoping
+
+A var declared in an included file *shadows* the
 including file's value of the same name, and all included files share one
 namespace. So no module here declares a bare knob name: every input is read
 inline as `{{.NAME | default …}}`, and every derived value carries its module's
@@ -146,7 +165,9 @@ read `_REL_VERSION` and `_REL_IMAGE` from `release`, because they act on what a
 release published. They read them — they must never declare them, or they would
 shadow the very values they are supposed to act on.
 
-**When a module's values are decided.** A module's `vars:` are evaluated once,
+### When a module's values are decided
+
+A module's `vars:` are evaluated once,
 as the include loads — not per call. Values reach them from the including
 file's own vars, from the include's `vars:` block, and from the command line. A
 `vars:` block on a `task:` reference does not reach them: it is visible to a
@@ -170,14 +191,18 @@ that reads a *different* name is fixed at whatever that name held, while one
 that reads its own sees a value given on the command line. Write inputs that
 way in a consumer and `task deploy REGISTRY=other` works.
 
-**Task naming.** Public tasks are the plain verb for the work (`build`, `test`,
+### Task naming
+
+Public tasks are the plain verb for the work (`build`, `test`,
 `deploy`, `restart`) namespaced by area when a module has several (`chart:push`,
 `image:build`, `deps:update`). Internal helpers are `internal: true` and named
 `_verb` when they stand alone, or `parent:_variant` when they are one branch of
 a public task — the complementary `image:build:_do` / `image:build:_skipped`
 pair, for instance, where exactly one of the two runs.
 
-**An empty value turns nothing off.** `{{.X | default "d"}}` yields `d` when `X`
+### An empty value turns nothing off
+
+`{{.X | default "d"}}` yields `d` when `X`
 is unset *and* when it is empty, so a consumer cannot switch a default off by
 passing nothing:
 
@@ -192,20 +217,26 @@ Every opt-out here is therefore an explicit value a consumer has to name —
 browser download. When adding one, pick a value and check for it; do not write
 a default that an empty string is supposed to defeat, because it will not.
 
-**Include naming.** A module is included under its own directory name, because
+### Include naming
+
+A module is included under its own directory name, because
 the include alias is what names every task it brings in — `python:test` says
 which of the two Python modules answered. `runtime/*` is the one exception: its
 five modules expose the same three tasks and differ only in which local cluster
 they target, so they are included as `local` and swapping one for another is a
 single line.
 
-**Logging.** Component-scoped modules print `<marker> <component> · <area> ·
+### Logging
+
+Component-scoped modules print `<marker> <component> · <area> ·
 <what happened>`; repo-scoped ones (`security`, `monorepo`, `argocd`) print
 `<marker> <module> · <what happened>`, because there is no one component to
 name. The markers are `▸` starting work, `✔` done, `⚠` skipped on purpose, `✖`
 failed.
 
-**Versioning.** One scheme, in [`release/`](release/README.md):
+### Versioning
+
+One scheme, in [`release/`](release/README.md):
 
 ```
 exact tag, clean tree  →  X.Y.Z
@@ -219,7 +250,9 @@ Timestamp before sha, so SemVer's left-to-right pre-release comparison orders
 builds chronologically and ArgoCD's `>=0.0.0-0` resolver always picks the
 newest push.
 
-**Idempotency.** Re-running `task deploy` on an unchanged commit does nothing:
+### Idempotency
+
+Re-running `task deploy` on an unchanged commit does nothing:
 the image build is skipped when a clean tree's image is already in the local
 store, and the chart push is skipped when that version is already in the
 registry. A dirty tree always rebuilds — it is not reproducible by definition.
@@ -227,12 +260,16 @@ registry. A dirty tree always rebuilds — it is not reproducible by definition.
 Everything runs under `silent: true`, so what you see is these lines plus
 whatever the underlying tool prints.
 
-**Workflows are audited.** `zizmor` runs over `.github/workflows/` in CI and in
+### Workflows are audited
+
+`zizmor` runs over `.github/workflows/` in CI and in
 the pre-commit hook, in its `auditor` persona. Actions are pinned to commit
 SHAs with the version in a trailing comment, and Dependabot moves the pins —
 a tag is mutable, and a pin nobody updates is its own problem.
 
-**Less shell.** Guards are `preconditions` (with an explanatory `msg`),
+### Less shell
+
+Guards are `preconditions` (with an explanatory `msg`),
 skips are `status`, cleanup is `defer`, iteration is `for`, and required
 inputs are `requires`. Multi-line bash blocks were the previous
 implementation; they are not the current one.
