@@ -74,23 +74,23 @@ own primitives rather than shelling out to a helper.
 
 | Module | Namespace | What it covers |
 |---|---|---|
-| [`release/`](release/README.md) | `release` | version derivation, image build/push, chart lint/render/package/push, `deploy` |
-| [`helm/`](helm/README.md) | `helm` | what is installed on a cluster, and removing it |
-| [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward |
+| [`argocd/`](argocd/README.md) | `argocd` | hard-refresh the apps a deploy republished, and operate the Argo server |
+| [`auth/`](auth/README.md) | `auth` | mint a local-dev JWT |
 | [`checkov/`](checkov/README.md) | `checkov` | policy-scan manifests, charts, Dockerfiles and workflows |
 | [`codegen/`](codegen/README.md) | `codegen` | mocks, protobuf stubs, `go generate`, sqlc — and the drift gates for them |
-| [`go/`](go/README.md) | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, dep bumps |
-| [`python/`](python/README.md) | `python` | poetry install/test/lint/format/typecheck/lock, dep bumps |
-| [`uv/`](uv/README.md) | `uv` | the same surface for uv-managed projects — swap the include line |
-| [`node/`](node/README.md) | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
 | [`compose/`](compose/README.md) | `compose` | local stack up/down/reset/logs |
+| [`cosign/`](cosign/README.md) | `cosign` | sign the published image and chart, attest an SBOM, verify both |
+| [`go/`](go/README.md) | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, dep bumps |
+| [`helm/`](helm/README.md) | `helm` | what is installed on a cluster, and removing it |
+| [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward |
 | [`monorepo/`](monorepo/README.md) | `monorepo` | run one target across every component, registry preflight |
+| [`node/`](node/README.md) | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
+| [`python/`](python/README.md) | `python` | poetry install/test/lint/format/typecheck/lock, dep bumps |
+| [`release/`](release/README.md) | `release` | version derivation, image build/push, chart lint/render/package/push, `deploy` |
+| [`runtime/*`](runtime/README.md) — docker, orbstack, minikube, kind, k3d | `local` | run a locally built image on a local cluster, no registry |
 | [`sealed-secrets/`](sealed-secrets/README.md) | `sealed-secrets` | seal a value into a committable SealedSecret, fetch the controller key |
 | [`security/`](security/README.md) | `security` | govulncheck, golangci-lint, gitleaks, trivy, buf breaking |
-| [`cosign/`](cosign/README.md) | `cosign` | sign the published image and chart, attest an SBOM, verify both |
-| [`argocd/`](argocd/README.md) | `argocd` | hard-refresh the apps a deploy just republished |
-| [`auth/`](auth/README.md) | `auth` | mint a local-dev JWT |
-| [`runtime/*`](runtime/README.md) — docker, orbstack, minikube, kind, k3d | `local` | run a locally built image on a local cluster, no registry |
+| [`uv/`](uv/README.md) | `uv` | the same surface for uv-managed projects — swap the include line |
 
 ### Local clusters
 
