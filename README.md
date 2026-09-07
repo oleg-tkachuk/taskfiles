@@ -71,6 +71,7 @@ own primitives rather than shelling out to a helper.
 | Module | Namespace | What it covers |
 |---|---|---|
 | [`release/`](release/README.md) | `release` | version derivation, image build/push, chart lint/render/package/push, `deploy` |
+| [`helm/`](helm/README.md) | `helm` | what is installed on a cluster, and removing it |
 | [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward |
 | [`codegen/`](codegen/README.md) | `codegen` | mocks, protobuf stubs, `go generate`, sqlc — and the drift gates for them |
 | [`go/`](go/README.md) | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, dep bumps |
