@@ -11,10 +11,16 @@ version: "3"
 #   PROJECT_NAME      label in log lines
 #   MOCKERY_CONFIG    default .mockery.yaml
 #   MOCKERY_MODULE    default github.com/vektra/mockery/v3
-#   BUF_TEMPLATE      default buf.gen.yaml
+#   BUF_TEMPLATE      one or more buf templates, space-separated
+#                     (default buf.gen.yaml)
 #   BUF_INPUT         buf's input, when it is not the working directory
 #   PROTO_FORBID      paths that must not exist when the stubs are generated
 #   PROTO_PLUGINS     protoc plugins to install from THIS module before buf
+#   PROTO_PATH        directories prepended to PATH before buf runs, for a
+#                     plugin that arrives from somewhere other than a Go
+#                     module — a JS one out of a pnpm tree, say. Evaluated by
+#                     the shell, so `$(pnpm -C ../web bin)` works.
+#   GENERATE_CMD      what `generate` runs (default `go generate ./...`)
 #   CODEGEN_BIN_DIR   where those plugins land            (default ./bin)
 #   GENERATED_DIRS    directories to normalise with goimports after generating
 #   SQLC_MODULE       run sqlc through `go run <module>` instead of from PATH
@@ -22,7 +28,7 @@ version: "3"
 #   SQLC_DIR          directory the sqlc gate watches
 #
 # Order is fixed, not configurable: mocks first, so they are written against
-# the interfaces the tree already has; buf before `go generate`, so the
+# the interfaces the tree already has; buf before the generate step, so the
 # protobuf types exist when generate's tools walk the tree; sqlc last, so its
 # bindings see any updated proto types.
 #
@@ -58,6 +64,7 @@ vars:
   _CG_MOCK_CFG: '{{.MOCKERY_CONFIG | default ".mockery.yaml"}}'
   _CG_MOCK_MOD: '{{.MOCKERY_MODULE | default "github.com/vektra/mockery/v3"}}'
   _CG_BUF_TPL: '{{.BUF_TEMPLATE | default "buf.gen.yaml"}}'
+  _CG_BUF_PATH: '{{.PROTO_PATH | default ""}}'
   _CG_BUF_IN: '{{.BUF_INPUT | default ""}}'
   _CG_FORBID: '{{.PROTO_FORBID | default ""}}'
   _CG_PLUGINS: '{{.PROTO_PLUGINS | default ""}}'
@@ -66,6 +73,7 @@ vars:
   _CG_SQLC_MOD: '{{.SQLC_MODULE | default ""}}'
   _CG_MOCK_SPEC: '{{.MOCKS_PATHSPEC | default "internal"}}'
   _CG_SQLC_DIR: '{{.SQLC_DIR | default ""}}'
+  _CG_GEN_CMD: '{{.GENERATE_CMD | default "go generate ./..."}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _CG_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -80,10 +88,10 @@ tasks:
   all:
     desc: "Regenerate everything this component ships generated"
     cmds:
-      - echo "{{._CG_RUN}} {{._CG_NAME}} · gen · mocks → proto → go generate → sqlc"
+      - echo "{{._CG_RUN}} {{._CG_NAME}} · gen · mocks → proto → generate → sqlc"
       - task: mocks
       - task: proto
-      - task: go
+      - task: generate
       - task: sqlc
       - echo "{{._CG_OK}} {{._CG_NAME}} · gen · regenerated"
 
@@ -106,8 +114,8 @@ tasks:
     preconditions:
       - sh: command -v buf >/dev/null
         msg: "buf is not installed — brew install bufbuild/buf/buf"
-      - sh: test -f {{._CG_BUF_TPL}}
-        msg: "{{._CG_BUF_TPL}} not found — set BUF_TEMPLATE"
+      - sh: 'for f in {{._CG_BUF_TPL}}; do test -f "$f" || exit 1; done'
+        msg: "one of {{._CG_BUF_TPL}} is missing — check BUF_TEMPLATE"
       # A generator whose output path is relative to the working directory
       # writes a second, complete copy of the stubs when it is invoked from the
       # wrong one. That copy compiles, nothing imports it, and it rots in place.
@@ -121,20 +129,25 @@ tasks:
           Nothing imports it and it drifts out of the real tree in silence.
           Remove it and re-run.
     cmds:
-      - cmd: |-
+      # One buf run per template. A repository that generates a second slice
+      # from a different template — a vendored contract, a TypeScript client —
+      # lists both here rather than keeping its own copy of this task.
+      - for: { var: _CG_BUF_TPL, split: " " }
+        cmd: |-
           set -eu
           {{if ._CG_PLUGINS}}
           export GOBIN="$PWD/{{._CG_BIN}}"
           export PATH="$GOBIN:$PATH"
           go install {{._CG_PLUGINS}}
           {{end}}
-          buf generate {{._CG_BUF_IN}} --template {{._CG_BUF_TPL}}
+          {{if ._CG_BUF_PATH}}export PATH="{{._CG_BUF_PATH}}:$PATH"{{end}}
+          buf generate {{._CG_BUF_IN}} --template {{.ITEM}}
       - task: _normalise
 
-  go:
-    desc: "Run `go generate` across the module"
+  generate:
+    desc: "Run this component's generate step (default: `go generate ./...`)"
     cmds:
-      - go generate ./...
+      - '{{._CG_GEN_CMD}}'
       # Normalised here too, not only after mocks and proto: `wire` and its
       # kind write their output at this step, and a generator that emits one
       # import block where the commit hook writes two leaves the tree dirty on

@@ -16,6 +16,34 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [3.0.0] — 2026-09-07
+
+A major because one task was renamed. The upgrade is one line per consumer,
+and only for a consumer that named that task directly.
+
+### Changed
+
+- **`codegen:go` is now `codegen:generate`.** It no longer only runs
+  `go generate`: `GENERATE_CMD` says what the step runs, defaulting to
+  `go generate ./...`. A component whose generator is invoked directly —
+  `wire ./internal/app/` — now uses the module instead of keeping its own task.
+
+  Migration: rename `codegen:go` to `codegen:generate` wherever you call it.
+  `codegen:all` and `codegen:check` are unaffected; they compose it internally.
+
+### Added
+
+- `BUF_TEMPLATE` accepts several templates, space-separated, and `proto` runs
+  buf once per template. A repository that generates a second slice from
+  another template — a vendored contract, a TypeScript client — lists both
+  rather than keeping its own `buf generate` beside the module's.
+- `PROTO_PATH` — directories prepended to `PATH` before buf runs, for a plugin
+  that arrives from neither `PATH` nor a Go module. It is expanded by the
+  shell, so `$(pnpm -C ../web bin)` reaches a plugin in a JS tree, which
+  `PROTO_PLUGINS` cannot.
+- `GENERATE_CMD` — what `generate` runs. Same shape as `TEST_CMD` and
+  `LINT_CMD` in `python`, `uv` and `node`.
+
 ## [2.2.1] — 2026-09-07
 
 ### Changed
@@ -479,6 +507,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[3.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.0.0
 [2.2.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.2.1
 [2.2.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.2.0
 [2.1.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.1.2

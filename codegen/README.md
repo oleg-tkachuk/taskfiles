@@ -1,6 +1,6 @@
 # codegen — generated code, and gates that keep it honest
 
-Mocks, protobuf stubs, `go generate` output and sqlc bindings, regenerated in
+Mocks, protobuf stubs, a generate step and sqlc bindings, regenerated in
 the one order that works — plus the drift gates that refuse a tree where the
 committed output no longer matches the source it came from.
 
@@ -16,10 +16,10 @@ component's directory.
 
 | Task | What it does |
 |---|---|
-| `all` | mocks → proto → `go generate` → sqlc, in that order |
+| `all` | mocks → proto → generate → sqlc, in that order |
 | `mocks` | Regenerate the interface mocks |
 | `proto` | Regenerate the protobuf and RPC stubs |
-| `go` | Run `go generate` across the module |
+| `generate` | Run this component's generate step — `go generate ./...` unless `GENERATE_CMD` says otherwise |
 | `sqlc` | Regenerate the sqlc bindings |
 | `check` | Both drift gates |
 | `mocks:check` | Fail when the committed mocks are stale |
@@ -32,12 +32,14 @@ component's directory.
 | `PROJECT_NAME` | `codegen` | label in log lines |
 | `MOCKERY_CONFIG` | `.mockery.yaml` | mockery's config; its absence stops `mocks` with a message |
 | `MOCKERY_MODULE` | `github.com/vektra/mockery/v3` | resolved through go.mod by `go run` |
-| `BUF_TEMPLATE` | `buf.gen.yaml` | the generation template buf reads |
+| `BUF_TEMPLATE` | `buf.gen.yaml` | one or more templates, space-separated — buf runs once per template |
 | `BUF_INPUT` | — | buf's input, when it is not the working directory |
 | `PROTO_FORBID` | — | paths that must not exist when the stubs are generated |
 | `PROTO_PLUGINS` | — | protoc plugins to install from this module before buf |
 | `CODEGEN_BIN_DIR` | `./bin` | where those plugins land |
 | `GENERATED_DIRS` | — | directories to normalise with goimports |
+| `PROTO_PATH` | — | directories prepended to `PATH` before buf runs; evaluated by the shell, so `$(pnpm -C ../web bin)` works |
+| `GENERATE_CMD` | `go generate ./...` | what `generate` runs |
 | `SQLC_MODULE` | — | run sqlc through `go run` at a pinned version instead of from PATH |
 | `MOCKS_PATHSPEC` | `internal` | git pathspec the mock gate watches |
 | `SQLC_DIR` | — | directory the sqlc gate watches; required by `sqlc:check` |
@@ -63,7 +65,7 @@ includes:
 
 ```console
 $ task codegen:all
-◉ core-api · gen · mocks → proto → go generate → sqlc
+◉ core-api · gen · mocks → proto → generate → sqlc
 ✔ core-api · gen · regenerated
 
 $ task codegen:check
@@ -74,7 +76,7 @@ $ task codegen:check
 ## Why the order is fixed
 
 Mocks first, so they are written against the interfaces the tree already has.
-buf before `go generate`, so the protobuf types exist when generate's tools walk
+buf before the generate step, so the protobuf types exist when its tools walk
 the tree. sqlc last, so its bindings see any updated proto types.
 
 ## Three choices that each cost a debugging session
