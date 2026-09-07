@@ -16,6 +16,33 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [2.1.2] — 2026-09-07
+
+A security fix. Upgrade if anything you pass to these modules is not written by
+hand at the keyboard — a secret read from a file, a password from a manager, a
+value from CI.
+
+### Fixed
+
+- Consumer values reaching a shell were interpolated between hand-written
+  single quotes. A value containing `'` closes them, and the rest of it stops
+  being data.
+
+  `sealed-secrets:seal` is the one that mattered, because a secret is arbitrary
+  text by definition. Sealing `x'; touch /tmp/PWNED; echo '` ran the command —
+  and cut off the `--dry-run=client` that keeps plaintext off the cluster with
+  it, so `kubectl create secret` ran for real and left the value in the
+  namespace. Elsewhere the same shape broke the command instead: through `auth`
+  the quote closed early and `step` refused a malformed invocation. Which one
+  happens depends only on where the value lands in the line.
+
+  Twenty-four values across `sealed-secrets`, `auth`, `argocd`, `helm`,
+  `checkov` and `codegen` now go through Task's `q`, which quotes correctly.
+  `*_FLAGS` inputs are deliberately left bare: they exist to expand into
+  several arguments.
+
+  Nothing to change in a consumer — the fix is inside the modules.
+
 ## [2.1.1] — 2026-09-07
 
 Documentation only. No module changed.
@@ -409,6 +436,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[2.1.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.1.2
 [2.1.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.1.1
 [2.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.1.0
 [2.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.0.0
