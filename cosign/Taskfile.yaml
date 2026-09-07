@@ -151,8 +151,18 @@ tasks:
     desc: "Verify the signatures on the published image and chart"
     # The counterpart of `all`, and the only proof that signing worked: a sign
     # step that quietly wrote nothing looks exactly like one that worked.
+    # COSIGN_SIGN=0 turns this off. The guard sits here rather than on the
+    # internal task because Task evaluates preconditions BEFORE status, so a
+    # status guard cannot skip past the internal task's own preconditions.
     status:
       - test '{{._CS_ON}}' = '0'
+    cmds:
+      - task: _verify
+
+  # ─── internals ──────────────────────────────────────────────────────────────
+
+  _verify:
+    internal: true
     preconditions:
       - sh: command -v cosign >/dev/null
         msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/"
@@ -170,8 +180,6 @@ tasks:
           cosign verify {{._CS_VERIFY_FLAGS}} --key {{._CS_PUB}} '{{.ITEM}}' >/dev/null 2>&1
           && echo "{{._CS_OK}} {{._CS_NAME}} · cosign · verified {{.ITEM}}"
           || { echo "{{._CS_ERR}} {{._CS_NAME}} · cosign · unsigned or bad signature: {{.ITEM}}" >&2; exit 1; }
-
-  # ─── internals ──────────────────────────────────────────────────────────────
 
   _sign:
     internal: true
