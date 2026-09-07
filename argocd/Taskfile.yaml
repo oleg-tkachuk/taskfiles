@@ -18,8 +18,18 @@ version: "3"
 # is safe to chain after a deploy on a laptop.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
-#   APP_PREFIX     required; which applications to refresh
+#   APP_PREFIX     required by refresh; which applications to touch
 #   ARGOCD_NS      default "argocd"
+#   ARGOCD_SERVER  the server deployment    (default "argocd-server"; a Helm
+#                  release named other than `argocd` prefixes it, so a release
+#                  called `argo-cd` makes this `argo-cd-argocd-server`)
+#   ARGOCD_SERVER_LABEL
+#                  app.kubernetes.io/name on the server pods (default
+#                  "argocd-server"). Not the same knob as ARGOCD_SERVER: the
+#                  chart's app label does not carry the release name, so a
+#                  release called `argo-cd` has deployment
+#                  argo-cd-argocd-server wearing the label argocd-server.
+#   ARGOCD_PORT    local port for server:port-forward     (default 8443)
 #   K8S_CONTEXT    pin a cluster                          (default: current)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -31,6 +41,9 @@ vars:
   # unrelated applications (infra Postgres, registries) that must not be touched.
   _ARGO_PREFIX: '{{.APP_PREFIX | default ""}}'
   _ARGO_KUBECTL: 'kubectl{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT}}{{end}}'
+  _ARGO_SERVER: '{{.ARGOCD_SERVER | default "argocd-server"}}'
+  _ARGO_LABEL: '{{.ARGOCD_SERVER_LABEL | default "argocd-server"}}'
+  _ARGO_PORT: '{{.ARGOCD_PORT | default "8443"}}'
 
 tasks:
 
@@ -64,3 +77,81 @@ tasks:
         {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} get applications.argoproj.io
         -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status
         {{if .APP_PREFIX}}| grep -E '^(NAME|{{._ARGO_PREFIX}})'{{end}}
+
+  # ═══ the server itself ══════════════════════════════════════════════════════
+  #
+  # Everything above acts on Argo's applications; everything below acts on the
+  # Argo that runs them. Read-only tasks keep the module's promise of no-opping
+  # without a cluster — `set-password` does not, because a mutation that
+  # silently does nothing is worse than one that says it cannot.
+
+  server:port-forward:
+    desc: "Port-forward the Argo server to localhost (Ctrl-C to stop)"
+    status:
+      - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
+    cmds:
+      - echo "▸ argocd · server · https://localhost:{{._ARGO_PORT}}"
+      - >-
+        {{._ARGO_KUBECTL}} -n {{._ARGO_NS}}
+        port-forward svc/{{._ARGO_SERVER}} {{._ARGO_PORT}}:443
+
+  server:password:
+    desc: "Print the initial admin password"
+    status:
+      - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
+    # The secret is deleted once the password has been changed, so its absence
+    # is an answer rather than a failure.
+    cmds:
+      - cmd: |-
+          pw=$({{._ARGO_KUBECTL}} -n {{._ARGO_NS}} get secret argocd-initial-admin-secret \
+                 -o jsonpath='{.data.password}' 2>/dev/null | base64 -d) || true
+          if [ -n "$pw" ]; then
+            printf '%s\n' "$pw"
+          else
+            echo "⚠ argocd · server · no initial password secret — it is removed once the password is changed"
+          fi
+
+  server:set-password:
+    desc: "Set the admin password and roll the server so it takes effect"
+    requires:
+      vars: [ARGOCD_ADMIN_PASSWORD]
+    preconditions:
+      - sh: command -v argocd >/dev/null
+        msg: "the argocd CLI is not installed — brew install argocd"
+      - sh: "{{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
+        msg: "no reachable cluster — this one changes a credential, so it refuses rather than skipping"
+    cmds:
+      # bcrypt via the argocd CLI rather than a hash written by hand: the
+      # server reads admin.password as bcrypt and rejects anything else at
+      # login, long after the patch reported success.
+      - cmd: |-
+          hash=$(argocd account bcrypt --password '{{.ARGOCD_ADMIN_PASSWORD}}')
+          {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} patch secret argocd-secret \
+            -p "{\"stringData\":{\"admin.password\":\"${hash}\",\"admin.passwordMtime\":\"$(date -u +%FT%TZ)\"}}" >/dev/null
+      - task: server:restart
+      - echo "✔ argocd · server · admin password set"
+
+  server:restart:
+    desc: "Roll the Argo server deployment"
+    status:
+      - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
+    cmds:
+      - "{{._ARGO_KUBECTL}} -n {{._ARGO_NS}} rollout restart deploy/{{._ARGO_SERVER}} >/dev/null"
+      - "{{._ARGO_KUBECTL}} -n {{._ARGO_NS}} rollout status deploy/{{._ARGO_SERVER}} --timeout={{.ROLLOUT_TIMEOUT | default \"2m\"}}"
+      - echo "✔ argocd · server · rolled"
+
+  server:status:
+    desc: "Show the Argo pods"
+    status:
+      - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
+    cmds:
+      - "{{._ARGO_KUBECTL}} -n {{._ARGO_NS}} get pods -o wide"
+
+  server:logs:
+    desc: "Tail the Argo server logs (Ctrl-C to stop)"
+    status:
+      - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
+    cmds:
+      - >-
+        {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} logs -l app.kubernetes.io/name={{._ARGO_LABEL}}
+        -f --tail={{.LOG_TAIL | default "100"}}

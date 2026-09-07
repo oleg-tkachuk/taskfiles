@@ -19,12 +19,21 @@ workspace — tasks then read `argocd:<task>`.
 |---|---|
 | `list` | Show the sync + health state of every application matching APP_PREFIX |
 | `refresh` | Hard-refresh every Argo application matching APP_PREFIX |
+| `server:port-forward` | Port-forward the Argo server to localhost |
+| `server:password` | Print the initial admin password |
+| `server:set-password` | Set the admin password and roll the server |
+| `server:restart` | Roll the Argo server deployment |
+| `server:status` | Show the Argo pods |
+| `server:logs` | Tail the Argo server logs |
 
 ## Inputs
 
 | Var | Default | Meaning |
 |---|---|---|
 | `APP_PREFIX` | — | required; which applications to refresh |
+| `ARGOCD_SERVER` | `argocd-server` | the server deployment; a Helm release named other than `argocd` prefixes it |
+| `ARGOCD_SERVER_LABEL` | `argocd-server` | `app.kubernetes.io/name` on the server pods — the chart's app label does not carry the release name, so these two differ whenever the release does |
+| `ARGOCD_PORT` | `8443` | local port for `server:port-forward` |
 | `ARGOCD_NS` | `argocd` | |
 | `K8S_CONTEXT` | current context | |
 
