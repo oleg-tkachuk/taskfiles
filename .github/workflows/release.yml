@@ -3,7 +3,7 @@
 # works. This workflow checks that promise before publishing the release, and
 # it checks it the way a consumer would — over the network, through the git
 # include path, not from a local checkout.
-name: release
+name: Release
 
 on:
   push:
