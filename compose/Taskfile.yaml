@@ -18,13 +18,17 @@ version: "3"
 #   PROJECT_NAME   the label in every log line
 #   SERVICE        narrow `logs` to one service
 #   TAIL           backlog for `logs`                     (default 200)
+#   COMPOSE_ENGINE    default "docker compose"; e.g. "podman compose"
 # ─────────────────────────────────────────────────────────────────────────────
 
 silent: true
 
 vars:
   _CMP_FILE: '{{.COMPOSE_FILE | default "docker-compose.yaml"}}'
-  _CMP_CMD: 'docker compose -f {{.COMPOSE_FILE | default "docker-compose.yaml"}}'
+  # The engine is an input: `docker compose` is the default because it is what
+  # most machines have, but the module asks nothing of it that podman does not
+  # also answer, and a consumer on podman had no way to say so.
+  _CMP_CMD: '{{.COMPOSE_ENGINE | default "docker compose"}} -f {{.COMPOSE_FILE | default "docker-compose.yaml"}}'
   _CMP_NAME: '{{.PROJECT_NAME | default "stack"}}'
 
 tasks:

@@ -15,6 +15,17 @@ version: "3"
 #   PY_SRC          source directory for lint/format   (default src)
 #   PY_TEST_FLAGS   default "-q"
 #   UV_SYNC_FLAGS   which dependency sets to install   (default "--group dev";
+#
+# The three tools each task runs are inputs, not assumptions. ruff, pytest and
+# mypy are the defaults because they are what most projects reach for; a project
+# on black, flake8 or pyright sets the command rather than doing without the
+# task.
+#
+#   TEST_CMD        default pytest
+#   LINT_CMD        default "ruff check"
+#   FORMAT_CMD      default "ruff format"
+#   TYPECHECK_CMD   default mypy
+#   TYPECHECK_MODULE  what typecheck probes for before running (default mypy)
 #                   an extras-based project passes "--extra dev --extra …")
 #
 # uv resolves and installs from the lockfile by default, which is the
@@ -27,6 +38,11 @@ silent: true
 vars:
   _UV_NAME: '{{.PROJECT_NAME | default "python"}}'
   _UV_SRC: '{{.PY_SRC | default "src"}}'
+  _UV_TEST_CMD: '{{.TEST_CMD | default "pytest"}}'
+  _UV_LINT_CMD: '{{.LINT_CMD | default "ruff check"}}'
+  _UV_FMT_CMD: '{{.FORMAT_CMD | default "ruff format"}}'
+  _UV_TC_CMD: '{{.TYPECHECK_CMD | default "mypy"}}'
+  _UV_TC_MOD: '{{.TYPECHECK_MODULE | default "mypy"}}'
   _UV_TEST_FLAGS: '{{.PY_TEST_FLAGS | default "-q"}}'
   _UV_SYNC: '{{.UV_SYNC_FLAGS | default "--group dev"}}'
   # uv picks an interpreter from .python-version or the pyproject constraint
@@ -53,7 +69,7 @@ tasks:
     deps: [install]
     cmds:
       - echo "▸ {{._UV_NAME}} · uv · pytest"
-      - uv run pytest {{._UV_TEST_FLAGS}}
+      - uv run {{._UV_TEST_CMD}} {{._UV_TEST_FLAGS}}
       - echo "✔ {{._UV_NAME}} · uv · tests pass"
 
   lint:
@@ -61,7 +77,7 @@ tasks:
     deps: [install]
     cmds:
       - echo "▸ {{._UV_NAME}} · uv · ruff check"
-      - uv run ruff check {{._UV_SRC}}
+      - uv run {{._UV_LINT_CMD}} {{._UV_SRC}}
       - echo "✔ {{._UV_NAME}} · uv · lint clean"
 
   fmt:
@@ -71,16 +87,16 @@ tasks:
     aliases: [format]
     deps: [install]
     cmds:
-      - uv run ruff format {{._UV_SRC}}
+      - uv run {{._UV_FMT_CMD}} {{._UV_SRC}}
       - echo "✔ {{._UV_NAME}} · uv · formatted"
 
   typecheck:
     desc: "mypy (skipped when mypy is not a project dependency)"
     status:
-      - "! uv run python -c 'import mypy' >/dev/null 2>&1"
+      - "! uv run python -c 'import {{._UV_TC_MOD}}' >/dev/null 2>&1"
     cmds:
       - echo "▸ {{._UV_NAME}} · uv · mypy"
-      - uv run mypy {{._UV_SRC}}
+      - uv run {{._UV_TC_CMD}} {{._UV_SRC}}
       - echo "✔ {{._UV_NAME}} · uv · types clean"
 
   lock:

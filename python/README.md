@@ -35,6 +35,17 @@ workspace — tasks then read `py:<task>`.
 | `PY_SRC` | `src` | what lint and format target |
 | `PY_TEST_FLAGS` | `-q` | |
 | `POETRY_INSTALL_FLAGS` | `--no-interaction` | e.g. add `--no-root` |
+| `TEST_CMD` | `pytest` | which runner each task invokes |
+| `LINT_CMD` | `ruff check` | |
+| `FORMAT_CMD` | `ruff format` | |
+| `TYPECHECK_CMD` | `mypy` | |
+| `TYPECHECK_MODULE` | `mypy` | what `typecheck` imports to decide whether it can run |
+
+
+The four tools are inputs, not assumptions. ruff, pytest and mypy are the
+defaults because they are what most projects reach for; a project on black,
+flake8, pyright or plain unittest sets the command rather than doing without
+the task.
 
 ## Examples
 

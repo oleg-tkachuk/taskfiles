@@ -13,6 +13,17 @@ version: "3"
 #   PY_TEST_FLAGS          default "-q"
 #   POETRY_INSTALL_FLAGS   e.g. "--no-interaction --no-root"
 #
+# The three tools each task runs are inputs, not assumptions. ruff, pytest and
+# mypy are the defaults because they are what most projects reach for; a project
+# on black, flake8 or pyright sets the command rather than doing without the
+# task.
+#
+#   TEST_CMD        default pytest
+#   LINT_CMD        default "ruff check"
+#   FORMAT_CMD      default "ruff format"
+#   TYPECHECK_CMD   default mypy
+#   TYPECHECK_MODULE  what typecheck probes for before running (default mypy)
+#
 # Pin PY to the interpreter the deployed image runs. Left at the default, a
 # pyproject that admits ">=3.13,<4.0" also admits 3.14, and a venv built on the
 # newer one falls back to source builds for native deps that ship no wheel for
@@ -26,6 +37,11 @@ vars:
   _PY_NAME: '{{.PROJECT_NAME | default "python"}}'
   _PY_BIN: '{{.PY | default "python3"}}'
   _PY_SRC: '{{.PY_SRC | default "src"}}'
+  _PY_TEST_CMD: '{{.TEST_CMD | default "pytest"}}'
+  _PY_LINT_CMD: '{{.LINT_CMD | default "ruff check"}}'
+  _PY_FMT_CMD: '{{.FORMAT_CMD | default "ruff format"}}'
+  _PY_TC_CMD: '{{.TYPECHECK_CMD | default "mypy"}}'
+  _PY_TC_MOD: '{{.TYPECHECK_MODULE | default "mypy"}}'
   _PY_TEST_FLAGS: '{{.PY_TEST_FLAGS | default "-q"}}'
   _PY_INSTALL_FLAGS: '{{.POETRY_INSTALL_FLAGS | default "--no-interaction"}}'
 
@@ -53,14 +69,14 @@ tasks:
     desc: "pytest"
     cmds:
       - echo "▸ {{._PY_NAME}} · py · pytest"
-      - poetry run pytest {{._PY_TEST_FLAGS}}
+      - poetry run {{._PY_TEST_CMD}} {{._PY_TEST_FLAGS}}
       - echo "✔ {{._PY_NAME}} · py · tests pass"
 
   lint:
     desc: "ruff check"
     cmds:
       - echo "▸ {{._PY_NAME}} · py · ruff check"
-      - poetry run ruff check {{._PY_SRC}}
+      - poetry run {{._PY_LINT_CMD}} {{._PY_SRC}}
       - echo "✔ {{._PY_NAME}} · py · lint clean"
 
   fmt:
@@ -69,16 +85,16 @@ tasks:
     # what ruff calls it, so it stays as an alias.
     aliases: [format]
     cmds:
-      - poetry run ruff format {{._PY_SRC}}
+      - poetry run {{._PY_FMT_CMD}} {{._PY_SRC}}
       - echo "✔ {{._PY_NAME}} · py · formatted"
 
   typecheck:
     desc: "mypy (skipped when mypy is not a project dependency)"
     status:
-      - "! poetry run python -c 'import mypy' >/dev/null 2>&1"
+      - "! poetry run python -c 'import {{._PY_TC_MOD}}' >/dev/null 2>&1"
     cmds:
       - echo "▸ {{._PY_NAME}} · py · mypy"
-      - poetry run mypy {{._PY_SRC}}
+      - poetry run {{._PY_TC_CMD}} {{._PY_SRC}}
       - echo "✔ {{._PY_NAME}} · py · types clean"
 
   lock:

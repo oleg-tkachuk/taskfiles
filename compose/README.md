@@ -31,6 +31,7 @@ workspace — tasks then read `dev:<task>`.
 | `PROJECT_NAME` | `stack` | the label in every log line |
 | `SERVICE` | — | narrow `logs` to one service |
 | `TAIL` | `200` | backlog for `logs` |
+| `COMPOSE_ENGINE` | `docker compose` | e.g. `podman compose` |
 
 ## Examples
 
