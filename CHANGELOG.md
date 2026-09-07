@@ -16,6 +16,19 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [5.1.3] — 2026-09-07
+
+### Added
+
+- **`demo/`** — a working example of the library: one small Go service taken
+  from `go test` to a signed, running deployment through `go`, `release`,
+  `runtime/kind`, `k8s`, `security` and `cosign`. Its Dockerfile ships
+  without a non-root `USER` on purpose, so the walkthrough's security step
+  has a real finding to catch and fix. Excluded from the root Taskfile's
+  module discovery and linked from the main README — it is a consumer of
+  this library, not a module in it, and does not change any module's task
+  or input surface.
+
 ## [5.1.2] — 2026-09-07
 
 ### Added
