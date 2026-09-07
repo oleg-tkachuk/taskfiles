@@ -16,6 +16,14 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [5.0.1] — 2026-09-07
+
+### Fixed
+
+- `node:deps:update` ran `dlx`, which is pnpm's spelling, against whatever `PM`
+  said — so every `PM: npm` repository got `Unknown command: "dlx"`. It now
+  resolves `pnpm dlx` or `npx` from `PM`, and `PM_EXEC` overrides it.
+
 ## [5.0.0] — 2026-09-07
 
 ### Removed
@@ -773,6 +781,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[5.0.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v5.0.1
 [5.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v5.0.0
 [4.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v4.1.0
 [4.0.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v4.0.1

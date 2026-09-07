@@ -9,6 +9,7 @@ version: "3"
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   PROJECT_NAME   label in log lines
 #   PM             package manager        (default pnpm; pass npm for npm ci)
+#   PM_EXEC        how a one-off tool is run  (default `pnpm dlx`, `npx` for npm)
 #   PM_INSTALL     override the install command outright
 #
 # Every task runs a package.json script, and which script is an input: a
@@ -39,6 +40,7 @@ silent: true
 vars:
   _NODE_NAME: '{{.PROJECT_NAME | default "node"}}'
   _NODE_PM: '{{.PM | default "pnpm"}}'
+  _NODE_EXEC: '{{.PM_EXEC | default (eq (.PM | default "pnpm") "npm" | ternary "npx" (printf "%s dlx" (.PM | default "pnpm")))}}'
   _NODE_DEV: '{{.SCRIPT_DEV | default "dev"}}'
   _NODE_BUILD: '{{.SCRIPT_BUILD | default "build"}}'
   _NODE_LINT: '{{.SCRIPT_LINT | default "lint"}}'
@@ -141,7 +143,9 @@ tasks:
     desc: "Bump dependencies to the latest minor/patch (no majors), then reinstall"
     cmds:
       - echo "{{._NODE_RUN}} {{._NODE_NAME}} · node · npm-check-updates --target minor"
-      - "{{._NODE_PM}} dlx npm-check-updates --target minor --upgrade"
+      # `dlx` is pnpm's; npm spells the same thing `npx`. Hardcoding one of
+      # them made this task fail with "Unknown command: dlx" on every npm repo.
+      - "{{._NODE_EXEC}} npm-check-updates --target minor --upgrade"
       - "{{._NODE_PM}} install"
       - echo "{{._NODE_OK}} {{._NODE_NAME}} · node · deps bumped — review the lockfile diff, then verify"
 

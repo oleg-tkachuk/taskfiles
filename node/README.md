@@ -34,6 +34,7 @@ workspace — tasks then read `node:<task>`.
 |---|---|---|
 | `PROJECT_NAME` | `node` | the label in every log line |
 | `PM` | `pnpm` | pass `npm` for a package-lock repo |
+| `PM_EXEC` | `pnpm dlx`, `npx` for npm | how a one-off tool is run |
 | `SCRIPT_DEV` | `dev` | which package.json script each task runs |
 | `SCRIPT_BUILD` | `build` | what `build` runs |
 | `SCRIPT_LINT` | `lint` | what `lint` and `lint:fix` run |
