@@ -135,6 +135,30 @@ read `_REL_VERSION` and `_REL_IMAGE` from `release`, because they act on what a
 release published. They read them — they must never declare them, or they would
 shadow the very values they are supposed to act on.
 
+**When a module's values are decided.** A module's `vars:` are evaluated once,
+as the include loads — not per call. Values reach them from the including
+file's own vars, from the include's `vars:` block, and from the command line. A
+`vars:` block on a `task:` reference does not reach them: it is visible to a
+task's own `vars:` and nowhere else.
+
+```yaml
+# configures the module — the include carries the value
+k8s: { taskfile: '{{.TASKLIB}}k8s{{.TASKLIB_REF}}', dir: ., vars: { K8S_NAMESPACE: billing } }
+
+# does not — the module derived its namespace when it loaded
+- task: k8s:restart
+  vars: { K8S_NAMESPACE: billing }
+```
+
+That is why every module here is scoped to one component. A repository that
+needs the same module aimed at several targets includes it once per target,
+rather than passing the target at the call.
+
+The `X: '{{.X | default "…"}}'` form in the quickstart is not decoration: a var
+that reads a *different* name is fixed at whatever that name held, while one
+that reads its own sees a value given on the command line. Write inputs that
+way in a consumer and `task deploy REGISTRY=other` works.
+
 **Task naming.** Public tasks are the plain verb for the work (`build`, `test`,
 `deploy`, `restart`) namespaced by area when a module has several (`chart:push`,
 `image:build`, `deps:update`). Internal helpers are `internal: true` and named
