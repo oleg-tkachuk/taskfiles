@@ -16,6 +16,57 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [2.1.0] — 2026-09-07
+
+Additive. Every default is what it was, so a consumer that sets none of this
+sees no difference.
+
+### Added
+
+- Every tool invocation takes what it needs to be somebody else's. A module
+  that hardcodes its command is usable by whoever wrote it and nobody else, and
+  five modules hardcoded theirs.
+
+  `security` gains `GOVULNCHECK_FLAGS`, `GOLANGCI_FLAGS`, `GITLEAKS_FLAGS`,
+  `BUF_BREAKING_FLAGS`, and — the clearest case — `TRIVY_SUBCOMMAND`,
+  `TRIVY_SCANNERS`, `TRIVY_TARGET` and `TRIVY_FLAGS`. A repository scanning a
+  built image rather than a working tree, or looking for misconfiguration
+  rather than vulnerabilities, previously had no way in. `checkov` gains
+  `CHECKOV_FLAGS` and `CHECKOV_TARGET`.
+
+  Flags are appended, never substituted for the invocation: what makes a task a
+  gate — trivy's `--exit-code 1`, the base golangci-lint measures against —
+  stays where a consumer cannot drop it by accident.
+
+- `python` and `uv` take `TEST_CMD`, `LINT_CMD`, `FORMAT_CMD`, `TYPECHECK_CMD`
+  and `TYPECHECK_MODULE`. They hardcoded ruff, pytest and mypy across four
+  tasks each, so a project on black, flake8, pyright or plain unittest could not
+  use lint, fmt, test or typecheck — not configure them, use them.
+
+- `node` names its package.json scripts: `SCRIPT_DEV`, `SCRIPT_BUILD`,
+  `SCRIPT_LINT`, `SCRIPT_TEST`, `SCRIPT_E2E`, `SCRIPT_GENERATE`,
+  `LINT_FIX_FLAGS`. A repository whose build is `build:prod` had to do without
+  the task. `E2E_SETUP` covers the preparation step, which was Playwright's
+  browser download and nothing else — set it to `none` to skip, since Task's
+  `default` filter fires on an empty value as well as an unset one and `""`
+  hands back the default.
+
+- `compose` takes `COMPOSE_ENGINE`. Two hardcoded words made the whole module
+  unavailable on podman, which answers everything it asks.
+
+### Fixed
+
+- Banners name the tool that runs. Making the Python toolchain configurable had
+  left six of them announcing the default while a different command executed —
+  `▸ py · mypy` above a pyright run. `node:test:e2e` had the deeper version:
+  it ran `playwright install` regardless, so `SCRIPT_E2E` promised a choice the
+  task did not honour.
+
+### Internal
+
+- `actions/setup-go` moves from v5.5.0 to v7.0.0, off the deprecated Node 20
+  runtime the runner had started warning about on every job.
+
 ## [2.0.0] — 2026-09-07
 
 One module split in two. If you do not scan infrastructure with checkov, this
@@ -337,6 +388,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[2.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.1.0
 [2.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.0.0
 [1.3.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.3.2
 [1.3.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.3.1
