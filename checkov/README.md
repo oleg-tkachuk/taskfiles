@@ -23,6 +23,8 @@ includes:
 | `CHECKOV_CONFIG` | `.checkov.yaml` | |
 | `CHECKOV_BASELINE` | `.checkov.baseline` | |
 | `CHECKOV_FRAMEWORKS` | `github_actions dockerfile helm kubernetes` | frameworks the triage view walks |
+| `CHECKOV_TARGET` | `.` | directory the triage view walks |
+| `CHECKOV_FLAGS` | — | extra checkov flags, appended to every invocation |
 
 ## Why this is not in `security`
 

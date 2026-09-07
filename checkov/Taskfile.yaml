@@ -19,6 +19,8 @@ version: "3"
 #   CHECKOV_BASELINE    default .checkov.baseline
 #   CHECKOV_FRAMEWORKS  frameworks the triage view walks
 #                       (default: github_actions dockerfile helm kubernetes)
+#   CHECKOV_TARGET      directory the triage view walks        (default .)
+#   CHECKOV_FLAGS       extra checkov flags, appended to every invocation
 # ─────────────────────────────────────────────────────────────────────────────
 
 silent: true
@@ -27,6 +29,8 @@ vars:
   _CKV_CFG: '{{.CHECKOV_CONFIG | default ".checkov.yaml"}}'
   _CKV_BASE: '{{.CHECKOV_BASELINE | default ".checkov.baseline"}}'
   _CKV_FW: '{{.CHECKOV_FRAMEWORKS | default "github_actions dockerfile helm kubernetes"}}'
+  _CKV_TARGET: '{{.CHECKOV_TARGET | default "."}}'
+  _CKV_FLAGS: '{{.CHECKOV_FLAGS | default ""}}'
 
 tasks:
 
@@ -42,7 +46,7 @@ tasks:
       - sh: test -f {{._CKV_BASE}}
         msg: "{{._CKV_BASE}} not found, and the config references it — create it with checkov:baseline"
     cmds:
-      - checkov --config-file {{._CKV_CFG}}
+      - checkov --config-file {{._CKV_CFG}} {{._CKV_FLAGS}}
       - echo "✔ checkov · no findings outside the baseline"
 
   all:
@@ -54,7 +58,7 @@ tasks:
     # deciding what to fix next, not a pass/fail check.
     cmds:
       - >-
-        checkov -d . --compact
+        checkov -d {{._CKV_TARGET}} --compact {{._CKV_FLAGS}}
         {{range $f := splitList " " ._CKV_FW}}--framework {{$f}} {{end}}
 
   baseline:
@@ -75,7 +79,7 @@ tasks:
             python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(sum(len(fi.get('check_ids',[])) for f in d['failed_checks'] for fi in f.get('findings',[])))" "$1" 2>/dev/null || echo 0
           }
           before=$(count '{{._CKV_BASE}}')
-          checkov --config-file '{{._CKV_CFG}}' --create-baseline >/dev/null 2>&1 || true
+          checkov --config-file '{{._CKV_CFG}}' {{._CKV_FLAGS}} --create-baseline >/dev/null 2>&1 || true
           after=$(count '{{._CKV_BASE}}')
           echo "▸ checkov · baselined findings: ${before} → ${after}"
           if [ "${after}" -gt "${before}" ]; then

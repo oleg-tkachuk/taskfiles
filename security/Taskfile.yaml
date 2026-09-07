@@ -17,6 +17,19 @@ version: "3"
 #   GO_MODULES   whitespace-separated module directories for the Go scans
 #   BASE         branch the new-findings and breaking gates compare against
 #   GOSEC_FLAGS        extra gosec flags
+#   GOVULNCHECK_FLAGS  extra govulncheck flags
+#   GOLANGCI_FLAGS     extra golangci-lint flags
+#   GITLEAKS_FLAGS     extra gitleaks flags
+#   TRIVY_SCANNERS     default "--scanners vuln,secret"
+#   TRIVY_SUBCOMMAND   default "fs"; "image" to scan a built image instead
+#   TRIVY_TARGET       what to scan              (default ".")
+#   TRIVY_FLAGS        extra trivy flags
+#   BUF_BREAKING_FLAGS extra buf breaking flags
+#
+# Every tool takes a FLAGS input, appended to the invocation rather than
+# replacing it: the flags that make a task a gate — trivy's --exit-code, the
+# base golangci-lint measures against — stay where a consumer cannot drop them
+# by accident, and everything else is theirs to add.
 #   GITLEAKS_BASELINE  findings accepted as known, so the gate reports only new ones
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -29,6 +42,14 @@ vars:
   # Branch the breaking-change and new-issue gates compare against.
   _SEC_BASE: '{{.BASE | default "main"}}'
   _SEC_GOSEC_FLAGS: '{{.GOSEC_FLAGS | default ""}}'
+  _SEC_VULN_FLAGS: '{{.GOVULNCHECK_FLAGS | default ""}}'
+  _SEC_LINT_FLAGS: '{{.GOLANGCI_FLAGS | default ""}}'
+  _SEC_GL_FLAGS: '{{.GITLEAKS_FLAGS | default ""}}'
+  _SEC_TRIVY_SCAN: '{{.TRIVY_SCANNERS | default "--scanners vuln,secret"}}'
+  _SEC_TRIVY_SUB: '{{.TRIVY_SUBCOMMAND | default "fs"}}'
+  _SEC_TRIVY_TARGET: '{{.TRIVY_TARGET | default "."}}'
+  _SEC_TRIVY_FLAGS: '{{.TRIVY_FLAGS | default ""}}'
+  _SEC_BUF_FLAGS: '{{.BUF_BREAKING_FLAGS | default ""}}'
   _SEC_GL_BASE: '{{.GITLEAKS_BASELINE | default ""}}'
 
 tasks:
@@ -49,7 +70,7 @@ tasks:
     cmds:
       - for: { var: _SEC_MODULES }
         task: _in-module
-        vars: { MODULE: "{{.ITEM}}", CMD: "govulncheck ./...", LABEL: "govulncheck" }
+        vars: { MODULE: "{{.ITEM}}", CMD: "govulncheck {{._SEC_VULN_FLAGS}} ./...", LABEL: "govulncheck" }
 
   lint:
     desc: "golangci-lint across every Go module, limited to issues new since {{._SEC_BASE}}"
@@ -64,7 +85,7 @@ tasks:
         task: _in-module
         vars:
           MODULE: "{{.ITEM}}"
-          CMD: "golangci-lint run --new-from-merge-base={{._SEC_BASE}} ./..."
+          CMD: "golangci-lint run --new-from-merge-base={{._SEC_BASE}} {{._SEC_LINT_FLAGS}} ./..."
           LABEL: "golangci-lint"
 
   secrets:
@@ -77,7 +98,7 @@ tasks:
       # A repository with accepted historical findings passes a baseline; without
       # one every old finding is reported again on every run, and a gate that
       # always fails is a gate nobody reads.
-      - gitleaks git . --no-banner --redact{{if ._SEC_GL_BASE}} --baseline-path {{._SEC_GL_BASE}}{{end}}
+      - gitleaks git . --no-banner --redact{{if ._SEC_GL_BASE}} --baseline-path {{._SEC_GL_BASE}}{{end}} {{._SEC_GL_FLAGS}}
       - echo "✔ sec · no secrets in history"
 
   trivy:
@@ -86,8 +107,8 @@ tasks:
       - sh: command -v trivy >/dev/null
         msg: "trivy is not installed — brew install trivy"
     cmds:
-      - echo "▸ sec · trivy fs"
-      - trivy fs --scanners vuln,secret --exit-code 1 --quiet .
+      - echo "▸ sec · trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_TARGET}}"
+      - trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_SCAN}} --exit-code 1 --quiet {{._SEC_TRIVY_FLAGS}} {{._SEC_TRIVY_TARGET}}
       # Misconfiguration findings are informational: they are dense, noisy, and
       # blocking on them would stop every release for a Kubernetes default.
       - trivy config --exit-code 0 --quiet .
@@ -100,7 +121,7 @@ tasks:
         msg: "buf is not installed — brew install bufbuild/buf/buf"
     cmds:
       - echo "▸ sec · buf breaking vs {{._SEC_BASE}}"
-      - buf breaking --against '.git#branch={{._SEC_BASE}}'
+      - buf breaking --against '.git#branch={{._SEC_BASE}}' {{._SEC_BUF_FLAGS}}
       - echo "✔ sec · proto contract compatible"
 
   _in-module:

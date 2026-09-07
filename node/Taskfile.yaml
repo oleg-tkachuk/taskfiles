@@ -11,6 +11,19 @@ version: "3"
 #   PM             package manager        (default pnpm; pass npm for npm ci)
 #   PM_INSTALL     override the install command outright
 #
+# Every task runs a package.json script, and which script is an input: a
+# repository whose build is `build:prod` or whose end-to-end suite is `e2e`
+# sets the name rather than doing without the task. The defaults are the
+# conventional ones.
+#
+#   SCRIPT_DEV        default dev
+#   SCRIPT_BUILD      default build
+#   SCRIPT_LINT       default lint
+#   SCRIPT_TEST       default test
+#   SCRIPT_E2E        default test:e2e
+#   SCRIPT_GENERATE   default generate
+#   LINT_FIX_FLAGS    what `lint:fix` appends       (default --fix)
+#
 # Every task is a thin wrapper over a package.json script, which keeps the
 # whole developer surface visible in `task --list-all` instead of split across
 # two tools.
@@ -21,6 +34,13 @@ silent: true
 vars:
   _NODE_NAME: '{{.PROJECT_NAME | default "node"}}'
   _NODE_PM: '{{.PM | default "pnpm"}}'
+  _NODE_DEV: '{{.SCRIPT_DEV | default "dev"}}'
+  _NODE_BUILD: '{{.SCRIPT_BUILD | default "build"}}'
+  _NODE_LINT: '{{.SCRIPT_LINT | default "lint"}}'
+  _NODE_TEST: '{{.SCRIPT_TEST | default "test"}}'
+  _NODE_E2E: '{{.SCRIPT_E2E | default "test:e2e"}}'
+  _NODE_GEN: '{{.SCRIPT_GENERATE | default "generate"}}'
+  _NODE_FIX: '{{.LINT_FIX_FLAGS | default "--fix"}}'
 
 env:
   # Let corepack fetch the pinned package manager without the interactive
@@ -50,34 +70,34 @@ tasks:
     desc: "Start the dev server"
     interactive: true
     cmds:
-      - echo "▸ {{._NODE_NAME}} · node · {{._NODE_PM}} run dev"
-      - "{{._NODE_PM}} run dev"
+      - echo "▸ {{._NODE_NAME}} · node · {{._NODE_PM}} run {{._NODE_DEV}}"
+      - "{{._NODE_PM}} run {{._NODE_DEV}}"
 
   build:
     desc: "Build the production bundle"
     cmds:
-      - echo "▸ {{._NODE_NAME}} · node · {{._NODE_PM}} run build"
-      - "{{._NODE_PM}} run build"
+      - echo "▸ {{._NODE_NAME}} · node · {{._NODE_PM}} run {{._NODE_BUILD}}"
+      - "{{._NODE_PM}} run {{._NODE_BUILD}}"
       - echo "✔ {{._NODE_NAME}} · node · bundle built"
 
   lint:
     desc: "Run the lint script (read-only)"
     cmds:
-      - echo "▸ {{._NODE_NAME}} · node · lint"
-      - "{{._NODE_PM}} run lint"
+      - echo "▸ {{._NODE_NAME}} · node · {{._NODE_LINT}}"
+      - "{{._NODE_PM}} run {{._NODE_LINT}}"
       - echo "✔ {{._NODE_NAME}} · node · lint clean"
 
   lint:fix:
     desc: "Run the lint script with --fix"
     cmds:
-      - "{{._NODE_PM}} run lint --fix"
+      - "{{._NODE_PM}} run {{._NODE_LINT}} {{._NODE_FIX}}"
       - echo "✔ {{._NODE_NAME}} · node · lint fixed"
 
   test:
     desc: "Run the test script"
     cmds:
-      - echo "▸ {{._NODE_NAME}} · node · test"
-      - "{{._NODE_PM}} run test"
+      - echo "▸ {{._NODE_NAME}} · node · {{._NODE_TEST}}"
+      - "{{._NODE_PM}} run {{._NODE_TEST}}"
       - echo "✔ {{._NODE_NAME}} · node · tests pass"
 
   test:e2e:
@@ -85,7 +105,7 @@ tasks:
     cmds:
       - echo "▸ {{._NODE_NAME}} · node · playwright"
       - "{{._NODE_PM}} exec playwright install --with-deps chromium >/dev/null"
-      - "{{._NODE_PM}} run test:e2e"
+      - "{{._NODE_PM}} run {{._NODE_E2E}}"
       - echo "✔ {{._NODE_NAME}} · node · e2e pass"
 
   verify:
@@ -98,8 +118,8 @@ tasks:
   generate:
     desc: "Run the codegen script"
     cmds:
-      - echo "▸ {{._NODE_NAME}} · node · generate"
-      - "{{._NODE_PM}} run generate"
+      - echo "▸ {{._NODE_NAME}} · node · {{._NODE_GEN}}"
+      - "{{._NODE_PM}} run {{._NODE_GEN}}"
       - echo "✔ {{._NODE_NAME}} · node · generated"
 
   deps:update:

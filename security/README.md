@@ -30,9 +30,22 @@ workspace — tasks then read `sec:<task>`.
 | Var | Default | Meaning |
 |---|---|---|
 | `GO_MODULES` | `.` | whitespace-separated module directories for the Go scans |
+| `GOVULNCHECK_FLAGS` | — | extra govulncheck flags |
+| `GOLANGCI_FLAGS` | — | extra golangci-lint flags |
+| `GITLEAKS_FLAGS` | — | extra gitleaks flags |
+| `TRIVY_SUBCOMMAND` | `fs` | `image` to scan a built image instead |
+| `TRIVY_SCANNERS` | `--scanners vuln,secret` | |
+| `TRIVY_TARGET` | `.` | what to scan |
+| `TRIVY_FLAGS` | — | extra trivy flags |
+| `BUF_BREAKING_FLAGS` | — | extra buf breaking flags |
 | `GITLEAKS_BASELINE` | — | findings accepted as known, so the gate reports only new ones |
 | `GOSEC_FLAGS` | — | extra gosec flags |
 | `BASE` | `main` | branch the new-findings and breaking gates compare against |
+
+Every tool takes a FLAGS input, appended rather than replacing the invocation:
+the flags that make a task a gate — trivy's `--exit-code 1`, the base
+golangci-lint measures against — stay where a consumer cannot drop them by
+accident, and everything else is theirs to add.
 
 ## Examples
 
