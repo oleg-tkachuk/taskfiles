@@ -36,7 +36,7 @@ version: "3"
 silent: true
 
 vars:
-  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v3.0.0'
+  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v3.1.0'
   PROJECT_NAME: billing-api
   IMAGE_NAMESPACE: acme
   K8S_NAMESPACE: acme

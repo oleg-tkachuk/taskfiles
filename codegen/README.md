@@ -32,7 +32,7 @@ component's directory.
 | `PROJECT_NAME` | `codegen` | label in log lines |
 | `MOCKERY_CONFIG` | `.mockery.yaml` | mockery's config; its absence stops `mocks` with a message |
 | `MOCKERY_MODULE` | `github.com/vektra/mockery/v3` | resolved through go.mod by `go run` |
-| `BUF_TEMPLATE` | `buf.gen.yaml` | one or more templates, space-separated — buf runs once per template |
+| `BUF_TEMPLATE` | `buf.gen.yaml` | one or more templates, as a YAML list or a space-separated string — buf runs once per template |
 | `BUF_INPUT` | — | buf's input, when it is not the working directory |
 | `PROTO_FORBID` | — | paths that must not exist when the stubs are generated |
 | `PROTO_PLUGINS` | — | protoc plugins to install from this module before buf |

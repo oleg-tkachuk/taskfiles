@@ -11,8 +11,8 @@ version: "3"
 #   PROJECT_NAME      label in log lines
 #   MOCKERY_CONFIG    default .mockery.yaml
 #   MOCKERY_MODULE    default github.com/vektra/mockery/v3
-#   BUF_TEMPLATE      one or more buf templates, space-separated
-#                     (default buf.gen.yaml)
+#   BUF_TEMPLATE      one or more buf templates — a YAML list, or a
+#                     space-separated string (default buf.gen.yaml)
 #   BUF_INPUT         buf's input, when it is not the working directory
 #   PROTO_FORBID      paths that must not exist when the stubs are generated
 #   PROTO_PLUGINS     protoc plugins to install from THIS module before buf
@@ -63,7 +63,13 @@ vars:
   _CG_NAME: '{{.PROJECT_NAME | default "codegen"}}'
   _CG_MOCK_CFG: '{{.MOCKERY_CONFIG | default ".mockery.yaml"}}'
   _CG_MOCK_MOD: '{{.MOCKERY_MODULE | default "github.com/vektra/mockery/v3"}}'
-  _CG_BUF_TPL: '{{.BUF_TEMPLATE | default "buf.gen.yaml"}}'
+  # Accepts a YAML list or a space-separated string, and normalises to the
+  # latter because `for:` splits a string on whitespace either way. A list is
+  # what a reader expects for several templates; the string form is what a
+  # single one looks like, and what CLI and env overrides can carry.
+  _CG_BUF_TPL: >-
+    {{if kindIs "slice" .BUF_TEMPLATE}}{{join " " .BUF_TEMPLATE}}
+    {{- else}}{{.BUF_TEMPLATE | default "buf.gen.yaml"}}{{end}}
   _CG_BUF_PATH: '{{.PROTO_PATH | default ""}}'
   _CG_BUF_IN: '{{.BUF_INPUT | default ""}}'
   _CG_FORBID: '{{.PROTO_FORBID | default ""}}'

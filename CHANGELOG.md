@@ -16,6 +16,26 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [3.1.0] — 2026-09-07
+
+### Changed
+
+- `BUF_TEMPLATE` now also accepts a YAML list, not only a space-separated
+  string:
+
+  ```yaml
+  BUF_TEMPLATE: ['buf.gen.yaml', 'buf.gen.ocp.yaml']
+  ```
+
+  A list is what a reader expects for several templates; the string form still
+  works and is what a single template, a CLI override or an env var carries.
+
+### Fixed
+
+- The library's own CI called `codegen:go`, renamed in 3.0.0, so the smoke job
+  went red on the first run after the tag. The modules were correct — only the
+  fixture named the task by its old name.
+
 ## [3.0.0] — 2026-09-07
 
 A major because one task was renamed. The upgrade is one line per consumer,
@@ -507,6 +527,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[3.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.1.0
 [3.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.0.0
 [2.2.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.2.1
 [2.2.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.2.0
