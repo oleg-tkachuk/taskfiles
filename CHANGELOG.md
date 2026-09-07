@@ -36,6 +36,11 @@ here, and the release gate refuses a tag with no entry.
   `{{.TASKLIB}}release{{.TASKLIB_REF}}` spelling keeps working; this is a change
   of convention, not of contract.
 
+- `release` strips the `v` off a tag with `trimPrefix` rather than piping
+  `git describe` through `sed` — one process instead of two, and the rule reads
+  as data rather than as a regex inside a folded scalar. The versions produced
+  are identical; all six branches were checked against real repositories.
+
 ## [2.2.0] — 2026-09-07
 
 ### Changed

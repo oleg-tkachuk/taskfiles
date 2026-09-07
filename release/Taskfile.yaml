@@ -112,11 +112,15 @@ vars:
   # VERSION_TAG_EXCLUDE keeps a tag namespace out of the version: a repo that
   # tags its proto contract `api/vN` must not let those restamp an image, and
   # the `/` in them is invalid in a Docker tag anyway.
-  _REL_TAG:
+  # The `v` comes off in the template, not through `sed`: one process instead
+  # of two, and the rule is legible as data rather than buried in a regex
+  # inside a folded scalar.
+  _REL_TAG_RAW:
     sh: >-
       git describe --tags --exact-match
       {{if .VERSION_TAG_EXCLUDE}}--exclude '{{.VERSION_TAG_EXCLUDE}}'{{end}}
-      HEAD 2>/dev/null | sed 's/^v//' || true
+      HEAD 2>/dev/null || true
+  _REL_TAG: '{{._REL_TAG_RAW | trimPrefix "v"}}'
   _REL_DIRTY:
     sh: git status --porcelain 2>/dev/null | head -c1
   _REL_NOW:
