@@ -171,6 +171,21 @@ way in a consumer and `task deploy REGISTRY=other` works.
 a public task — the complementary `image:build:_do` / `image:build:_skipped`
 pair, for instance, where exactly one of the two runs.
 
+**An empty value turns nothing off.** `{{.X | default "d"}}` yields `d` when `X`
+is unset *and* when it is empty, so a consumer cannot switch a default off by
+passing nothing:
+
+```console
+$ task show          # X unset → fallback
+$ task show X=       # X empty → fallback, not ""
+$ task show X=none   # → none
+```
+
+Every opt-out here is therefore an explicit value a consumer has to name —
+`COSIGN_SIGN=0` makes the signing tasks no-ops, `E2E_SETUP=none` skips the
+browser download. When adding one, pick a value and check for it; do not write
+a default that an empty string is supposed to defeat, because it will not.
+
 **Include naming.** A module is included under its own directory name, because
 the include alias is what names every task it brings in — `python:test` says
 which of the two Python modules answered. `runtime/*` is the one exception: its
