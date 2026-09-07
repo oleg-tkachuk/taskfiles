@@ -59,11 +59,17 @@ vars:
 tasks:
 
   all:
-    desc: "Run every scan: vulnerabilities, lint, secrets, filesystem, proto compatibility"
+    desc: "Run every scan: vulnerabilities, lint, secrets, SAST, filesystem"
+    # proto:breaking is deliberately not here. Every task above runs against
+    # whatever the repository happens to hold, but that one needs a proto tree
+    # and a base branch to compare against, so it would fail for every consumer
+    # that ships no protobuf — and a gate that cannot pass is a gate people
+    # learn to skip. Call it from the workflow that owns the contract.
     cmds:
       - task: vuln
       - task: lint
       - task: secrets
+      - task: gosec
       - task: trivy
 
   vuln:

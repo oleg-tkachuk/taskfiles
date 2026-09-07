@@ -17,9 +17,9 @@ workspace — tasks then read `sec:<task>`.
 
 | Task | What it does |
 |---|---|
-| `all` | Run every scan: vulnerabilities, lint, secrets, filesystem, proto compatibility |
+| `all` | Run every scan: vulnerabilities, lint, secrets, SAST, filesystem |
 | `lint` | golangci-lint across every Go module, limited to issues new since main |
-| `gosec` | gosec — insecure patterns the compiler is happy with |
+| `gosec` | gosec — insecure patterns the compiler is happy with; part of `all` |
 | `secrets` | gitleaks — committed credentials anywhere in the history |
 | `trivy` | trivy — vulnerable dependencies and secrets (blocking) plus IaC misconfig (report-only) |
 | `vuln` | govulncheck across every Go module — vulnerabilities the code actually reaches |
@@ -60,7 +60,7 @@ includes:
 ```
 
 ```console
-$ task security:all           # vuln · lint · secrets · trivy
+$ task security:all           # vuln · lint · secrets · gosec · trivy
 $ task security:secrets       # gitleaks over the whole history
 $ task security:proto:breaking
 ```

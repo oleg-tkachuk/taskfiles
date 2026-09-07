@@ -16,6 +16,26 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [3.2.0] — 2026-09-07
+
+### Changed
+
+- **`security:all` now runs `gosec`.** The task has described itself as "run
+  every scan" since it was written, while quietly leaving out the one scan that
+  reads the source for insecure patterns rather than checking dependencies.
+
+  This can turn a green `security:all` red twice over: gosec has to be
+  installed (`go install github.com/securego/gosec/v2/cmd/gosec@latest`), and
+  once it is, it may find something. If that is not the moment you want to deal
+  with it, call the individual tasks — `vuln`, `lint`, `secrets`, `trivy` —
+  which are unchanged.
+
+- `security:all`'s description no longer claims proto compatibility. It never
+  ran `proto:breaking` and should not: that gate needs a proto tree and a base
+  branch, so it would fail for every consumer shipping no protobuf, and a gate
+  that cannot pass is one people learn to skip. Call it from the workflow that
+  owns the contract.
+
 ## [3.1.0] — 2026-09-07
 
 ### Changed
@@ -527,6 +547,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[3.2.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.0
 [3.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.1.0
 [3.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.0.0
 [2.2.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.2.1
