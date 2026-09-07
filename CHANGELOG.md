@@ -16,6 +16,34 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [5.1.2] — 2026-09-07
+
+### Added
+
+- `task lint`'s **check:surface** also compares whether shared tasks declare
+  `deps:` at all, not just whether the names match — `python/poetry`'s
+  `test`/`lint`/`fmt` went a full release without `deps: [install]` while
+  `python/uv` had it, and a name-only diff could not see that kind of drift.
+  Best-effort: needs `yq`, warns rather than fails when that is missing.
+- **check:runtime-install**, refusing a `runtime/*` variant whose `install:`
+  task has drifted from the other four. It stays duplicated on purpose — a
+  shared include would resolve `CHART_DIR` against this checkout instead of
+  the consumer's — so this is what keeps the five copies honest instead.
+
+### Fixed
+
+- `cosign:verify` and `cosign:keygen` carried `preconditions:` alongside
+  their own `status:` guard. Task evaluates preconditions before status, so
+  `COSIGN_SIGN=0` could not skip `verify` past its "is cosign installed"
+  check, and an existing key still demanded cosign be on PATH just for
+  `keygen` to decide there was nothing to do.
+- `helm:list` had the same trap: a laptop with no cluster running still
+  needed `helm` installed just to be told there was nothing to list.
+- `monorepo:registry:check`'s own comment already said 200/401/403 all mean
+  the registry answered; the code only rejected `000`, so a registry
+  answering 500 or 404 passed this preflight and then failed
+  `release:doctor` on the same host.
+
 ## [5.1.1] — 2026-09-07
 
 ### Fixed
