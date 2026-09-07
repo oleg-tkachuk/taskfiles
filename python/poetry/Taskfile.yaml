@@ -73,6 +73,7 @@ tasks:
 
   test:
     desc: "pytest"
+    deps: [install]
     cmds:
       - echo "{{._PY_RUN}} {{._PY_NAME}} · py · {{._PY_TEST_CMD}}"
       - poetry run {{._PY_TEST_CMD}} {{._PY_TEST_FLAGS}}
@@ -80,6 +81,7 @@ tasks:
 
   lint:
     desc: "ruff check"
+    deps: [install]
     cmds:
       - echo "{{._PY_RUN}} {{._PY_NAME}} · py · {{._PY_LINT_CMD}}"
       - poetry run {{._PY_LINT_CMD}} {{._PY_SRC}}
@@ -90,12 +92,14 @@ tasks:
     # `fmt` to match the Go module's verb for the same operation; `format` is
     # what ruff calls it, so it stays as an alias.
     aliases: [format]
+    deps: [install]
     cmds:
       - poetry run {{._PY_FMT_CMD}} {{._PY_SRC}}
       - echo "{{._PY_OK}} {{._PY_NAME}} · py · formatted"
 
   typecheck:
     desc: "mypy (skipped when mypy is not a project dependency)"
+    deps: [install]
     status:
       - "! poetry run python -c 'import {{._PY_TC_MOD}}' >/dev/null 2>&1"
     cmds:

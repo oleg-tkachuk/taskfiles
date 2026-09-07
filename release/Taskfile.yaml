@@ -69,8 +69,8 @@ vars:
   # wins over a component's own REGISTRY.
   _REL_REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}'
   _REL_NS: '{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}'
-  _REL_IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.IMAGE_NAME | default .PROJECT_NAME | default "service"}}'
-  _REL_CHART_REPO: 'oci://{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/charts'
+  _REL_IMAGE: '{{._REL_REG}}{{._REL_NS}}/{{.IMAGE_NAME | default .PROJECT_NAME | default "service"}}'
+  _REL_CHART_REPO: 'oci://{{._REL_REG}}{{._REL_NS}}/charts'
   # A registry serving a certificate strict oras clients reject — a wildcard
   # that does not cover the apex, say — needs --insecure-skip-tls-verify here.
   _REL_HELM_FLAGS: '{{.HELM_FLAGS | default ""}}'
@@ -422,9 +422,15 @@ tasks:
     cmds:
       # yq is optional: the separator gate above already catches the bug this
       # file was written for, and a missing tool should not turn a checkout red.
-      - >-
-        command -v yq >/dev/null 2>&1 && yq ea '.' {{._REL_RENDER}} >/dev/null ||
-        echo "{{._REL_WARN}} {{._REL_SVC}} · chart · yq absent, YAML parse gate skipped"
+      # `&&/||` would let a yq PARSE FAILURE fall through to the `||` branch
+      # exactly like a missing binary does — the shell's exit status is the
+      # echo's, not yq's — so presence and success are checked separately.
+      - cmd: |-
+          if command -v yq >/dev/null 2>&1; then
+            yq ea '.' {{._REL_RENDER}} >/dev/null
+          else
+            echo "{{._REL_WARN}} {{._REL_SVC}} · chart · yq absent, YAML parse gate skipped"
+          fi
       - echo "{{._REL_OK}} {{._REL_SVC}} · chart · renders $(grep -c '^kind:' {{._REL_RENDER}}) resources cleanly"
       - rm -f {{._REL_RENDER}}
 

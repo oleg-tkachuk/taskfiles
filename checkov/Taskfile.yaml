@@ -80,8 +80,19 @@ tasks:
       # regenerated to clear one fixed finding also swallows anything that broke
       # since, and the run that does it looks exactly like the run that does not.
       - cmd: |-
+          # Each accepted finding's check_ids sit one per line in checkov's own
+          # baseline writer, indent=4 regardless of --compact — a resource with
+          # several failing checks (Kubernetes groups them per-resource) lists
+          # every id on its own line, so counting "CKV lines counts findings the
+          # same way len(check_ids) summed across them does. No interpreter
+          # required — an interpreter this task has no reason to require, and
+          # whose absence would surface only after the prompt above had already
+          # been answered. `grep -c` alone is not enough here: on zero matches it
+          # both prints 0 AND exits 1, so `|| echo 0` would double that 0 — the
+          # missing-file case is handled separately instead.
           count() {
-            python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(sum(len(fi.get('check_ids',[])) for f in d['failed_checks'] for fi in f.get('findings',[])))" "$1" 2>/dev/null || echo 0
+            [ -f "$1" ] || { echo 0; return; }
+            grep -c '"CKV' "$1" || true
           }
           before=$(count {{._CKV_BASE | q}})
           checkov --config-file {{._CKV_CFG | q}} {{._CKV_FLAGS}} --create-baseline >/dev/null 2>&1 || true

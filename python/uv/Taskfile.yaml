@@ -97,6 +97,7 @@ tasks:
 
   typecheck:
     desc: "mypy (skipped when mypy is not a project dependency)"
+    deps: [install]
     status:
       - "! uv run python -c 'import {{._UV_TC_MOD}}' >/dev/null 2>&1"
     cmds:

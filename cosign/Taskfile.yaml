@@ -57,7 +57,7 @@ vars:
   _CS_NAME: '{{.PROJECT_NAME | default "service"}}'
   _CS_CHART: '{{.CHART_NAME | default .PROJECT_NAME | default "service"}}'
   _CS_REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}'
-  _CS_CHART_REF: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/charts/{{.CHART_NAME | default .PROJECT_NAME | default "service"}}'
+  _CS_CHART_REF: '{{._CS_REG}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/charts/{{._CS_CHART}}'
 
   _CS_SYFT_FLAGS: '{{.SYFT_FLAGS | default ""}}'
   _CS_DIR: '{{.COSIGN_DIR | default "deploy/sigstore"}}'
