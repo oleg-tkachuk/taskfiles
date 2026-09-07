@@ -36,6 +36,7 @@ vars:
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _LIB_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
+  _LIB_WARN: '{{if .NO_COLOR}}▲{{else}}{{"\x1b[33m▲\x1b[0m"}}{{end}}'
   _LIB_ERR: '{{if .NO_COLOR}}✖{{else}}{{"\x1b[31m✖\x1b[0m"}}{{end}}'
 
 tasks:
@@ -155,20 +156,38 @@ tasks:
           exit "$fail"
 
   check:surface:
-    desc: "Refuse a family whose variants no longer expose the same tasks"
+    desc: "Refuse a family whose variants no longer expose the same tasks, or disagree on which ones need deps:"
     # python/poetry and python/uv are sold as interchangeable — a consumer
     # swaps one include line and every task name it calls still resolves. That
     # promise is only true while the two agree, and nothing else would notice
     # them drifting. Documented exceptions go in the allowlist below.
+    #
+    # Task NAMES are not the whole promise: python/poetry's test/lint/fmt went
+    # a full release without `deps: [install]`, while python/uv had it from the
+    # start — same three names in `--list-all`, but one variant ran `pytest`
+    # against whatever venv happened to exist and the other always synced
+    # first. That drift is invisible to a name-only diff, so shared tasks are
+    # also compared on whether they declare `deps:` at all — not on the exact
+    # list, which legitimately differs per tool. This half is best-effort: it
+    # needs `yq` and warns rather than fails when that is missing, the same
+    # tradeoff `release:chart:render` makes for its own optional parse gate.
     vars:
       # <family>:<task> that only one variant is expected to have.
       SURFACE_EXCEPT: "python:deps:update:latest"
+      # <family>:<task> allowed to declare deps: on one variant and not another.
+      # runtime:image:load is a real difference, not drift: docker and orbstack
+      # share the daemon the build wrote to, so loading is a no-op with nothing
+      # to depend on; k3d, kind and minikube each run their own store and must
+      # depend on `check` to import into it.
+      DEPS_EXCEPT: "runtime:image:load"
     cmds:
       - cmd: |-
           set -eu
           fail=0
+          have_yq=0
+          command -v yq >/dev/null 2>&1 && have_yq=1
           for fam in {{.FAMILIES}}; do
-            first=""; base=""
+            first=""; base=""; basedeps=""
             for v in $(ls -d "$fam"/*/Taskfile.yaml 2>/dev/null | sed "s|/Taskfile.yaml||"); do
               got=$(task -t "$v/Taskfile.yaml" --list-all 2>/dev/null \
                     | grep -oE '^\* [a-z0-9:_-]+' | sed 's/^\* //; s/:$//' | sort)
@@ -178,15 +197,32 @@ tasks:
                   "$fam":*) got=$(printf '%s\n' "$got" | grep -vxF "${e#*:}" || true) ;;
                 esac
               done
-              if [ -z "$first" ]; then first="$v"; base="$got"; continue; fi
+
+              deps=""
+              if [ "$have_yq" = 1 ]; then
+                deps=$(yq e '.tasks | to_entries | .[] | select(.value.deps != null) | .key' "$v/Taskfile.yaml" 2>/dev/null | sort)
+                for e in {{.DEPS_EXCEPT}}; do
+                  case "$e" in
+                    "$fam":*) deps=$(printf '%s\n' "$deps" | grep -vxF "${e#*:}" || true) ;;
+                  esac
+                done
+              fi
+
+              if [ -z "$first" ]; then first="$v"; base="$got"; basedeps="$deps"; continue; fi
               if [ "$got" != "$base" ]; then
                 echo "{{._LIB_ERR}} taskfiles · $v and $first do not expose the same tasks:" >&2
                 diff <(printf '%s\n' "$base") <(printf '%s\n' "$got") | sed 's/^/    /' >&2
                 fail=1
               fi
+              if [ "$have_yq" = 1 ] && [ "$deps" != "$basedeps" ]; then
+                echo "{{._LIB_ERR}} taskfiles · $v and $first disagree on which shared tasks declare deps::" >&2
+                diff <(printf '%s\n' "$basedeps") <(printf '%s\n' "$deps") | sed 's/^/    /' >&2
+                fail=1
+              fi
             done
           done
-          [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every family's variants expose the same tasks"
+          [ "$have_yq" = 1 ] || echo "{{._LIB_WARN}} taskfiles · yq absent, deps: parity within families not checked" >&2
+          [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every family's variants expose the same tasks and agree on deps:"
           exit "$fail"
 
   # ─── docs ───────────────────────────────────────────────────────────────────
