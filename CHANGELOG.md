@@ -16,6 +16,37 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [5.1.1] — 2026-09-07
+
+### Fixed
+
+- `release:chart:render`'s yq check used `&&/||`, so a genuine parse failure
+  on the rendered chart fell into the same branch as a missing binary and
+  exited 0 — the exact "chart shipped 1 of N Deployments" failure this gate
+  exists to catch, passing silently. Presence and success are now checked
+  separately.
+
+- `security`'s hadolint-missing message referenced `_SEC_ERR`, a marker the
+  module never declared, so it printed with no marker at all. Declared
+  alongside the rest.
+
+- `checkov:baseline` counted accepted findings through `python3`, an
+  interpreter this task had no reason to require, and whose absence would
+  surface only after the confirmation prompt had already been answered.
+  Replaced with `grep -c` against checkov's own one-check-id-per-line
+  baseline format.
+
+- `release` and `cosign` declared `_REL_NS`, `_CS_REG` and `_CS_CHART` and
+  never read them, while `_REL_IMAGE`, `_REL_CHART_REPO` and `_CS_CHART_REF`
+  re-derived the same registry and chart expressions inline instead. The
+  declared vars are wired in now, so the expression exists once per file.
+
+- `python/poetry`'s `test`, `lint`, `fmt` and `typecheck` had no
+  `deps: [install]`, unlike `python/uv`. Poetry does not auto-sync its
+  environment the way uv does, so a fresh checkout's `task python:test`
+  failed outright with "Command not found: pytest" instead of installing
+  first. Both variants now depend on `install`.
+
 ## [5.1.0] — 2026-09-07
 
 ### Added
