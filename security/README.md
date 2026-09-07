@@ -19,6 +19,10 @@ workspace — tasks then read `sec:<task>`.
 |---|---|
 | `all` | Run every scan: vulnerabilities, lint, secrets, filesystem, proto compatibility |
 | `lint` | golangci-lint across every Go module, limited to issues new since main |
+| `checkov` | Policy-scan manifests, charts, Dockerfiles and workflows against the baseline |
+| `checkov:all` | Every finding, baselined ones included — a triage view |
+| `checkov:baseline` | Regenerate the checkov baseline |
+| `gosec` | gosec — insecure patterns the compiler is happy with |
 | `secrets` | gitleaks — committed credentials anywhere in the history |
 | `trivy` | trivy — vulnerable dependencies and secrets (blocking) plus IaC misconfig (report-only) |
 | `vuln` | govulncheck across every Go module — vulnerabilities the code actually reaches |
@@ -29,6 +33,11 @@ workspace — tasks then read `sec:<task>`.
 | Var | Default | Meaning |
 |---|---|---|
 | `GO_MODULES` | `.` | whitespace-separated module directories for the Go scans |
+| `GITLEAKS_BASELINE` | — | findings accepted as known, so the gate reports only new ones |
+| `CHECKOV_CONFIG` | `.checkov.yaml` | |
+| `CHECKOV_BASELINE` | `.checkov.baseline` | |
+| `CHECKOV_FRAMEWORKS` | `github_actions dockerfile helm kubernetes` | frameworks the triage view walks |
+| `GOSEC_FLAGS` | — | extra gosec flags |
 | `BASE` | `main` | branch the new-findings and breaking gates compare against |
 
 ## Examples

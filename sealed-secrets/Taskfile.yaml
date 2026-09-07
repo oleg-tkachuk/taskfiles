@@ -1,0 +1,89 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# sealed-secrets — turn a value into a SealedSecret manifest that is safe to
+# commit, and fetch the key that lets you do it offline.
+#
+#   includes:
+#     sealed-secrets:
+#       taskfile: '{{.TASKLIB}}sealed-secrets{{.TASKLIB_REF}}'
+#       dir: .
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+#   SEALED_SECRETS_NS          controller namespace  (default sealed-secrets)
+#   SEALED_SECRETS_CONTROLLER  controller name       (default sealed-secrets-controller)
+#   K8S_CONTEXT                pin a cluster                (default: current)
+#
+# ── Per call ─────────────────────────────────────────────────────────────────
+#   namespace name output      required by both sealing tasks
+#   key value                  seal
+#   file                       seal:file
+#
+# `seal` takes the value as a variable, which puts it in this process's
+# argument list for as long as kubectl runs — visible to anything that can read
+# the process table on this machine. That is a fair trade for a one-off dev
+# credential and a poor one for anything else: prefer `seal:file`, which reads
+# from disk, when the value matters.
+#
+# Nothing here reads the cluster's secrets. Both tasks build a manifest locally
+# with --dry-run=client and hand it to kubeseal, so the plaintext never leaves
+# this machine and the output is encrypted to a key only the controller holds.
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+vars:
+  _SS_NS: '{{.SEALED_SECRETS_NS | default "sealed-secrets"}}'
+  _SS_CTRL: '{{.SEALED_SECRETS_CONTROLLER | default "sealed-secrets-controller"}}'
+  _SS_KUBECTL: 'kubectl{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT}}{{end}}'
+  _SS_SEAL: 'kubeseal --controller-namespace {{.SEALED_SECRETS_NS | default "sealed-secrets"}} --controller-name {{.SEALED_SECRETS_CONTROLLER | default "sealed-secrets-controller"}} --format yaml'
+
+tasks:
+
+  seal:
+    desc: "Seal one key/value into a SealedSecret manifest"
+    requires:
+      vars: [namespace, name, key, value, output]
+    preconditions:
+      - sh: command -v kubeseal >/dev/null
+        msg: "kubeseal is not installed — brew install kubeseal"
+    cmds:
+      - mkdir -p {{dir .output}}
+      - >-
+        {{._SS_KUBECTL}} create secret generic '{{.name}}'
+        --namespace '{{.namespace}}'
+        --from-literal='{{.key}}={{.value}}'
+        --dry-run=client -o yaml
+        | {{._SS_SEAL}} > '{{.output}}'
+      - echo "✔ sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
+
+  seal:file:
+    desc: "Seal every key in an env file into one SealedSecret manifest"
+    requires:
+      vars: [namespace, name, file, output]
+    preconditions:
+      - sh: command -v kubeseal >/dev/null
+        msg: "kubeseal is not installed — brew install kubeseal"
+      - sh: test -f '{{.file}}'
+        msg: "{{.file}} not found"
+    cmds:
+      - mkdir -p {{dir .output}}
+      - >-
+        {{._SS_KUBECTL}} create secret generic '{{.name}}'
+        --namespace '{{.namespace}}'
+        --from-env-file='{{.file}}'
+        --dry-run=client -o yaml
+        | {{._SS_SEAL}} > '{{.output}}'
+      - echo "✔ sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
+
+  pubkey:
+    desc: "Print the controller's public certificate, for sealing without a cluster"
+    preconditions:
+      - sh: command -v kubeseal >/dev/null
+        msg: "kubeseal is not installed — brew install kubeseal"
+    # Committing this lets anyone seal a value for this cluster without reaching
+    # it. It is a public key: it can encrypt and cannot decrypt.
+    cmds:
+      - >-
+        kubeseal --controller-namespace {{._SS_NS}}
+        --controller-name {{._SS_CTRL}} --fetch-cert

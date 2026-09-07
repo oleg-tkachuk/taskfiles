@@ -45,6 +45,8 @@ workspace — tasks then read `go:<task>`.
 | `GO_TEST_FLAGS` | `-race -short` | |
 | `GO_BUILD_FLAGS` | — | |
 | `GOLANGCI_FLAGS` | — | |
+| `GO_BENCH_PKG` | `GO_PKG` | packages to benchmark |
+| `GO_BENCH_FLAGS` | `-benchtime=1x` | |
 | `GO_TEST_TAGS` | `integration` | for the tagged suites |
 | `GOWORK` | `off` | set to `""` to build through the workspace |
 

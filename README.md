@@ -79,6 +79,7 @@ own primitives rather than shelling out to a helper.
 | [`node/`](node/README.md) | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
 | [`compose/`](compose/README.md) | `compose` | local stack up/down/reset/logs |
 | [`monorepo/`](monorepo/README.md) | `monorepo` | run one target across every component, registry preflight |
+| [`sealed-secrets/`](sealed-secrets/README.md) | `sealed-secrets` | seal a value into a committable SealedSecret, fetch the controller key |
 | [`security/`](security/README.md) | `security` | govulncheck, golangci-lint, gitleaks, trivy, buf breaking |
 | [`cosign/`](cosign/README.md) | `cosign` | sign the published image and chart, attest an SBOM, verify both |
 | [`argocd/`](argocd/README.md) | `argocd` | hard-refresh the apps a deploy just republished |
