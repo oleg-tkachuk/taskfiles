@@ -166,18 +166,28 @@ jobs:
             REGISTRY: registry.example.com
             VERSION_BASE: 9.9.9
           includes:
-            release:  { taskfile: '{{printf .TASKLIB "release"}}', dir: . }
-            k8s:      { taskfile: '{{printf .TASKLIB "k8s"}}', dir: . }
-            go:       { taskfile: '{{printf .TASKLIB "go"}}', dir: . }
-            python:   { taskfile: '{{printf .TASKLIB "python/poetry"}}', dir: . }
-            node:     { taskfile: '{{printf .TASKLIB "node"}}', dir: . }
-            compose:  { taskfile: '{{printf .TASKLIB "compose"}}', dir: . }
-            security: { taskfile: '{{printf .TASKLIB "security"}}', dir: . }
-            monorepo: { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: . }
-            argocd:   { taskfile: '{{printf .TASKLIB "argocd"}}', dir: . }
-            auth:     { taskfile: '{{printf .TASKLIB "auth"}}', dir: . }
-            codegen:  { taskfile: '{{printf .TASKLIB "codegen"}}', dir: . }
-            local:    { taskfile: '{{printf .TASKLIB "runtime/orbstack"}}', dir: . }
+            release:        { taskfile: '{{printf .TASKLIB "release"}}', dir: . }
+            k8s:            { taskfile: '{{printf .TASKLIB "k8s"}}', dir: . }
+            go:             { taskfile: '{{printf .TASKLIB "go"}}', dir: . }
+            python:         { taskfile: '{{printf .TASKLIB "python/poetry"}}', dir: . }
+            pythonuv:       { taskfile: '{{printf .TASKLIB "python/uv"}}', dir: . }
+            node:           { taskfile: '{{printf .TASKLIB "node"}}', dir: . }
+            pnpm:           { taskfile: '{{printf .TASKLIB "pnpm"}}', dir: . }
+            compose:        { taskfile: '{{printf .TASKLIB "compose"}}', dir: . }
+            security:       { taskfile: '{{printf .TASKLIB "security"}}', dir: . }
+            checkov:        { taskfile: '{{printf .TASKLIB "checkov"}}', dir: . }
+            monorepo:       { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: . }
+            argocd:         { taskfile: '{{printf .TASKLIB "argocd"}}', dir: . }
+            auth:           { taskfile: '{{printf .TASKLIB "auth"}}', dir: . }
+            codegen:        { taskfile: '{{printf .TASKLIB "codegen"}}', dir: . }
+            cosign:         { taskfile: '{{printf .TASKLIB "cosign"}}', dir: . }
+            helm:           { taskfile: '{{printf .TASKLIB "helm"}}', dir: . }
+            sealedsecrets:  { taskfile: '{{printf .TASKLIB "sealed-secrets"}}', dir: . }
+            local:          { taskfile: '{{printf .TASKLIB "runtime/orbstack"}}', dir: . }
+            localdocker:    { taskfile: '{{printf .TASKLIB "runtime/docker"}}', dir: . }
+            localk3d:       { taskfile: '{{printf .TASKLIB "runtime/k3d"}}', dir: . }
+            localkind:      { taskfile: '{{printf .TASKLIB "runtime/kind"}}', dir: . }
+            localminikube:  { taskfile: '{{printf .TASKLIB "runtime/minikube"}}', dir: . }
           tasks: {}
           YAML
 
@@ -220,6 +230,29 @@ jobs:
         # This is the check that catches a module quietly claiming a name
         # another module already uses.
         run: task --list-all > /dev/null
+
+      - name: 'Verify: cosign no-ops cleanly with no key and no binary'
+        working-directory: consumer
+        # cosign is the one module that reads another module's derived vars
+        # (_REL_VERSION, _REL_IMAGE) rather than its own — the most likely
+        # place for the var-namespace scoping the whole library depends on to
+        # break quietly. COSIGN_SIGN=0 exercises every task's status guard
+        # without needing cosign or syft installed, which a real sign/attest
+        # run would.
+        run: |
+          set -euo pipefail
+          COSIGN_SIGN=0 task cosign:all cosign:verify
+          echo "✔ cosign no-ops without a key, syft or the cosign binary"
+
+      - name: 'Verify: helm no-ops cleanly with no cluster'
+        working-directory: consumer
+        # helm:list's own status guard skips it when kubectl cannot reach a
+        # cluster, which is always true here — this proves that guard, not the
+        # Helm listing itself.
+        run: |
+          set -euo pipefail
+          task helm:list
+          echo "✔ helm:list no-ops without a reachable cluster"
 
       - name: 'Verify: codegen actually generates'
         working-directory: consumer
