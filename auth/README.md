@@ -23,10 +23,10 @@ workspace — tasks then read `auth:<task>`.
 
 | Var | Default | Meaning |
 |---|---|---|
-| `JWT_ALG` | `HS256` | |
-| `JWT_SECRET` | `dev-secret-change-me-32-bytes-min` | |
+| `JWT_ALG` | `HS256` | signing algorithm |
+| `JWT_SECRET` | `dev-secret-change-me-32-bytes-min` | HMAC key; the default names itself so a real service rejects it |
 | `JWT_ISS` / `JWT_AUD` / `JWT_SUB` | `local-dev` / `local-api` / `dev-user` | claims |
-| `JWT_TTL_SECONDS` | `86400` | |
+| `JWT_TTL_SECONDS` | `86400` | lifetime, in seconds |
 | `JWT_CLAIMS` | `{}` | extra claims, as a JSON object |
 
 ## Examples

@@ -20,11 +20,30 @@ includes:
 
 | Var | Default | Meaning |
 |---|---|---|
-| `CHECKOV_CONFIG` | `.checkov.yaml` | |
-| `CHECKOV_BASELINE` | `.checkov.baseline` | |
+| `CHECKOV_CONFIG` | `.checkov.yaml` | the config `scan` and `baseline` pass to checkov |
+| `CHECKOV_BASELINE` | `.checkov.baseline` | findings already accepted; `scan` reports only what is new |
 | `CHECKOV_FRAMEWORKS` | `github_actions dockerfile helm kubernetes` | frameworks the triage view walks |
 | `CHECKOV_TARGET` | `.` | directory the triage view walks |
 | `CHECKOV_FLAGS` | — | extra checkov flags, appended to every invocation |
+
+## Examples
+
+```yaml
+includes:
+  checkov:
+    taskfile: '{{.TASKLIB}}checkov{{.TASKLIB_REF}}'
+    dir: .
+    vars:
+      CHECKOV_FRAMEWORKS: terraform kubernetes helm
+```
+
+```console
+$ task checkov:scan
+✔ checkov · no findings outside the baseline
+
+$ task checkov:all          # everything, baselined findings included
+$ task checkov:baseline     # after fixing some, accept what is left
+```
 
 ## Why this is not in `security`
 

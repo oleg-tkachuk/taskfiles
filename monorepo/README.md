@@ -60,7 +60,7 @@ $ task monorepo:deploy COMPONENTS="backend/api"         # narrow the run
 There is no `ONLY=` or `SKIP=`: override `COMPONENTS` instead. One knob, and it
 is the same knob that defines the set in the first place.
 
-## registry:check
+## Why a deploy checks the registry first
 
 `deploy` probes the registry before the first push, so a misconfiguration costs
 seconds rather than a half-finished chain. 200, 401 and 403 all count as "the

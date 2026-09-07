@@ -34,7 +34,7 @@ workspace — tasks then read `sec:<task>`.
 | `GOLANGCI_FLAGS` | — | extra golangci-lint flags |
 | `GITLEAKS_FLAGS` | — | extra gitleaks flags |
 | `TRIVY_SUBCOMMAND` | `fs` | `image` to scan a built image instead |
-| `TRIVY_SCANNERS` | `--scanners vuln,secret` | |
+| `TRIVY_SCANNERS` | `--scanners vuln,secret` | which scanners run; `--scanners misconfig` for IaC |
 | `TRIVY_TARGET` | `.` | what to scan |
 | `TRIVY_FLAGS` | — | extra trivy flags |
 | `BUF_BREAKING_FLAGS` | — | extra buf breaking flags |

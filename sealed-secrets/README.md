@@ -27,7 +27,15 @@ includes:
 Per call: `namespace`, `name`, `output` for both sealing tasks; `key` and
 `value` for `seal`; `file` for `seal:file`.
 
-## Example
+## Examples
+
+```yaml
+includes:
+  sealed-secrets:
+    taskfile: '{{.TASKLIB}}sealed-secrets{{.TASKLIB_REF}}'
+    dir: .
+    vars: { SEALED_SECRETS_NS: kube-system }
+```
 
 ```console
 $ task sealed-secrets:seal namespace=billing name=api-keys \

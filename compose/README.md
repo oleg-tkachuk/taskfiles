@@ -27,7 +27,7 @@ workspace — tasks then read `dev:<task>`.
 
 | Var | Default | Meaning |
 |---|---|---|
-| `COMPOSE_FILE` | `docker-compose.yaml` | |
+| `COMPOSE_FILE` | `docker-compose.yaml` | the stack definition every task acts on |
 | `PROJECT_NAME` | `stack` | the label in every log line |
 | `SERVICE` | — | narrow `logs` to one service |
 | `TAIL` | `200` | backlog for `logs` |

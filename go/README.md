@@ -41,12 +41,12 @@ workspace — tasks then read `go:<task>`.
 | `PROJECT_NAME` | `go` | the label in every log line |
 | `GO_PKG` | `./...` | package pattern to test and lint |
 | `GO_MAIN` | `./cmd/...` | packages that produce binaries |
-| `GO_BIN_DIR` | `./bin` | |
-| `GO_TEST_FLAGS` | `-race -short` | |
-| `GO_BUILD_FLAGS` | — | |
-| `GOLANGCI_FLAGS` | — | |
+| `GO_BIN_DIR` | `./bin` | where `build` writes its binaries |
+| `GO_TEST_FLAGS` | `-race -short` | flags for the unit run |
+| `GO_BUILD_FLAGS` | — | extra `go build` flags, e.g. `-ldflags` |
+| `GOLANGCI_FLAGS` | — | extra golangci-lint flags |
 | `GO_BENCH_PKG` | `GO_PKG` | packages to benchmark |
-| `GO_BENCH_FLAGS` | `-benchtime=1x` | |
+| `GO_BENCH_FLAGS` | `-benchtime=1x` | flags for the benchmark run |
 | `GO_TEST_TAGS` | `integration` | for the tagged suites |
 | `GOWORK` | `off` | set to `""` to build through the workspace |
 
@@ -74,14 +74,14 @@ tasks:
   build: { cmds: [{ task: go:compile }] }   # type-checks, writes nothing
 ```
 
-## test:tagged:compile
+## Why the tagged suites are compiled but not run
 
 A build-tagged suite is invisible to the normal gate: it does not compile, it
 does not run, and nothing notices it has rotted until someone needs it. `go vet`
 with the tag takes seconds and catches exactly that — put it in the commit gate
 next to `test`.
 
-## gotestsum
+## gotestsum when it is installed, `go test` when it is not
 
 `test` uses `gotestsum` when it is installed (one line per package) and plain
 `go test` otherwise. Neither is worth a hard dependency.

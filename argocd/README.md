@@ -34,8 +34,8 @@ workspace — tasks then read `argocd:<task>`.
 | `ARGOCD_SERVER` | `argocd-server` | the server deployment; a Helm release named other than `argocd` prefixes it |
 | `ARGOCD_SERVER_LABEL` | `argocd-server` | `app.kubernetes.io/name` on the server pods — the chart's app label does not carry the release name, so these two differ whenever the release does |
 | `ARGOCD_PORT` | `8443` | local port for `server:port-forward` |
-| `ARGOCD_NS` | `argocd` | |
-| `K8S_CONTEXT` | current context | |
+| `ARGOCD_NS` | `argocd` | namespace Argo itself runs in |
+| `K8S_CONTEXT` | current | pin a cluster |
 
 ## Examples
 

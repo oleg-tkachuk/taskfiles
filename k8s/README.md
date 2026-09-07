@@ -31,8 +31,8 @@ workspace — tasks then read `k8s:<task>`.
 | Var | Default | Meaning |
 |---|---|---|
 | `PROJECT_NAME` | `service` | the label in every log line |
-| `K8S_NAMESPACE` | `default` | |
-| `K8S_DEPLOYMENT_NAME` | `PROJECT_NAME` | |
+| `K8S_NAMESPACE` | `default` | namespace every task acts in |
+| `K8S_DEPLOYMENT_NAME` | `PROJECT_NAME` | when the deployment is not named after the component |
 | `K8S_CONTEXT` | current context | pin a cluster |
 | `CHART_DIR` | `./deploy/chart` | for `upgrade` |
 | `ROLLOUT_TIMEOUT` | `2m` | how long `restart` waits |

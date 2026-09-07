@@ -28,12 +28,12 @@ workspace — tasks then read `sign:<task>`.
 | Var | Default | Meaning |
 |---|---|---|
 | `COSIGN_DIR` | `deploy/sigstore` | where the key pair lives |
-| `COSIGN_KEY` | `<dir>/cosign.key` | |
-| `COSIGN_PUB` | `<dir>/cosign.pub` | |
-| `COSIGN_SIGNING_CONFIG` | `<dir>/signing-config.json` | |
+| `COSIGN_KEY` | `<dir>/cosign.key` | private key; never commit it |
+| `COSIGN_PUB` | `<dir>/cosign.pub` | public key; commit this one |
+| `COSIGN_SIGNING_CONFIG` | `<dir>/signing-config.json` | written by `keygen`; keeps signing off the public infrastructure |
 | `COSIGN_SIGN` | `1` | `0` makes every task here a no-op |
 | `COSIGN_SIGN_FLAGS` | — | extra flags for sign and attest |
-| `COSIGN_VERIFY_FLAGS` | `--insecure-ignore-tlog=true` | |
+| `COSIGN_VERIFY_FLAGS` | `--insecure-ignore-tlog=true` | the default matches signing without a transparency log |
 | `SBOM_FORMAT` | `spdx-json` | syft output format |
 | `SBOM_INSECURE` | `0` | `1` when the registry's certificate is one syft rejects |
 

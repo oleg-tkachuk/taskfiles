@@ -30,9 +30,9 @@ component's directory.
 | Var | Default | Meaning |
 |---|---|---|
 | `PROJECT_NAME` | `codegen` | label in log lines |
-| `MOCKERY_CONFIG` | `.mockery.yaml` | |
+| `MOCKERY_CONFIG` | `.mockery.yaml` | mockery's config; its absence stops `mocks` with a message |
 | `MOCKERY_MODULE` | `github.com/vektra/mockery/v3` | resolved through go.mod by `go run` |
-| `BUF_TEMPLATE` | `buf.gen.yaml` | |
+| `BUF_TEMPLATE` | `buf.gen.yaml` | the generation template buf reads |
 | `BUF_INPUT` | — | buf's input, when it is not the working directory |
 | `PROTO_FORBID` | — | paths that must not exist when the stubs are generated |
 | `PROTO_PLUGINS` | — | protoc plugins to install from this module before buf |
@@ -43,7 +43,7 @@ component's directory.
 | `SQLC_DIR` | — | directory the sqlc gate watches; required by `sqlc:check` |
 | `GOWORK` | `off` | set to `""` to generate through a go.work workspace |
 
-## Example
+## Examples
 
 ```yaml
 includes:
@@ -77,7 +77,7 @@ Mocks first, so they are written against the interfaces the tree already has.
 buf before `go generate`, so the protobuf types exist when generate's tools walk
 the tree. sqlc last, so its bindings see any updated proto types.
 
-## Three things that are not obvious
+## Three choices that each cost a debugging session
 
 **`GOWORK=off`, for everything here.** `wire` and other generators run `go` with
 `-mod=mod`, which the toolchain refuses in workspace mode — and a `go.work` is

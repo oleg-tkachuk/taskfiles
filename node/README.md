@@ -35,11 +35,11 @@ workspace — tasks then read `node:<task>`.
 | `PROJECT_NAME` | `node` | the label in every log line |
 | `PM` | `pnpm` | pass `npm` for a package-lock repo |
 | `SCRIPT_DEV` | `dev` | which package.json script each task runs |
-| `SCRIPT_BUILD` | `build` | |
-| `SCRIPT_LINT` | `lint` | |
-| `SCRIPT_TEST` | `test` | |
-| `SCRIPT_E2E` | `test:e2e` | |
-| `SCRIPT_GENERATE` | `generate` | |
+| `SCRIPT_BUILD` | `build` | what `build` runs |
+| `SCRIPT_LINT` | `lint` | what `lint` and `lint:fix` run |
+| `SCRIPT_TEST` | `test` | what `test` runs |
+| `SCRIPT_E2E` | `test:e2e` | what `test:e2e` runs |
+| `SCRIPT_GENERATE` | `generate` | what `generate` runs |
 | `LINT_FIX_FLAGS` | `--fix` | what `lint:fix` appends |
 | `PM_INSTALL` | — | override the install command outright |
 | `E2E_SETUP` | `exec playwright install --with-deps chromium` | run before the suite; `none` to skip |
@@ -71,7 +71,7 @@ vars:
 package.json should fail the install, not be quietly rewritten. Override
 `PM_INSTALL` if you need something else.
 
-## Script names
+## Pointing a task at a different script
 
 Every task calls the script of the same name — `dev`, `build`, `lint`, `test`,
 `generate`. A project whose script is named differently should call it directly

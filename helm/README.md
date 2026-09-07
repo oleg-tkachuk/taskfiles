@@ -22,6 +22,23 @@ includes:
 | `HELM_NS` | every namespace | limit the scope to one namespace |
 | `CONFIRM` | — | required by `uninstall-all`; must name the context being emptied |
 
+## Examples
+
+```yaml
+includes:
+  helm: { taskfile: '{{.TASKLIB}}helm{{.TASKLIB_REF}}', dir: . }
+```
+
+```console
+$ task helm:list
+NAME       NAMESPACE   REVISION  STATUS    CHART
+argo-cd    argocd      13        deployed  argo-cd-10.8.1
+cnpg       cnpg-system 2         deployed  cloudnative-pg-0.29.0
+
+$ task helm:list HELM_NS=argocd            # one namespace
+$ task helm:uninstall-all CONFIRM=minikube # asks before it empties it
+```
+
 ## Why this is not in `k8s`
 
 `k8s` acts on one component's deployment and is included by every component, so

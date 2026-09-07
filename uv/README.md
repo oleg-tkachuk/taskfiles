@@ -32,12 +32,12 @@ workspace — tasks then read `py:<task>`.
 | `PROJECT_NAME` | `python` | the label in every log line |
 | `PY` | uv's choice | interpreter, when it must be pinned |
 | `PY_SRC` | `src` | what lint and format target |
-| `PY_TEST_FLAGS` | `-q` | |
+| `PY_TEST_FLAGS` | `-q` | flags for the test run |
 | `UV_SYNC_FLAGS` | `--group dev` | which dependency sets to install |
 | `TEST_CMD` | `pytest` | which runner each task invokes |
-| `LINT_CMD` | `ruff check` | |
-| `FORMAT_CMD` | `ruff format` | |
-| `TYPECHECK_CMD` | `mypy` | |
+| `LINT_CMD` | `ruff check` | what `lint` runs |
+| `FORMAT_CMD` | `ruff format` | what `fmt` runs |
+| `TYPECHECK_CMD` | `mypy` | what `typecheck` runs |
 | `TYPECHECK_MODULE` | `mypy` | what `typecheck` imports to decide whether it can run |
 
 

@@ -33,12 +33,12 @@ workspace — tasks then read `py:<task>`.
 | `PROJECT_NAME` | `python` | the label in every log line |
 | `PY` | `python3` | interpreter the venv is built on |
 | `PY_SRC` | `src` | what lint and format target |
-| `PY_TEST_FLAGS` | `-q` | |
+| `PY_TEST_FLAGS` | `-q` | flags for the test run |
 | `POETRY_INSTALL_FLAGS` | `--no-interaction` | e.g. add `--no-root` |
 | `TEST_CMD` | `pytest` | which runner each task invokes |
-| `LINT_CMD` | `ruff check` | |
-| `FORMAT_CMD` | `ruff format` | |
-| `TYPECHECK_CMD` | `mypy` | |
+| `LINT_CMD` | `ruff check` | what `lint` runs |
+| `FORMAT_CMD` | `ruff format` | what `fmt` runs |
+| `TYPECHECK_CMD` | `mypy` | what `typecheck` runs |
 | `TYPECHECK_MODULE` | `mypy` | what `typecheck` imports to decide whether it can run |
 
 
@@ -72,7 +72,7 @@ vars:
   POETRY_INSTALL_FLAGS: --no-interaction --no-root
 ```
 
-## Pin `PY`
+## Pin the interpreter
 
 Left at the default, a pyproject that admits `>=3.13,<4.0` also admits 3.14, and
 a venv built on the newer one falls back to source builds for native deps that

@@ -47,7 +47,7 @@ workspace — tasks then read `release:<task>`.
 | `DOCKERFILE` | `./Dockerfile` | resolved from the component directory, **not** from `DOCKER_CONTEXT` |
 | `DOCKER_CONTEXT` | `.` | build context, when it is not the component directory |
 | `DOCKER_BUILD_FLAGS` | — | verbatim extra buildx flags |
-| `CHART_DIR` | `./deploy/chart` | |
+| `CHART_DIR` | `./deploy/chart` | the chart every chart task reads |
 | `CHART_APP_VERSION` | derived version | pin it when the image is upstream's |
 | `CHART_MIN_RESOURCES` | `1` | render-gate floor |
 | `HELM_FLAGS` | — | e.g. `--insecure-skip-tls-verify` for a self-signed registry |
@@ -148,7 +148,7 @@ The first is why the gate exists — a range block that strips the newline befor
 separator makes every parser read the stream as one garbage document and silently
 drop every resource after the first.
 
-## doctor
+## doctor — what a component declares, checked before it costs minutes
 
 `task release:doctor` reports, in one pass, whether what this component declares
 actually resolves — the version, the chart, the Dockerfile, the build contexts
