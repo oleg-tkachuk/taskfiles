@@ -13,7 +13,18 @@ cluster it is:
 | `k3d/` | `k3d image import` — same reason |
 
 That difference is the only thing these modules contain. All five expose the
-same three tasks, so moving between them is one line:
+same three tasks, so moving between them is one line.
+
+`install` is identical, word for word, in all five — and stays that way on
+purpose rather than through a shared include. A module that includes its own
+parts hands them the *library's* working directory, not the consumer's, even
+when that internal include carries `dir: .`: `dir: .` on a nested include
+resolves against the file declaring it, not against wherever the outermost
+include eventually runs. A shared `install` would read `CHART_DIR` against
+this checkout instead of the consumer's, silently. `task lint`'s
+`check:runtime-install` is what keeps the five copies from drifting apart
+instead of a shared file — edit one, then check the diff shows the same
+change in the other four.
 
 ```yaml
 includes:

@@ -53,6 +53,7 @@ tasks:
       - task: check:silent
       - task: check:readme
       - task: check:surface
+      - task: check:runtime-install
 
   # ─── gates ──────────────────────────────────────────────────────────────────
 
@@ -223,6 +224,32 @@ tasks:
           done
           [ "$have_yq" = 1 ] || echo "{{._LIB_WARN}} taskfiles · yq absent, deps: parity within families not checked" >&2
           [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every family's variants expose the same tasks and agree on deps:"
+          exit "$fail"
+
+  check:runtime-install:
+    desc: "Refuse a runtime/* variant whose install: task has drifted from the others"
+    # install: is deliberately duplicated byte-for-byte across every runtime/*
+    # variant rather than factored into a shared include: a nested include
+    # resolves its `dir: .` against the FILE that declares it, not against
+    # wherever the outermost include eventually runs — confirmed by hand, a
+    # shared install: reads CHART_DIR against this checkout instead of the
+    # consumer's, silently. Duplication is the safer choice here; this gate is
+    # what keeps the five copies from quietly drifting apart instead.
+    cmds:
+      - cmd: |-
+          set -eu
+          fail=0
+          first=""; base=""
+          for f in runtime/*/Taskfile.yaml; do
+            block=$(sed -n '/^  install:/,$p' "$f")
+            if [ -z "$first" ]; then first="$f"; base="$block"; continue; fi
+            if [ "$block" != "$base" ]; then
+              echo "{{._LIB_ERR}} taskfiles · $f's install: has drifted from $first's:" >&2
+              diff <(printf '%s\n' "$base") <(printf '%s\n' "$block") | sed 's/^/    /' >&2
+              fail=1
+            fi
+          done
+          [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every runtime/* install: task matches"
           exit "$fail"
 
   # ─── docs ───────────────────────────────────────────────────────────────────
