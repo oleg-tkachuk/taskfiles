@@ -38,7 +38,7 @@ version: "3"
 silent: true
 
 vars:
-  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v3.6.0'
+  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v4.0.0'
   PROJECT_NAME: billing-api
   IMAGE_NAMESPACE: acme
   K8S_NAMESPACE: acme
@@ -128,12 +128,11 @@ implementation; they are not the current one.
 | [`monorepo/`](monorepo/README.md) | `monorepo` | run one target across every component, registry preflight |
 | [`node/`](node/README.md) | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
 | [`pnpm/`](pnpm/README.md) | `pnpm` | keep the corepack pnpm pin current and agreed across a repo's apps |
-| [`python/`](python/README.md) | `python` | poetry install/test/lint/format/typecheck/lock, dep bumps |
+| [`python/*`](python/README.md) — poetry, uv | `python` | install/test/lint/format/typecheck/lock and dep bumps, one surface per manager |
 | [`release/`](release/README.md) | `release` | version derivation, image build/push, chart lint/render/package/push, `deploy` |
 | [`runtime/*`](runtime/README.md) — docker, orbstack, minikube, kind, k3d | `local` | run a locally built image on a local cluster, no registry |
 | [`sealed-secrets/`](sealed-secrets/README.md) | `sealed-secrets` | seal a value into a committable SealedSecret, fetch the controller key |
 | [`security/`](security/README.md) | `security` | govulncheck, golangci-lint, gitleaks, trivy, buf breaking |
-| [`uv/`](uv/README.md) | `uv` | the same surface for uv-managed projects — swap the include line |
 
 ### Local clusters
 
@@ -239,12 +238,16 @@ a default that an empty string is supposed to defeat, because it will not.
 
 ### Include naming
 
-A module is included under its own directory name, because
-the include alias is what names every task it brings in — `python:test` says
-which of the two Python modules answered. `runtime/*` is the one exception: its
-five modules expose the same three tasks and differ only in which local cluster
-they target, so they are included as `local` and swapping one for another is a
-single line.
+A module is included under its own directory name, because the include alias
+is what names every task it brings in.
+
+A **family** is the exception, and it is the point of being one. `runtime/*`
+and `python/*` hold variants of a single surface — five local clusters, two
+Python package managers — so they are included under the family name, `local`
+and `python`, and swapping one variant for another is a single line with no
+task rename anywhere in the consumer. `task lint` refuses a family whose
+variants stop exposing the same tasks, which is what keeps that promise true;
+a deliberate difference goes in `SURFACE_EXCEPT` with a reason.
 
 ### Logging
 
@@ -322,7 +325,7 @@ you — leaves a lock in `.task/remote/`:
 Task refuses to run when the content behind that ref no longer matches it:
 
 ```
-task: Taskfile "…//go?ref=v3.6.0" not trusted by user
+task: Taskfile "…//go?ref=v4.0.0" not trusted by user
 ```
 
 That is the only thing standing between a moved tag and your build, so commit

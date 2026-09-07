@@ -16,6 +16,40 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [4.0.0] — 2026-09-07
+
+A major because two modules moved. The upgrade is one line per consumer.
+
+### Changed
+
+- **`python` and `uv` are now `python/poetry` and `python/uv`,** a family in
+  the shape of `runtime/*`. They were always alternatives — nobody includes
+  both — and they expose the same tasks, so they now live together and are
+  included under the family name:
+
+  ```yaml
+  includes:
+    python: { taskfile: '{{printf .TASKLIB "python/poetry"}}', dir: . }
+    # or
+    python: { taskfile: '{{printf .TASKLIB "python/uv"}}', dir: . }
+  ```
+
+  The point is what does *not* change: a project moving between the two edits
+  one line, and every `python:test`, `python:lint`, `python:install` it already
+  calls keeps resolving. Before, the uv variant answered to `uv:` and the swap
+  meant renaming every call site.
+
+  Migration: `"python"` → `"python/poetry"`, `"uv"` → `"python/uv"`, and if the
+  uv module was included as `uv:` rename that alias to `python:`.
+
+### Added
+
+- `task lint` gained **check:surface**: a family whose variants stop exposing
+  the same tasks fails the gate. Interchangeability that nothing verifies stops
+  being true quietly. `deps:update:latest` is the one allowed difference —
+  `poetry up --latest` rewrites `pyproject.toml` while `uv lock --upgrade`
+  respects it — and it is named in `SURFACE_EXCEPT` with that reason.
+
 ## [3.6.0] — 2026-09-07
 
 ### Added
@@ -677,6 +711,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[4.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v4.0.0
 [3.6.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.6.0
 [3.5.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.5.0
 [3.4.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.4.0

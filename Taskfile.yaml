@@ -14,8 +14,9 @@ vars:
   # file inside it. The split is by domain, not by file size: `release` never
   # talks to a cluster and `k8s` never publishes anything, so a repository that
   # only does one of the two includes only one of them.
-  # Modules with their own README. The runtime/* family shares one README, so
-  # it is checked separately — hence the top-level glob rather than PARSE_MODULES.
+  # Modules with their own README. A family — a directory with no Taskfile of
+  # its own whose subdirectories have one — shares a single README, so those
+  # are checked separately; hence the top-level glob rather than PARSE_MODULES.
   # Discovered for the same reason PARSE_MODULES is: the hand-written list had
   # gone four modules stale (checkov, codegen, helm, sealed-secrets), and a
   # module missing from it walked past the README gate rather than failing it.
@@ -29,6 +30,9 @@ vars:
   # Every YAML the modules are made of, for the file-level checks.
   MODULE_FILES:
     sh: ls */Taskfile.yaml */*/Taskfile.yaml 2>/dev/null | sort -u | tr '\n' ' '
+  # runtime, python — the directories that hold variants rather than a module.
+  FAMILIES:
+    sh: ls -d */*/Taskfile.yaml 2>/dev/null | cut -d/ -f1 | sort -u | tr '\n' ' '
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _LIB_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
@@ -47,6 +51,7 @@ tasks:
       - task: check:vars
       - task: check:silent
       - task: check:readme
+      - task: check:surface
 
   # ─── gates ──────────────────────────────────────────────────────────────────
 
@@ -136,14 +141,52 @@ tasks:
             grep -q "($m/README.md)" README.md || {
               echo "{{._LIB_ERR}} taskfiles · README.md does not link $m/README.md" >&2; fail=1; }
           done
-          # runtime/* share one README for the family, linked as runtime/.
-          grep -q "(runtime/README.md)" README.md || {
-            echo "{{._LIB_ERR}} taskfiles · README.md does not link runtime/README.md" >&2; fail=1; }
+          # A family shares one README for all its variants.
+          for fam in {{.FAMILIES}}; do
+            [ -f "$fam/README.md" ] || { echo "{{._LIB_ERR}} taskfiles · $fam/ has no README.md" >&2; fail=1; }
+            grep -q "($fam/README.md)" README.md || {
+              echo "{{._LIB_ERR}} taskfiles · README.md does not link $fam/README.md" >&2; fail=1; }
+          done
           # And the reverse: a link to a README that is not on disk.
           for f in $(grep -oE '\(([a-z0-9-]+/)+README\.md\)' README.md | tr -d '()' | sort -u); do
             [ -f "$f" ] || { echo "{{._LIB_ERR}} taskfiles · README.md links $f, which is not in the repo" >&2; fail=1; }
           done
           [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every module has a README and the index links it"
+          exit "$fail"
+
+  check:surface:
+    desc: "Refuse a family whose variants no longer expose the same tasks"
+    # python/poetry and python/uv are sold as interchangeable — a consumer
+    # swaps one include line and every task name it calls still resolves. That
+    # promise is only true while the two agree, and nothing else would notice
+    # them drifting. Documented exceptions go in the allowlist below.
+    vars:
+      # <family>:<task> that only one variant is expected to have.
+      SURFACE_EXCEPT: "python:deps:update:latest"
+    cmds:
+      - cmd: |-
+          set -eu
+          fail=0
+          for fam in {{.FAMILIES}}; do
+            first=""; base=""
+            for v in $(ls -d "$fam"/*/Taskfile.yaml 2>/dev/null | sed "s|/Taskfile.yaml||"); do
+              got=$(task -t "$v/Taskfile.yaml" --list-all 2>/dev/null \
+                    | grep -oE '^\* [a-z0-9:_-]+' | sed 's/^\* //; s/:$//' | sort)
+              # Drop the tasks this family is allowed to differ on.
+              for e in {{.SURFACE_EXCEPT}}; do
+                case "$e" in
+                  "$fam":*) got=$(printf '%s\n' "$got" | grep -vxF "${e#*:}" || true) ;;
+                esac
+              done
+              if [ -z "$first" ]; then first="$v"; base="$got"; continue; fi
+              if [ "$got" != "$base" ]; then
+                echo "{{._LIB_ERR}} taskfiles · $v and $first do not expose the same tasks:" >&2
+                diff <(printf '%s\n' "$base") <(printf '%s\n' "$got") | sed 's/^/    /' >&2
+                fail=1
+              fi
+            done
+          done
+          [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every family's variants expose the same tasks"
           exit "$fail"
 
   # ─── docs ───────────────────────────────────────────────────────────────────
