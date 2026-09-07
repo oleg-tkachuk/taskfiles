@@ -16,6 +16,50 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [2.0.0] — 2026-09-07
+
+One module split in two. If you do not scan infrastructure with checkov, this
+release changes nothing for you.
+
+### What to do
+
+If you called `security:checkov`, `security:checkov:all` or
+`security:checkov:baseline`, add a second include and rename the calls:
+
+```yaml
+includes:
+  security: { taskfile: '{{.TASKLIB}}security{{.TASKLIB_REF}}', dir: . }
+  checkov:  { taskfile: '{{.TASKLIB}}checkov{{.TASKLIB_REF}}', dir: . }
+```
+
+| was | is |
+|---|---|
+| `security:checkov` | `checkov:scan` |
+| `security:checkov:all` | `checkov:all` |
+| `security:checkov:baseline` | `checkov:baseline` |
+
+`CHECKOV_CONFIG`, `CHECKOV_BASELINE` and `CHECKOV_FRAMEWORKS` keep their names
+and move to the new include. Everything else in `security` is untouched.
+
+A second include rather than a re-export, because a module cannot include
+another one: a nested include resolves against this library's working directory
+rather than the consumer's, so every relative path in it would read the wrong
+tree.
+
+### Changed
+
+- **BREAKING** — checkov is its own module. `security` was reaching for seven
+  tools across three unrelated jobs: Go analysis, proto compatibility, and
+  infrastructure policy. The seam is not size — checkov was three tasks of ten,
+  while `release` is fourteen and is not being split. The seam is what a task
+  can be run against: `security` wants Go modules and a git history, checkov
+  wants YAML a cluster will apply, and a repository usually has one or the
+  other. Either consumer was reading a task list half of which it had nothing
+  to point at.
+
+  `security:all` never composed the checkov tasks, which is the evidence that
+  the boundary was already there.
+
 ## [1.3.2] — 2026-09-07
 
 One module changed, and it dropped a requirement rather than adding one.
@@ -293,6 +337,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[2.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.0.0
 [1.3.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.3.2
 [1.3.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.3.1
 [1.3.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.3.0
