@@ -16,6 +16,34 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [1.3.2] — 2026-09-07
+
+One module changed, and it dropped a requirement rather than adding one.
+
+### Fixed
+
+- `helm:uninstall-all` no longer needs `python3`. It parsed helm's JSON through
+  an interpreter the module has no reason to require, and whose absence would
+  have surfaced only after the prompt had been answered — the worst moment to
+  learn a tool is missing. A release name is a DNS label, so awk over the table
+  cannot mis-split it.
+
+### Internal
+
+- CI runs the modules on macOS as well as Linux. The library is developed on
+  macOS and was checked only on Linux, so a divergence between the two
+  userlands would have been invisible here and obvious on the first local run.
+- The consumer smoke now runs tasks instead of only loading them. It carries a
+  real Go module, so `codegen:go` executes a directive and the file it writes
+  is asserted, and the `go` module's fmt, compile, test and tidy act on
+  something. Both defects found in this library last week parse cleanly, which
+  is what a load-only check would have kept missing.
+- Every workflow job has a timeout, so nothing that hangs runs to GitHub's
+  six-hour default.
+- CI reports when a newer Task is released. Dependabot watches `uses:` pins and
+  cannot see `TASK_VERSION`, so nothing else would ever mention it — a notice,
+  not a gate, because the pin is deliberate.
+
 ## [1.3.1] — 2026-09-07
 
 Documentation only. No module changed, so a consumer moving the ref from
@@ -265,6 +293,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[1.3.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.3.2
 [1.3.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.3.1
 [1.3.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.3.0
 [1.2.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.2.0
