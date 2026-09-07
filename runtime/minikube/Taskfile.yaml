@@ -41,7 +41,7 @@ tasks:
     desc: "Fail early when the minikube cluster is not running"
     preconditions:
       - sh: command -v minikube >/dev/null
-        msg: "minikube is not installed"
+        msg: "minikube is not installed — https://minikube.sigs.k8s.io/docs/start/"
       - sh: minikube status --format '{{"{{"}}.Host{{"}}"}}' 2>/dev/null | grep -qx Running
         msg: "the minikube cluster is not running — `minikube start`"
     cmds:

@@ -49,7 +49,7 @@ tasks:
       vars: [namespace, name, key, value, output]
     preconditions:
       - sh: command -v kubeseal >/dev/null
-        msg: "kubeseal is not installed — brew install kubeseal"
+        msg: "kubeseal is not installed — https://github.com/bitnami-labs/sealed-secrets#installation"
     cmds:
       - mkdir -p {{dir .output}}
       - >-
@@ -66,7 +66,7 @@ tasks:
       vars: [namespace, name, file, output]
     preconditions:
       - sh: command -v kubeseal >/dev/null
-        msg: "kubeseal is not installed — brew install kubeseal"
+        msg: "kubeseal is not installed — https://github.com/bitnami-labs/sealed-secrets#installation"
       - sh: test -f {{.file | q}}
         msg: "{{.file}} not found"
     cmds:
@@ -83,7 +83,7 @@ tasks:
     desc: "Print the controller's public certificate, for sealing without a cluster"
     preconditions:
       - sh: command -v kubeseal >/dev/null
-        msg: "kubeseal is not installed — brew install kubeseal"
+        msg: "kubeseal is not installed — https://github.com/bitnami-labs/sealed-secrets#installation"
     # Committing this lets anyone seal a value for this cluster without reaching
     # it. It is a public key: it can encrypt and cannot decrypt.
     cmds:

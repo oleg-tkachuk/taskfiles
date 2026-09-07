@@ -60,7 +60,7 @@ tasks:
       - "{{._GO_BIN}}/*"
     preconditions:
       - sh: command -v go >/dev/null
-        msg: "go is not installed"
+        msg: "go is not installed — https://go.dev/doc/install"
     cmds:
       - echo "{{._GO_RUN}} {{._GO_NAME}} · go · build {{._GO_MAIN}}"
       - go build {{._GO_BUILD_FLAGS}} -o {{._GO_BIN}}/ {{._GO_MAIN}}
@@ -116,7 +116,7 @@ tasks:
     desc: "golangci-lint over the module"
     preconditions:
       - sh: command -v golangci-lint >/dev/null
-        msg: "golangci-lint is not installed — brew install golangci-lint"
+        msg: "golangci-lint is not installed — https://golangci-lint.run/docs/welcome/install/"
     cmds:
       - echo "{{._GO_RUN}} {{._GO_NAME}} · go · golangci-lint"
       - golangci-lint run {{._GO_LINT_FLAGS}} {{._GO_PKG}}

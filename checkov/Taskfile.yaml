@@ -43,7 +43,7 @@ tasks:
     desc: "Policy-scan manifests, charts, Dockerfiles and workflows against the baseline"
     preconditions:
       - sh: command -v checkov >/dev/null
-        msg: "checkov is not installed — pipx install checkov"
+        msg: "checkov is not installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
       - sh: test -f {{._CKV_CFG}}
         msg: "{{._CKV_CFG}} not found — set CHECKOV_CONFIG"
       # The config names the baseline, so a missing baseline is not "no findings
@@ -58,7 +58,7 @@ tasks:
     desc: "Every checkov finding, baselined ones included — a triage view, never a gate"
     preconditions:
       - sh: command -v checkov >/dev/null
-        msg: "checkov is not installed — pipx install checkov"
+        msg: "checkov is not installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
     # Deliberately ignores the baseline and the config: this is the view for
     # deciding what to fix next, not a pass/fail check.
     cmds:
@@ -70,7 +70,7 @@ tasks:
     desc: "Regenerate the checkov baseline — only after deliberately fixing findings"
     preconditions:
       - sh: command -v checkov >/dev/null
-        msg: "checkov is not installed — pipx install checkov"
+        msg: "checkov is not installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
     prompt: |
       Regenerating the baseline accepts every CURRENT finding as permitted,
       including any regression introduced since the last run. Do this after

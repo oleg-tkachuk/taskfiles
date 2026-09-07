@@ -41,7 +41,7 @@ tasks:
     desc: "Fail early when the k3d cluster is not there"
     preconditions:
       - sh: command -v k3d >/dev/null
-        msg: "k3d is not installed — brew install k3d"
+        msg: "k3d is not installed — https://k3d.io/stable/"
       - sh: k3d cluster list -o json 2>/dev/null | grep -q '"name"'
         msg: "no k3d cluster exists — `k3d cluster create`"
     cmds:

@@ -87,7 +87,7 @@ tasks:
       - test -f {{._CS_KEY}}
     preconditions:
       - sh: command -v cosign >/dev/null
-        msg: "cosign is not installed — brew install cosign"
+        msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/"
     cmds:
       - mkdir -p {{._CS_DIR}}
       - cmd: cd {{._CS_DIR}} && COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign generate-key-pair
@@ -152,7 +152,7 @@ tasks:
       - test '{{._CS_ON}}' = '0'
     preconditions:
       - sh: command -v cosign >/dev/null
-        msg: "cosign is not installed — brew install cosign"
+        msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/"
       - sh: test -f {{._CS_PUB}}
         msg: "{{._CS_PUB}} not found — nothing to verify against (run `task cosign:keygen`)"
       - sh: test -n '{{._CS_VERSION}}'
@@ -178,7 +178,7 @@ tasks:
       - sh: test -n '{{._CS_VERSION}}'
         msg: "no version resolved — include the shared `release` module under the name `release` beside this one"
       - sh: command -v cosign >/dev/null
-        msg: "cosign is not installed — brew install cosign (or set COSIGN_SIGN=0)"
+        msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/ (or set COSIGN_SIGN=0)"
       - sh: test -f {{._CS_KEY}}
         msg: "{{._CS_KEY}} not found — run `task cosign:keygen`, or set COSIGN_SIGN=0 to publish unsigned"
     cmds:
@@ -196,9 +196,9 @@ tasks:
       - sh: test -n '{{._CS_VERSION}}'
         msg: "no version resolved — include the shared `release` module under the name `release` beside this one"
       - sh: command -v syft >/dev/null
-        msg: "syft is not installed — brew install syft (or set COSIGN_SIGN=0)"
+        msg: "syft is not installed — https://github.com/anchore/syft#installation (or set COSIGN_SIGN=0)"
       - sh: command -v cosign >/dev/null
-        msg: "cosign is not installed — brew install cosign (or set COSIGN_SIGN=0)"
+        msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/ (or set COSIGN_SIGN=0)"
       - sh: test -f {{._CS_KEY}}
         msg: "{{._CS_KEY}} not found — run `task cosign:keygen`, or set COSIGN_SIGN=0"
     cmds:

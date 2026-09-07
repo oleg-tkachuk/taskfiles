@@ -219,7 +219,7 @@ tasks:
           # one only means this component publishes a chart around an upstream
           # image, which is a supported shape.
           if [ -f '{{._REL_DOCKERFILE}}' ]; then
-            command -v docker >/dev/null 2>&1 || bad "docker is not installed"
+            command -v docker >/dev/null 2>&1 || bad "docker is not installed — https://docs.docker.com/get-started/get-docker/"
             [ -d '{{._REL_CONTEXT}}' ] || bad "DOCKER_CONTEXT {{._REL_CONTEXT}} is not a directory"
             say '{{._REL_OK}}' "image {{._REL_IMAGE}} from {{._REL_DOCKERFILE}} (context {{._REL_CONTEXT}})"
 
@@ -307,7 +307,7 @@ tasks:
       - docker image inspect {{._REL_IMAGE}}:{{._REL_VERSION}} >/dev/null 2>&1
     preconditions:
       - sh: command -v docker >/dev/null
-        msg: "docker is not installed"
+        msg: "docker is not installed — https://docs.docker.com/get-started/get-docker/"
       - sh: test -f {{._REL_DOCKERFILE}}
         msg: |-
           {{._REL_DOCKERFILE}} not found.
@@ -365,7 +365,7 @@ tasks:
     desc: "helm lint the chart"
     preconditions:
       - sh: command -v helm >/dev/null
-        msg: "helm is not installed"
+        msg: "helm is not installed — https://helm.sh/docs/intro/install/"
       - sh: test -f {{._REL_CHART_DIR}}/Chart.yaml
         msg: "{{._REL_CHART_DIR}}/Chart.yaml not found — set CHART_DIR"
     cmds:
@@ -407,7 +407,7 @@ tasks:
     internal: true
     preconditions:
       - sh: command -v helm >/dev/null
-        msg: "helm is not installed"
+        msg: "helm is not installed — https://helm.sh/docs/intro/install/"
     cmds:
       - mkdir -p {{dir ._REL_RENDER}}
       - helm template {{._REL_SVC}} {{._REL_CHART_DIR}} --namespace {{._REL_K8S_NS}} > {{._REL_RENDER}}

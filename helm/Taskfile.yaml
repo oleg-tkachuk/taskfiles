@@ -39,7 +39,7 @@ tasks:
     desc: "Show every Helm release on the cluster"
     preconditions:
       - sh: command -v helm >/dev/null
-        msg: "helm is not installed — brew install helm"
+        msg: "helm is not installed — https://helm.sh/docs/intro/install/"
     status:
       - "! kubectl{{._HELM_CTX}} version --request-timeout=3s >/dev/null 2>&1"
     cmds:
@@ -57,7 +57,7 @@ tasks:
       vars: [CONFIRM]
     preconditions:
       - sh: command -v helm >/dev/null
-        msg: "helm is not installed — brew install helm"
+        msg: "helm is not installed — https://helm.sh/docs/intro/install/"
       - sh: >-
           ctx="$(kubectl{{._HELM_KCTX}} config current-context 2>/dev/null)";
           test -n "$ctx" && test {{.CONFIRM | q}} = "$ctx"

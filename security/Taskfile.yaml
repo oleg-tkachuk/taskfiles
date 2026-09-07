@@ -92,7 +92,7 @@ tasks:
     # gate that can actually stay green. Full audit: golangci-lint run ./...
     preconditions:
       - sh: 'has=0; for d in {{._SEC_MODULES}}; do if [ -f "$d/go.mod" ]; then has=1; fi; done; [ "$has" = 0 ] || command -v golangci-lint >/dev/null'
-        msg: "golangci-lint is not installed — brew install golangci-lint"
+        msg: "golangci-lint is not installed — https://golangci-lint.run/docs/welcome/install/"
     cmds:
       - for: { var: _SEC_MODULES }
         task: _in-module
@@ -105,7 +105,7 @@ tasks:
     desc: "gitleaks — committed credentials anywhere in the history"
     preconditions:
       - sh: command -v gitleaks >/dev/null
-        msg: "gitleaks is not installed — brew install gitleaks"
+        msg: "gitleaks is not installed — https://github.com/gitleaks/gitleaks#installing"
     cmds:
       - echo "{{._SEC_RUN}} sec · gitleaks"
       # A repository with accepted historical findings passes a baseline; without
@@ -118,7 +118,7 @@ tasks:
     desc: "trivy — vulnerable dependencies and secrets (blocking) plus IaC misconfig (report-only)"
     preconditions:
       - sh: command -v trivy >/dev/null
-        msg: "trivy is not installed — brew install trivy"
+        msg: "trivy is not installed — https://github.com/aquasecurity/trivy#installation"
     cmds:
       - echo "{{._SEC_RUN}} sec · trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_TARGET}}"
       - trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_SCAN}} --exit-code 1 --quiet {{._SEC_TRIVY_FLAGS}} {{._SEC_TRIVY_TARGET}}
@@ -131,7 +131,7 @@ tasks:
     desc: "buf breaking — refuse incompatible proto changes against {{._SEC_BASE}}"
     preconditions:
       - sh: command -v buf >/dev/null
-        msg: "buf is not installed — brew install bufbuild/buf/buf"
+        msg: "buf is not installed — https://buf.build/docs/installation/"
     cmds:
       - echo "{{._SEC_RUN}} sec · buf breaking vs {{._SEC_BASE}}"
       - buf breaking --against '.git#branch={{._SEC_BASE}}' {{._SEC_BUF_FLAGS}}

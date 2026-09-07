@@ -37,7 +37,7 @@ tasks:
       CLAIMS: '{{.JWT_CLAIMS | default "{}"}}'
     preconditions:
       - sh: command -v step >/dev/null
-        msg: "the smallstep CLI is not installed — brew install step"
+        msg: "the smallstep CLI is not installed — https://smallstep.com/docs/step-cli/installation/"
     cmds:
       # The key goes in through a process substitution rather than an argument,
       # so it never lands in the process table.

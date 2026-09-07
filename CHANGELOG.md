@@ -16,6 +16,23 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [3.2.2] — 2026-09-07
+
+### Changed
+
+- Every "tool is not installed" message now points at that tool's own
+  installation page instead of naming a Homebrew formula. `brew install trivy`
+  is useless on Debian, Arch or Alpine, and the upstream page is the only
+  place that stays right for all of them. The `poetry` and `uv` messages
+  already did this; the rest now match.
+
+  `gosec` and `govulncheck` keep `go install …@latest`: they are Go programs,
+  that is the upstream instruction, and it is identical on every platform.
+
+  Each of the twenty links was checked for a 200 before being written down —
+  trivy's documentation site has moved and its old path 404s, so that one
+  points at the repository's install section.
+
 ## [3.2.1] — 2026-09-07
 
 ### Fixed
@@ -574,6 +591,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[3.2.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.2
 [3.2.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.1
 [3.2.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.0
 [3.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.1.0

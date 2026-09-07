@@ -41,7 +41,7 @@ tasks:
     desc: "Fail early when the kind cluster is not there"
     preconditions:
       - sh: command -v kind >/dev/null
-        msg: "kind is not installed — brew install kind"
+        msg: "kind is not installed — https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
       - sh: kind get clusters 2>/dev/null | grep -q .
         msg: "no kind cluster exists — `kind create cluster`"
     cmds:
