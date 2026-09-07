@@ -19,9 +19,6 @@ workspace — tasks then read `sec:<task>`.
 |---|---|
 | `all` | Run every scan: vulnerabilities, lint, secrets, filesystem, proto compatibility |
 | `lint` | golangci-lint across every Go module, limited to issues new since main |
-| `checkov` | Policy-scan manifests, charts, Dockerfiles and workflows against the baseline |
-| `checkov:all` | Every finding, baselined ones included — a triage view |
-| `checkov:baseline` | Regenerate the checkov baseline |
 | `gosec` | gosec — insecure patterns the compiler is happy with |
 | `secrets` | gitleaks — committed credentials anywhere in the history |
 | `trivy` | trivy — vulnerable dependencies and secrets (blocking) plus IaC misconfig (report-only) |
@@ -34,9 +31,6 @@ workspace — tasks then read `sec:<task>`.
 |---|---|---|
 | `GO_MODULES` | `.` | whitespace-separated module directories for the Go scans |
 | `GITLEAKS_BASELINE` | — | findings accepted as known, so the gate reports only new ones |
-| `CHECKOV_CONFIG` | `.checkov.yaml` | |
-| `CHECKOV_BASELINE` | `.checkov.baseline` | |
-| `CHECKOV_FRAMEWORKS` | `github_actions dockerfile helm kubernetes` | frameworks the triage view walks |
 | `GOSEC_FLAGS` | — | extra gosec flags |
 | `BASE` | `main` | branch the new-findings and breaking gates compare against |
 
@@ -70,6 +64,10 @@ that can actually stay green. The full audit is still one command away:
 Misconfiguration findings are dense and noisy, and blocking on them would stop
 every release for a Kubernetes default. Vulnerabilities and secrets block;
 misconfiguration reports.
+
+Infrastructure policy scanning lives in [`checkov`](../checkov/README.md): it
+asks a different question of a different tree, and a repository usually has one
+or the other.
 
 ---
 

@@ -1,0 +1,83 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# checkov — policy scanning for infrastructure: manifests, charts, Dockerfiles
+# and workflows.
+#
+#   includes:
+#     checkov: { taskfile: '{{.TASKLIB}}checkov{{.TASKLIB_REF}}', dir: . }
+#
+# Separate from `security` because it asks a different question of a different
+# tree. `security` scans a repository's code and the artifacts built from it —
+# every task there wants Go modules or a git history. This one wants YAML a
+# cluster will apply. A repository usually has one or the other, and a module
+# should not fill a consumer's task list with work it has nothing to run
+# against.
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+#   CHECKOV_CONFIG      default .checkov.yaml
+#   CHECKOV_BASELINE    default .checkov.baseline
+#   CHECKOV_FRAMEWORKS  frameworks the triage view walks
+#                       (default: github_actions dockerfile helm kubernetes)
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+vars:
+  _CKV_CFG: '{{.CHECKOV_CONFIG | default ".checkov.yaml"}}'
+  _CKV_BASE: '{{.CHECKOV_BASELINE | default ".checkov.baseline"}}'
+  _CKV_FW: '{{.CHECKOV_FRAMEWORKS | default "github_actions dockerfile helm kubernetes"}}'
+
+tasks:
+
+  scan:
+    desc: "Policy-scan manifests, charts, Dockerfiles and workflows against the baseline"
+    preconditions:
+      - sh: command -v checkov >/dev/null
+        msg: "checkov is not installed — pipx install checkov"
+      - sh: test -f {{._CKV_CFG}}
+        msg: "{{._CKV_CFG}} not found — set CHECKOV_CONFIG"
+      # The config names the baseline, so a missing baseline is not "no findings
+      # accepted yet" — it is checkov reading a file that is not there.
+      - sh: test -f {{._CKV_BASE}}
+        msg: "{{._CKV_BASE}} not found, and the config references it — create it with checkov:baseline"
+    cmds:
+      - checkov --config-file {{._CKV_CFG}}
+      - echo "✔ checkov · no findings outside the baseline"
+
+  all:
+    desc: "Every checkov finding, baselined ones included — a triage view, never a gate"
+    preconditions:
+      - sh: command -v checkov >/dev/null
+        msg: "checkov is not installed — pipx install checkov"
+    # Deliberately ignores the baseline and the config: this is the view for
+    # deciding what to fix next, not a pass/fail check.
+    cmds:
+      - >-
+        checkov -d . --compact
+        {{range $f := splitList " " ._CKV_FW}}--framework {{$f}} {{end}}
+
+  baseline:
+    desc: "Regenerate the checkov baseline — only after deliberately fixing findings"
+    preconditions:
+      - sh: command -v checkov >/dev/null
+        msg: "checkov is not installed — pipx install checkov"
+    prompt: |
+      Regenerating the baseline accepts every CURRENT finding as permitted,
+      including any regression introduced since the last run. Do this after
+      fixing findings, never to make a red build green. Continue?
+    cmds:
+      # Counted before and after, because the failure mode is silent: a baseline
+      # regenerated to clear one fixed finding also swallows anything that broke
+      # since, and the run that does it looks exactly like the run that does not.
+      - cmd: |-
+          count() {
+            python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(sum(len(fi.get('check_ids',[])) for f in d['failed_checks'] for fi in f.get('findings',[])))" "$1" 2>/dev/null || echo 0
+          }
+          before=$(count '{{._CKV_BASE}}')
+          checkov --config-file '{{._CKV_CFG}}' --create-baseline >/dev/null 2>&1 || true
+          after=$(count '{{._CKV_BASE}}')
+          echo "▸ checkov · baselined findings: ${before} → ${after}"
+          if [ "${after}" -gt "${before}" ]; then
+            echo "⚠ checkov · the baseline GREW — something new was accepted rather than fixed" >&2
+          fi
