@@ -50,11 +50,11 @@ tasks:
     cmds:
       - mkdir -p {{dir .output}}
       - >-
-        {{._SS_KUBECTL}} create secret generic '{{.name}}'
-        --namespace '{{.namespace}}'
-        --from-literal='{{.key}}={{.value}}'
+        {{._SS_KUBECTL}} create secret generic {{.name | q}}
+        --namespace {{.namespace | q}}
+        --from-literal={{ printf "%s=%s" .key .value | q }}
         --dry-run=client -o yaml
-        | {{._SS_SEAL}} > '{{.output}}'
+        | {{._SS_SEAL}} > {{.output | q}}
       - echo "✔ sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
 
   seal:file:
@@ -64,16 +64,16 @@ tasks:
     preconditions:
       - sh: command -v kubeseal >/dev/null
         msg: "kubeseal is not installed — brew install kubeseal"
-      - sh: test -f '{{.file}}'
+      - sh: test -f {{.file | q}}
         msg: "{{.file}} not found"
     cmds:
       - mkdir -p {{dir .output}}
       - >-
-        {{._SS_KUBECTL}} create secret generic '{{.name}}'
-        --namespace '{{.namespace}}'
-        --from-env-file='{{.file}}'
+        {{._SS_KUBECTL}} create secret generic {{.name | q}}
+        --namespace {{.namespace | q}}
+        --from-env-file={{.file | q}}
         --dry-run=client -o yaml
-        | {{._SS_SEAL}} > '{{.output}}'
+        | {{._SS_SEAL}} > {{.output | q}}
       - echo "✔ sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
 
   pubkey:

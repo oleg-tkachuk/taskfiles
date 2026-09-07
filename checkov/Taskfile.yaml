@@ -78,9 +78,9 @@ tasks:
           count() {
             python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(sum(len(fi.get('check_ids',[])) for f in d['failed_checks'] for fi in f.get('findings',[])))" "$1" 2>/dev/null || echo 0
           }
-          before=$(count '{{._CKV_BASE}}')
-          checkov --config-file '{{._CKV_CFG}}' {{._CKV_FLAGS}} --create-baseline >/dev/null 2>&1 || true
-          after=$(count '{{._CKV_BASE}}')
+          before=$(count {{._CKV_BASE | q}})
+          checkov --config-file {{._CKV_CFG | q}} {{._CKV_FLAGS}} --create-baseline >/dev/null 2>&1 || true
+          after=$(count {{._CKV_BASE | q}})
           echo "▸ checkov · baselined findings: ${before} → ${after}"
           if [ "${after}" -gt "${before}" ]; then
             echo "⚠ checkov · the baseline GREW — something new was accepted rather than fixed" >&2

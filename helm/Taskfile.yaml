@@ -56,7 +56,7 @@ tasks:
         msg: "helm is not installed — brew install helm"
       - sh: >-
           ctx="$(kubectl{{._HELM_KCTX}} config current-context 2>/dev/null)";
-          test -n "$ctx" && test '{{.CONFIRM}}' = "$ctx"
+          test -n "$ctx" && test {{.CONFIRM | q}} = "$ctx"
         msg: |-
           CONFIRM does not name the context this would empty.
           Re-run with CONFIRM=<the context you mean>, after checking

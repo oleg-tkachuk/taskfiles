@@ -42,9 +42,9 @@ tasks:
       # The key goes in through a process substitution rather than an argument,
       # so it never lands in the process table.
       - >-
-        printf '%s' '{{.CLAIMS}}' |
-        step crypto jwt sign --alg '{{.ALG}}'
-        --key <(printf '%s' '{{.SECRET}}')
-        --iss '{{.ISS}}' --aud '{{.AUD}}' --sub '{{.SUB}}'
+        printf '%s' {{.CLAIMS | q}} |
+        step crypto jwt sign --alg {{.ALG | q}}
+        --key <(printf '%s' {{.SECRET | q}})
+        --iss {{.ISS | q}} --aud {{.AUD | q}} --sub {{.SUB | q}}
         --exp $(($(date +%s) + {{.TTL}}))
         --subtle

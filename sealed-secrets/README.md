@@ -55,6 +55,12 @@ shell history. That is a fair trade for a one-off dev credential and a poor one
 for anything that matters. `seal:file` reads from disk instead; prefer it when
 the value is real.
 
+The value is passed as a single shell-quoted argument, so a quote or a
+semicolon in it is data. Before v2.1.2 it was interpolated between hand-written
+quotes, and a value containing `'` closed them: the remainder of the value ran
+as commands, and the `--dry-run=client` that keeps the plaintext off the cluster
+was cut off with them.
+
 `pubkey` prints a public key. Committing it lets a colleague seal a value for
 this cluster without having access to it — it can encrypt and cannot decrypt.
 
