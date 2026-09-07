@@ -16,6 +16,14 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [3.3.1] — 2026-09-07
+
+### Fixed
+
+- The `IMAGE_LATEST` push and its log line carried the same condition on two
+  separate commands. Editing one would have left the other behind, printing
+  "pushed latest" with nothing pushed. One guarded block now.
+
 ## [3.3.0] — 2026-09-07
 
 ### Added
@@ -620,6 +628,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[3.3.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.3.1
 [3.3.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.3.0
 [3.2.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.2
 [3.2.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.1

@@ -348,10 +348,12 @@ tasks:
       # resolved to yesterday is gone — and because the charts here read their
       # tag from appVersion, so nothing in this library needs it. Repositories
       # whose consumers pull by name still do.
-      - cmd: docker tag {{._REL_IMAGE}}:{{._REL_VERSION}} {{._REL_IMAGE}}:latest && docker push {{._REL_IMAGE}}:latest
-        if: '{{ne ._REL_LATEST "0"}}'
-      - cmd: echo "{{._REL_OK}} {{._REL_SVC}} · image · pushed latest → {{._REL_VERSION}}"
-        if: '{{ne ._REL_LATEST "0"}}'
+      - if: '{{ne ._REL_LATEST "0"}}'
+        cmd: |-
+          set -eu
+          docker tag {{._REL_IMAGE}}:{{._REL_VERSION}} {{._REL_IMAGE}}:latest
+          docker push {{._REL_IMAGE}}:latest
+          echo "{{._REL_OK}} {{._REL_SVC}} · image · pushed latest → {{._REL_VERSION}}"
 
   image:gc:
     desc: "Trim the BuildKit cache to the keep floor and drop dangling images"
