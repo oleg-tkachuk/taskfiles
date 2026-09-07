@@ -15,6 +15,7 @@ includes:
 | `seal` | Seal one key/value into a SealedSecret manifest |
 | `seal:file` | Seal every key in an env file into one SealedSecret manifest |
 | `seal:literals` | Seal several key/value pairs into one manifest — `literals="k1=v1 k2=v2"` |
+| `seal:merge` | Rotate one key inside an existing manifest, leaving the others |
 | `pubkey` | Print the controller's public certificate |
 
 ## Inputs

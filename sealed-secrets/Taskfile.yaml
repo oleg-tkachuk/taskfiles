@@ -101,6 +101,27 @@ tasks:
             | {{._SS_SEAL}} > {{.output | q}}
       - echo "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
 
+  seal:merge:
+    desc: "Seal one key and merge it into an existing SealedSecret, leaving the rest"
+    requires:
+      vars: [namespace, name, key, value, output]
+    preconditions:
+      - sh: command -v kubeseal >/dev/null
+        msg: "kubeseal is not installed — https://github.com/bitnami-labs/sealed-secrets#installation"
+      - sh: test -f {{.output | q}}
+        msg: "{{.output}} does not exist — seal the whole manifest first, then merge into it"
+    # Rotating one credential in a manifest that holds several: --merge-into
+    # rewrites that key's ciphertext and leaves every other key, and the file's
+    # structure, as they were. The plaintext only ever reaches kubeseal's stdin.
+    cmds:
+      - >-
+        {{._SS_KUBECTL}} create secret generic {{.name | q}}
+        --namespace {{.namespace | q}}
+        --from-literal={{ printf "%s=%s" .key .value | q }}
+        --dry-run=client -o yaml
+        | {{._SS_SEAL}} --merge-into {{.output | q}}
+      - echo "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} · {{.key}} merged → {{.output}}"
+
   pubkey:
     desc: "Print the controller's public certificate, for sealing without a cluster"
     preconditions:

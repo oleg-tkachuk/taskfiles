@@ -16,6 +16,16 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [3.4.0] — 2026-09-07
+
+### Added
+
+- `sealed-secrets:seal:merge` — seal one key and merge it into an existing
+  manifest with `kubeseal --merge-into`, leaving the other keys and the file's
+  structure untouched. Rotating one credential no longer means rewriting the
+  whole SealedSecret, which is what kept one repository on its own kubeseal
+  call.
+
 ## [3.3.1] — 2026-09-07
 
 ### Fixed
@@ -628,6 +638,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[3.4.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.4.0
 [3.3.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.3.1
 [3.3.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.3.0
 [3.2.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.2
