@@ -62,6 +62,10 @@ there: no `{{if}}`, and no variable whose value is itself a template. The query
 has to be literal somewhere, and once in a variable beats once per include
 line.
 
+`task surface` prints every module's tasks from this checkout, which is the one
+view a consumer cannot get: `task --list-all` there shows what that repository
+included, not what the library offers.
+
 Only the YAML is fetched. Sibling scripts in this repo are **not** downloaded,
 which is why every module is self-contained and expresses its logic in Task's
 own primitives rather than shelling out to a helper.
