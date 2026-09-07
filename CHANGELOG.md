@@ -16,6 +16,33 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [3.2.1] — 2026-09-07
+
+### Fixed
+
+- **`security:all` was unusable on a repository that ships no Go.** It died on
+  the first scan — `govulncheck: no go.mod file` — and never reached `secrets`
+  or `trivy`, the two scans that repository actually needed.
+
+  A directory in `GO_MODULES` without a `go.mod` is now skipped, and says so:
+
+  ```
+  ○ sec · govulncheck · . is not a Go module — skipped
+  ```
+
+  The rule is: skip when there is nothing to scan, fail when there is something
+  to scan and the tool is missing. A Python repository no longer needs
+  govulncheck installed; a Go repository that lacks it still stops with an
+  install hint. The skip is printed rather than done with `status:`, which is
+  silent — a typo in `GO_MODULES` must be visible.
+
+### Changed
+
+- `security:all` runs `secrets` and `trivy` before the Go scans, so the checks
+  that apply to every repository have already run whatever the rest finds.
+- `gosec` goes through the same internal helper as `vuln` and `lint` instead of
+  doing its own `cd`, which is what let one change cover all three.
+
 ## [3.2.0] — 2026-09-07
 
 ### Changed
@@ -547,6 +574,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[3.2.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.1
 [3.2.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.0
 [3.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.1.0
 [3.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.0.0

@@ -29,7 +29,7 @@ workspace — tasks then read `sec:<task>`.
 
 | Var | Default | Meaning |
 |---|---|---|
-| `GO_MODULES` | `.` | whitespace-separated module directories for the Go scans |
+| `GO_MODULES` | `.` | whitespace-separated module directories for the Go scans; one without a `go.mod` is skipped, not failed |
 | `GOVULNCHECK_FLAGS` | — | extra govulncheck flags |
 | `GOLANGCI_FLAGS` | — | extra golangci-lint flags |
 | `GITLEAKS_FLAGS` | — | extra gitleaks flags |
@@ -64,6 +64,30 @@ $ task security:all           # vuln · lint · secrets · gosec · trivy
 $ task security:secrets       # gitleaks over the whole history
 $ task security:proto:breaking
 ```
+
+## A repository with no Go still gets scanned
+
+Three of the five scans read Go — `vuln`, `lint` and `gosec` — and two apply to
+anything: `secrets` and `trivy`. `all` runs the agnostic pair first, then the
+Go ones, and a directory in `GO_MODULES` without a `go.mod` is skipped with a
+line saying so:
+
+```
+◉ sec · gitleaks
+✔ sec · no secrets in history
+◉ sec · trivy fs .
+✔ sec · trivy clean
+○ sec · govulncheck · . is not a Go module — skipped
+○ sec · golangci-lint · . is not a Go module — skipped
+○ sec · gosec · . is not a Go module — skipped
+```
+
+The rule is: **skip when there is nothing to scan, fail when there is
+something to scan and the tool is missing.** So a Python repository does not
+need govulncheck installed, while a Go repository that lacks it stops with an
+install hint rather than passing quietly. The skip is printed rather than done
+with `status:`, which is silent — a typo in `GO_MODULES` has to be visible, or
+the scan it disables is one nobody notices is gone.
 
 ## Why lint is new-findings-only
 
