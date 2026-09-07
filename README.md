@@ -12,6 +12,10 @@ instead of copied into every repository.
 Requires [Task](https://taskfile.dev/docs/installation) **3.53+** — remote
 Taskfiles are stable from that version, with no experiment flag to set.
 
+See [demo/](demo/README.md) for a working example — one small Go service
+taken from `go test` to a signed, running deployment using six of these
+modules, walkthrough included.
+
 - [Using it](#using-it)
   - [Working on the library itself](#working-on-the-library-itself)
     - [Workflows are audited](#workflows-are-audited)
