@@ -19,7 +19,7 @@ silent: true
 
 vars:
   TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//'
-  TASKLIB_REF: '?ref=v1.1.2'
+  TASKLIB_REF: '?ref=v1.2.0'
   PROJECT_NAME: billing-api
   IMAGE_NAMESPACE: acme
   K8S_NAMESPACE: acme
@@ -37,15 +37,6 @@ tasks:
 
 `dir: .` is required on every include — it pins the module's commands to the
 including component's directory.
-
-Task fetches the modules over git and caches them under `.task/remote/`, asking
-for confirmation the first time; in CI pass `--yes` or
-`--trusted-hosts github.com`. A private repository needs git to be able to
-reach it — `gh auth setup-git`, or an `insteadOf` rewrite carrying a token:
-
-```bash
-git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-```
 
 **Pin a tag.** Not a branch, or your build changes when someone else commits —
 and never a commit SHA: Task clones with `--depth 1`, and git refuses a bare

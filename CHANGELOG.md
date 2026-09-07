@@ -16,6 +16,42 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [1.2.0] — 2026-09-07
+
+### Added
+
+- `codegen` — mocks, protobuf stubs, `go generate` and sqlc bindings,
+  regenerated in the one order that works, plus the drift gates that refuse a
+  tree where the committed output no longer matches its source. Two projects
+  had written the same task independently; what differed was paths, and those
+  are now inputs.
+
+  Three of its choices are not obvious and each one cost a debugging session
+  before it was written down: `GOWORK=off` throughout, because generators run
+  `go` with `-mod=mod` and the toolchain refuses that under a workspace;
+  protoc plugins installed from the module rather than taken from `PATH`,
+  because `buf` resolves them through `PATH` and whichever patch release was
+  installed globally then decided the committed bytes; and `goimports` over
+  the generated directories, because a commit hook usually runs it too and
+  disagrees with the generators about import grouping — without it the drift
+  gate reports files stale on a tree that was just generated.
+
+  The two gates differ deliberately. `mocks:check` reads `git status`, because
+  a new interface produces a new file that a diff-only check would call clean;
+  `sqlc:check` reads `git diff`, because sqlc rewrites files that already
+  exist.
+
+### Changed
+
+- The quickstart no longer explains git authentication for a private
+  repository, which this one is not.
+
+### Internal
+
+- The module list the parse gate walks is discovered from the filesystem
+  rather than hand-maintained. It was a literal string, so a new module
+  escaped that gate until someone remembered to edit it.
+
 ## [1.1.2] — 2026-09-07
 
 Documentation, with one user-visible string. Nothing a consumer includes
@@ -162,6 +198,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[1.2.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.2.0
 [1.1.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.2
 [1.1.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.1
 [1.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.0
