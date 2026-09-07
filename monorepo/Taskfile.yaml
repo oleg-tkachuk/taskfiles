@@ -73,10 +73,17 @@ tasks:
   registry:check:
     desc: "Fail fast when {{._MONO_REG}} is not reachable"
     # A misconfigured registry should cost seconds, not a half-finished push
-    # chain. 200/401/403 all mean the registry answered.
+    # chain. 200/401/403 all mean the registry answered — the same three codes
+    # release:doctor accepts, so the two do not disagree about what "reachable"
+    # means for the same kind of endpoint. --max-time bounds it for the same
+    # reason: this runs before a fan-out across every component, and an
+    # unreachable host must cost seconds, not a hang.
     preconditions:
       - sh: >-
-          test "$(curl -sk -o /dev/null -w '%{http_code}' https://{{._MONO_REG}}/v2/ || echo 000)" != "000"
+          case "$(curl -sk --max-time 10 -o /dev/null -w '%{http_code}'
+          https://{{._MONO_REG}}/v2/ 2>/dev/null || echo 000)" in
+            200|401|403) true ;; *) false ;;
+          esac
         msg: |-
           {{._MONO_REG}} is not answering on :443.
           Bring the OCI registry up, or point the run somewhere else with
