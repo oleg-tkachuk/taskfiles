@@ -15,8 +15,12 @@ vars:
   # talks to a cluster and `k8s` never publishes anything, so a repository that
   # only does one of the two includes only one of them.
   # Modules with their own README. The runtime/* family shares one README, so
-  # it is checked separately.
-  MODULES: "release k8s go python uv node compose monorepo security cosign argocd auth"
+  # it is checked separately — hence the top-level glob rather than PARSE_MODULES.
+  # Discovered for the same reason PARSE_MODULES is: the hand-written list had
+  # gone four modules stale (checkov, codegen, helm, sealed-secrets), and a
+  # module missing from it walked past the README gate rather than failing it.
+  MODULES:
+    sh: ls -d */Taskfile.yaml 2>/dev/null | sed "s|/Taskfile.yaml||" | sort | tr "\n" " "
   # Everything that must parse, the runtime variants included.
   # Discovered, not listed: a hand-maintained list is one a new module can be
   # left out of, and a module outside it escapes the parse gate in silence.
