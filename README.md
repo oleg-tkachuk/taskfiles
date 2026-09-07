@@ -81,6 +81,7 @@ own primitives rather than shelling out to a helper.
 |---|---|---|
 | [`release/`](release/README.md) | `release` | version derivation, image build/push, chart lint/render/package/push, `deploy` |
 | [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward |
+| [`codegen/`](codegen/README.md) | `codegen` | mocks, protobuf stubs, `go generate`, sqlc — and the drift gates for them |
 | [`go/`](go/README.md) | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, dep bumps |
 | [`python/`](python/README.md) | `python` | poetry install/test/lint/format/typecheck/lock, dep bumps |
 | [`uv/`](uv/README.md) | `uv` | the same surface for uv-managed projects — swap the include line |

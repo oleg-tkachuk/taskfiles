@@ -18,8 +18,10 @@ vars:
   # it is checked separately.
   MODULES: "release k8s go python uv node compose monorepo security cosign argocd auth"
   # Everything that must parse, the runtime variants included.
-  PARSE_MODULES: "release k8s go python uv node compose monorepo security cosign argocd auth
-    runtime/docker runtime/orbstack runtime/minikube runtime/kind runtime/k3d"
+  # Discovered, not listed: a hand-maintained list is one a new module can be
+  # left out of, and a module outside it escapes the parse gate in silence.
+  PARSE_MODULES:
+    sh: ls -d */Taskfile.yaml */*/Taskfile.yaml 2>/dev/null | sed "s|/Taskfile.yaml||" | sort | tr "\n" " "
   # Every YAML the modules are made of, for the file-level checks.
   MODULE_FILES:
     sh: ls */Taskfile.yaml */*/Taskfile.yaml 2>/dev/null | sort -u | tr '\n' ' '
