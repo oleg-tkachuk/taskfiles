@@ -16,6 +16,24 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [1.3.1] — 2026-09-07
+
+Documentation only. No module changed, so a consumer moving the ref from
+`v1.3.0` has nothing to do.
+
+### Changed
+
+- Conventions now says when a module's values are decided: its `vars:` are
+  evaluated once as the include loads, so a `vars:` block on a `task:`
+  reference never reaches them. That is the rule behind the shape of the whole
+  library — a module is configured per include, which is why each is scoped to
+  one component and why a repository aiming the same module at several targets
+  includes it several times.
+
+  The self-referencing `X: '{{.X | default "…"}}'` form gets its sentence too:
+  a var reading a different name is fixed at whatever that name held, while one
+  reading its own sees a value given on the command line.
+
 ## [1.3.0] — 2026-09-07
 
 Additive throughout: nothing that existed changed behaviour, so moving the ref
@@ -247,6 +265,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[1.3.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.3.1
 [1.3.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.3.0
 [1.2.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.2.0
 [1.1.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.2
