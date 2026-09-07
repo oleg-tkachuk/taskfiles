@@ -14,6 +14,10 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.2.0] — 2026-09-07
+
 ### Changed
 
 - Status markers are now `◉` starting work, `✔` done, `○` nothing to do, `▲`
@@ -446,6 +450,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[2.2.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.2.0
 [2.1.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.1.2
 [2.1.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.1.1
 [2.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v2.1.0
