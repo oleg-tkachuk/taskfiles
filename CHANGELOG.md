@@ -16,6 +16,55 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [1.3.0] — 2026-09-07
+
+Additive throughout: nothing that existed changed behaviour, so moving the ref
+from `v1.2.0` costs nothing.
+
+### Added
+
+- `helm` — `list` answers which releases are on a cluster, which nothing here
+  answered before (`argocd:list` shows Argo applications, a different set), and
+  `uninstall-all` empties it. Both are cluster-wide, which is why they are not
+  in `k8s`: that module acts on one component's deployment and every component
+  includes it, so a task that empties the cluster does not belong in each of
+  their lists.
+
+  `uninstall-all` carries two locks. `CONFIRM` must name the context being
+  emptied — a prompt guards against not meaning it and does nothing about
+  meaning it on the wrong cluster — and the releases are printed before the
+  prompt asks, so the question is answered with the list in view.
+
+- `sealed-secrets` — seal a value or an env file into a manifest that is safe to
+  commit, and fetch the controller's public key. Both sealing tasks build the
+  Secret locally with `--dry-run=client`, so the plaintext never leaves the
+  machine. `seal` puts the value in the argument list; the README says so
+  rather than leaving it to be discovered.
+
+- `security` gains `checkov`, `checkov:all` and `checkov:baseline` for
+  infrastructure policy, and `gosec` for Go. The baseline regeneration counts
+  findings before and after, because a baseline refreshed to clear one fixed
+  finding also swallows anything that broke since — and the run that does it
+  looks exactly like the run that does not.
+
+- `argocd` gains six `server:` tasks: port-forward, password, set-password,
+  restart, status and logs. `ARGOCD_SERVER` and `ARGOCD_SERVER_LABEL` are
+  separate inputs because the deployment carries the Helm release name while
+  the pods' `app.kubernetes.io/name` does not.
+
+- `go` gains `bench`. `-run='^$'` matches no test, so the run measures
+  benchmarks rather than timing the unit suite alongside them.
+
+- `auth` gains `JWT_CLAIMS`: claims beyond the registered ones, as a JSON
+  object. `step` reads the claims set from stdin and merges the registered ones
+  over it, so an application whose tokens carry roles or a tenant no longer
+  needs its own minting script.
+
+- `security` gains `GITLEAKS_BASELINE`, which it should have had already. A
+  repository with accepted historical findings had no way to say so, so the
+  scan reported the same ones every run — and a gate that always fails is a
+  gate nobody reads.
+
 ## [1.2.0] — 2026-09-07
 
 ### Added
@@ -198,6 +247,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[1.3.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.3.0
 [1.2.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.2.0
 [1.1.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.2
 [1.1.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v1.1.1
