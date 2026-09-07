@@ -86,8 +86,18 @@ tasks:
     desc: "One-time — generate the cosign key pair and a no-transparency-log signing config"
     # Refuses to overwrite: a regenerated key silently invalidates every
     # signature already published under the old one. Rotation is deliberate.
+    # The guard sits here rather than on the internal task because Task
+    # evaluates preconditions BEFORE status, so a status guard cannot skip
+    # past the internal task's own preconditions — an existing key would
+    # otherwise still demand cosign be installed just to decide there was
+    # nothing to do.
     status:
       - test -f {{._CS_KEY}}
+    cmds:
+      - task: _keygen
+
+  _keygen:
+    internal: true
     preconditions:
       - sh: command -v cosign >/dev/null
         msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/"
