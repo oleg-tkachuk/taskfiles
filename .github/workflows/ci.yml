@@ -230,10 +230,10 @@ jobs:
         run: |
           set -euo pipefail
           test ! -f generated.go
-          task codegen:go
+          task codegen:generate
           test -f generated.go
           grep -q 'const Generated = true' generated.go
-          echo "✔ codegen:go wrote the file its directive asks for"
+          echo "✔ codegen:generate wrote the file its directive asks for"
 
       - name: 'Verify: the go module compiles, tests and builds'
         working-directory: consumer
