@@ -15,8 +15,8 @@ version: "3"
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   GO_MODULES   whitespace-separated module directories for the Go scans
-#   PY_PROJECTS  whitespace-separated project directories for the Python scan
-#   DOCKERFILES  whitespace-separated Dockerfiles to lint  (default ./Dockerfile)
+#   DOCKERFILES  Dockerfiles to lint                       (default: discovered)
+#   SCAN_EXCLUDE find(1) predicates discovery skips — vendored and throwaway trees
 #   BASE         branch the new-findings and breaking gates compare against
 #   GOSEC_FLAGS        extra gosec flags
 #   GOVULNCHECK_FLAGS  extra govulncheck flags
@@ -27,9 +27,6 @@ version: "3"
 #   TRIVY_TARGET       what to scan              (default ".")
 #   TRIVY_FLAGS        extra trivy flags
 #   BUF_BREAKING_FLAGS extra buf breaking flags
-#   PIP_AUDIT_CMD      how pip-audit is reached (default "pip-audit"; a repo
-#                      without it installed can use "uvx pip-audit")
-#   PIP_AUDIT_FLAGS    extra pip-audit flags
 #   HADOLINT_FLAGS     hadolint flags (default "--failure-threshold error")
 #
 # Every tool takes a FLAGS input, appended to the invocation rather than
@@ -56,10 +53,17 @@ vars:
   _SEC_TRIVY_TARGET: '{{.TRIVY_TARGET | default "."}}'
   _SEC_TRIVY_FLAGS: '{{.TRIVY_FLAGS | default ""}}'
   _SEC_BUF_FLAGS: '{{.BUF_BREAKING_FLAGS | default ""}}'
-  _SEC_PY_PROJECTS: '{{.PY_PROJECTS | default "."}}'
-  _SEC_PIP_AUDIT: '{{.PIP_AUDIT_CMD | default "pip-audit"}}'
-  _SEC_PIP_AUDIT_FLAGS: '{{.PIP_AUDIT_FLAGS | default ""}}'
-  _SEC_DOCKERFILES: '{{.DOCKERFILES | default "./Dockerfile"}}'
+  # What discovery never looks inside. Vendored trees and throwaway agent
+  # worktrees are not this repository's code, and scanning them turns a gate
+  # into noise about somebody else's Dockerfile.
+  # The patterns carry their own quotes: this value is spliced into a shell
+  # command unquoted, and a bare */node_modules/* is a glob the shell expands
+  # to real paths before find ever sees it — find then gets a list of
+  # directories where it expected one pattern, errors, and discovery comes
+  # back empty.
+  _SEC_PRUNE: >-
+    {{.SCAN_EXCLUDE | default "-not -path \"*/node_modules/*\" -not -path \"*/.git/*\" -not -path \"*/.venv/*\" -not -path \"*/.claude/*\" -not -path \"*/vendor/*\" -not -path \"*/3rd-party-repos/*\" -not -path \"*/dist/*\" -not -path \"*/.terraform/*\""}}
+  _SEC_DOCKERFILES: '{{.DOCKERFILES | default ""}}'
   # error-level only by default. Across this workspace hadolint's out-of-the-box
   # threshold flags 113 findings in 48 Dockerfiles — 3 errors and 110 warnings
   # and notes. A gate that is red everywhere on the day it lands is one people
@@ -76,7 +80,7 @@ vars:
 tasks:
 
   all:
-    desc: "Run every scan: secrets, filesystem, Go vuln + lint + SAST, Python vuln, Dockerfiles"
+    desc: "Run every scan: secrets, filesystem, Go vuln + lint + SAST, Dockerfiles"
     # proto:breaking is deliberately not here. Every task above runs against
     # whatever the repository happens to hold, but that one needs a proto tree
     # and a base branch to compare against, so it would fail for every consumer
@@ -90,7 +94,6 @@ tasks:
       - task: vuln
       - task: lint
       - task: gosec
-      - task: pyvuln
       - task: dockerfile
 
   vuln:
@@ -176,44 +179,29 @@ tasks:
 
   # ═══ Go static analysis ═════════════════════════════════════════════════════
 
-  pyvuln:
-    desc: "pip-audit across every Python project — the govulncheck of the Python side"
-    # Same rule as the Go scans: skip a directory with nothing to scan, fail
-    # when there is something to scan and the tool is missing.
-    preconditions:
-      - sh: 'has=0; for d in {{._SEC_PY_PROJECTS}}; do if [ -f "$d/pyproject.toml" ]; then has=1; fi; done; [ "$has" = 0 ] || command -v {{._SEC_PIP_AUDIT}} >/dev/null 2>&1 || {{._SEC_PIP_AUDIT}} --version >/dev/null 2>&1'
-        msg: "pip-audit is not installed — https://pypi.org/project/pip-audit/, or set PIP_AUDIT_CMD to \"uvx pip-audit\""
-    cmds:
-      - for: { var: _SEC_PY_PROJECTS }
-        cmd: |-
-          set -eu
-          cd {{.ITEM}}
-          if [ ! -f pyproject.toml ]; then
-            echo "{{._SEC_SKIP}} sec · pip-audit · {{.ITEM}} is not a Python project — skipped"
-            exit 0
-          fi
-          echo "{{._SEC_RUN}} sec · pip-audit · {{.ITEM}}"
-          # The `.` is load-bearing: with no path pip-audit audits whatever is
-          # installed in the ambient environment, which on a machine with no
-          # venv active is nothing at all — a scan that passes by scanning
-          # nothing. Given the project directory it resolves what the project
-          # declares.
-          {{._SEC_PIP_AUDIT}} {{._SEC_PIP_AUDIT_FLAGS}} .
-          echo "{{._SEC_OK}} sec · pip-audit · {{.ITEM}} clean"
-
   dockerfile:
     desc: "hadolint over the Dockerfiles this repository ships"
-    preconditions:
-      - sh: 'has=0; for f in {{._SEC_DOCKERFILES}}; do if [ -f "$f" ]; then has=1; fi; done; [ "$has" = 0 ] || command -v hadolint >/dev/null'
-        msg: "hadolint is not installed — https://github.com/hadolint/hadolint#install"
+    vars:
+      _SEC_DF_LIST:
+        sh: |-
+          if [ -n "{{._SEC_DOCKERFILES}}" ]; then
+            printf '%s' "{{._SEC_DOCKERFILES}}"
+          else
+            find . -name "Dockerfile*" -not -name "*.dockerignore" \
+              {{._SEC_PRUNE}} 2>/dev/null | sort | tr "\n" " "
+          fi
     cmds:
-      - for: { var: _SEC_DOCKERFILES }
+      - for: { var: _SEC_DF_LIST }
         cmd: |-
           set -eu
           if [ ! -f {{.ITEM}} ]; then
             echo "{{._SEC_SKIP}} sec · hadolint · {{.ITEM}} not found — skipped"
             exit 0
           fi
+          command -v hadolint >/dev/null || {
+            echo "{{._SEC_ERR}} sec · hadolint is not installed — https://github.com/hadolint/hadolint#install" >&2
+            exit 1
+          }
           echo "{{._SEC_RUN}} sec · hadolint · {{.ITEM}}"
           hadolint {{._SEC_HADOLINT_FLAGS}} {{.ITEM}}
           echo "{{._SEC_OK}} sec · hadolint · {{.ITEM}} clean"

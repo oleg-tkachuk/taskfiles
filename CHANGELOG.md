@@ -16,6 +16,31 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [5.0.0] — 2026-09-07
+
+### Removed
+
+- **`security:pyvuln`, added in 4.1.0, is withdrawn.** It made coverage worse,
+  not better. `pip-audit` reads a project only when it declares PEP 621
+  `[project]` metadata — 4 of this workspace's 19 Python projects — and errors
+  out on the other 15, while `trivy fs`, already in `security:all`, reads
+  `poetry.lock` and `uv.lock` directly and covers all of them.
+
+  The gap it was meant to fill did not exist; it was read off a missing task
+  name rather than off what the existing scans do. `security`'s README now says
+  plainly that Python and Node dependencies are trivy's job and Go's are
+  govulncheck's.
+
+  Migration: delete any `PY_PROJECTS`, `PIP_AUDIT_CMD` or `PIP_AUDIT_FLAGS` you
+  set. Nothing replaces the task — `security:trivy` was already doing the work.
+
+### Documentation
+
+- The `Using it` example explains why `PROJECT_NAME`, `IMAGE_NAMESPACE` and
+  `K8S_NAMESPACE` sit in the consumer's own `vars:` — a var declared inside a
+  module would shadow the value it is supposed to receive — and what breaks if
+  they are dropped.
+
 ## [4.1.0] — 2026-09-07
 
 ### Added
@@ -748,6 +773,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[5.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v5.0.0
 [4.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v4.1.0
 [4.0.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v4.0.1
 [4.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v4.0.0

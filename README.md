@@ -38,7 +38,7 @@ version: "3"
 silent: true
 
 vars:
-  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v4.1.0'
+  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v5.0.0'
   PROJECT_NAME: billing-api
   IMAGE_NAMESPACE: acme
   K8S_NAMESPACE: acme
@@ -56,6 +56,14 @@ tasks:
 
 `dir: .` is required on every include — it pins the module's commands to the
 including component's directory.
+
+The three names above `includes:` are inputs, not decoration. A module never
+declares a bare input name — a var declared inside an included file *shadows*
+the including file's value of the same name — so it reads
+`{{.PROJECT_NAME | default "service"}}` instead, and the consumer sets the value
+once at file level where every include sees it. Drop them and the image
+becomes `localhost:5000/service` and `k8s:restart` rolls something in
+`default`. See [Variable scoping](#variable-scoping).
 
 **Pin a tag.** Not a branch, or your build changes when someone else commits —
 and never a commit SHA: Task clones with `--depth 1`, and git refuses a bare
@@ -325,7 +333,7 @@ you — leaves a lock in `.task/remote/`:
 Task refuses to run when the content behind that ref no longer matches it:
 
 ```
-task: Taskfile "…//go?ref=v4.1.0" not trusted by user
+task: Taskfile "…//go?ref=v5.0.0" not trusted by user
 ```
 
 That is the only thing standing between a moved tag and your build, so commit
