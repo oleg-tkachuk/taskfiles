@@ -47,6 +47,7 @@ workspace — tasks then read `release:<task>`.
 | `DOCKERFILE` | `./Dockerfile` | resolved from the component directory, **not** from `DOCKER_CONTEXT` |
 | `DOCKER_CONTEXT` | `.` | build context, when it is not the component directory |
 | `DOCKER_BUILD_FLAGS` | — | verbatim extra buildx flags |
+| `IMAGE_LATEST` | `0` | set to `1` to push a floating `:latest` beside the version tag |
 | `CHART_DIR` | `./deploy/chart` | the chart every chart task reads |
 | `CHART_APP_VERSION` | derived version | pin it when the image is upstream's |
 | `CHART_MIN_RESOURCES` | `1` | render-gate floor |
@@ -185,5 +186,17 @@ It checks the mistakes that have actually happened here:
   tools.
 
 ---
+
+
+## `:latest` is off by default
+
+Nothing here needs it. Charts read their tag from the chart's `appVersion`,
+which `deploy` stamps with the version it tagged the image with, so a
+deployment always names an exact build. A floating `:latest` breaks that: what
+it resolved to yesterday is gone, and a rollback has nothing to roll back to.
+
+`IMAGE_LATEST: '1'` turns it on for the repositories that genuinely need it —
+where something outside this pipeline pulls the image by name. The version tag
+is still pushed first, and `:latest` is a second tag on the same digest.
 
 Part of [taskfiles](../README.md).

@@ -43,6 +43,8 @@ version: "3"
 #   K8S_NAMESPACE        namespace the chart renders against (default "default")
 #   INFO_ENV_FILE        default ./deploy/info.env
 #   VERSION_BASE         base for untagged builds       (default 0.1.0)
+#   IMAGE_LATEST     set to 1 to also push a floating :latest beside the
+#                    version tag. Off by default — see the note below.
 #   VERSION_TAG_EXCLUDE  tag glob to keep out of the version (e.g. "api/*")
 #   APP_VERSION          pin the version outright, skipping git derivation
 #
@@ -121,6 +123,7 @@ vars:
       {{if .VERSION_TAG_EXCLUDE}}--exclude '{{.VERSION_TAG_EXCLUDE}}'{{end}}
       HEAD 2>/dev/null || true
   _REL_TAG: '{{._REL_TAG_RAW | trimPrefix "v"}}'
+  _REL_LATEST: '{{.IMAGE_LATEST | default "0"}}'
   _REL_DIRTY:
     sh: git status --porcelain 2>/dev/null | head -c1
   _REL_NOW:
@@ -340,6 +343,15 @@ tasks:
       - echo "{{._REL_RUN}} {{._REL_SVC}} · image · push {{._REL_IMAGE}}:{{._REL_VERSION}}"
       - docker push {{._REL_IMAGE}}:{{._REL_VERSION}}
       - echo "{{._REL_OK}} {{._REL_SVC}} · image · pushed {{._REL_VERSION}}"
+      # A floating tag, only when a repository asks for one. It is off by
+      # default because :latest makes a deployment unreproducible — what it
+      # resolved to yesterday is gone — and because the charts here read their
+      # tag from appVersion, so nothing in this library needs it. Repositories
+      # whose consumers pull by name still do.
+      - cmd: docker tag {{._REL_IMAGE}}:{{._REL_VERSION}} {{._REL_IMAGE}}:latest && docker push {{._REL_IMAGE}}:latest
+        if: '{{ne ._REL_LATEST "0"}}'
+      - cmd: echo "{{._REL_OK}} {{._REL_SVC}} · image · pushed latest → {{._REL_VERSION}}"
+        if: '{{ne ._REL_LATEST "0"}}'
 
   image:gc:
     desc: "Trim the BuildKit cache to the keep floor and drop dangling images"

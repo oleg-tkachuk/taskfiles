@@ -26,6 +26,7 @@ Taskfiles are stable from that version, with no experiment flag to set.
   - [Include naming](#include-naming)
   - [Logging](#logging)
   - [Versioning](#versioning)
+  - [Commit the remote lock](#commit-the-remote-lock)
   - [Idempotency](#idempotency)
 - [License](#license)
 
@@ -36,7 +37,7 @@ version: "3"
 silent: true
 
 vars:
-  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v3.2.2'
+  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v3.3.0'
   PROJECT_NAME: billing-api
   IMAGE_NAMESPACE: acme
   K8S_NAMESPACE: acme
@@ -125,6 +126,7 @@ implementation; they are not the current one.
 | [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward |
 | [`monorepo/`](monorepo/README.md) | `monorepo` | run one target across every component, registry preflight |
 | [`node/`](node/README.md) | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
+| [`pnpm/`](pnpm/README.md) | `pnpm` | keep the corepack pnpm pin current and agreed across a repo's apps |
 | [`python/`](python/README.md) | `python` | poetry install/test/lint/format/typecheck/lock, dep bumps |
 | [`release/`](release/README.md) | `release` | version derivation, image build/push, chart lint/render/package/push, `deploy` |
 | [`runtime/*`](runtime/README.md) — docker, orbstack, minikube, kind, k3d | `local` | run a locally built image on a local cluster, no registry |
@@ -284,6 +286,35 @@ version on every run — that is what makes the publish path idempotent.
 Timestamp before sha, so SemVer's left-to-right pre-release comparison orders
 builds chronologically and ArgoCD's `>=0.0.0-0` resolver always picks the
 newest push.
+
+### Commit the remote lock
+
+A module pulled over the network — `?ref=vX.Y.Z` rather than a checkout beside
+you — leaves a lock in `.task/remote/`:
+
+```
+.task/remote/git.github.com.go.<hash>.checksum
+```
+
+Task refuses to run when the content behind that ref no longer matches it:
+
+```
+task: Taskfile "…//go?ref=v3.3.0" not trusted by user
+```
+
+That is the only thing standing between a moved tag and your build, so commit
+those `.checksum` files. Most repositories ignore `.task/`, which throws the
+lock away — add an exception:
+
+```gitignore
+.task/
+!.task/remote/
+```
+
+Refresh it deliberately when you bump the pin, with `task --download`.
+
+A checkout-based include produces no lock, because there is no fetch to
+verify — nothing to commit until you move to a tag.
 
 ### Idempotency
 

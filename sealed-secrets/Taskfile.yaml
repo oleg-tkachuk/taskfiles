@@ -79,6 +79,28 @@ tasks:
         | {{._SS_SEAL}} > {{.output | q}}
       - echo "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
 
+  seal:literals:
+    desc: "Seal several key/value pairs into one SealedSecret manifest"
+    requires:
+      vars: [namespace, name, literals, output]
+    preconditions:
+      - sh: command -v kubeseal >/dev/null
+        msg: "kubeseal is not installed — https://github.com/bitnami-labs/sealed-secrets#installation"
+    cmds:
+      - mkdir -p {{dir .output}}
+      # Each pair becomes its own argv element, so a value carrying a quote, a
+      # semicolon or a $( ) reaches kubectl as data. `literals` is split on
+      # whitespace, which is what makes the list a list — a value containing a
+      # space belongs in seal:file or in a file of its own.
+      - cmd: |-
+          set -eu
+          set --
+          for kv in {{.literals}}; do set -- "$@" --from-literal="$kv"; done
+          {{._SS_KUBECTL}} create secret generic {{.name | q}} \
+            --namespace {{.namespace | q}} "$@" --dry-run=client -o yaml \
+            | {{._SS_SEAL}} > {{.output | q}}
+      - echo "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
+
   pubkey:
     desc: "Print the controller's public certificate, for sealing without a cluster"
     preconditions:

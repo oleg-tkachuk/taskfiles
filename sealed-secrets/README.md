@@ -14,6 +14,7 @@ includes:
 |---|---|
 | `seal` | Seal one key/value into a SealedSecret manifest |
 | `seal:file` | Seal every key in an env file into one SealedSecret manifest |
+| `seal:literals` | Seal several key/value pairs into one manifest — `literals="k1=v1 k2=v2"` |
 | `pubkey` | Print the controller's public certificate |
 
 ## Inputs
@@ -73,5 +74,19 @@ was cut off with them.
 this cluster without having access to it — it can encrypt and cannot decrypt.
 
 ---
+
+## Three shapes, and which to reach for
+
+| The secret is | Use |
+| --- | --- |
+| one key | `seal` |
+| several keys, values with no whitespace | `seal:literals` |
+| several keys, values that can contain anything | `seal:file` with an env file |
+
+`seal:literals` splits `literals` on whitespace — that is what makes the list a
+list. Each pair then becomes its own argv element, so a value carrying a quote,
+a semicolon or a `$( )` reaches kubectl as data rather than as shell. A value
+that genuinely contains a space has no place in that list; write it to a file
+and use `seal:file`.
 
 Part of [taskfiles](../README.md).

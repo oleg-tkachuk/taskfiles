@@ -16,6 +16,35 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [3.3.0] — 2026-09-07
+
+### Added
+
+- **`pnpm`** — a new module that keeps the corepack pnpm pin current and
+  agreed across a repository's apps: `pin:update`, `pin:update:major`,
+  `pin:check`. Repo-scoped, unlike `node`, because a repository whose apps
+  sit on different pnpm versions writes two lockfile dialects.
+
+  It also documents the trap it exists to avoid: corepack resolves the pin
+  from the current directory, so `pnpm -C <app> …` runs corepack's default
+  rather than the app's pin and then refuses to switch.
+
+- `release` takes `IMAGE_LATEST`. Set it to `1` to push a floating `:latest`
+  beside the version tag. Off by default — the charts here read their tag from
+  `appVersion`, so nothing in this library needs it, and a floating tag makes a
+  rollback point disappear.
+
+- `sealed-secrets:seal:literals` seals several key/value pairs into one
+  manifest. Each pair becomes its own argv element, so a value carrying a
+  quote or a `$( )` reaches kubectl as data.
+
+### Documentation
+
+- Conventions gained **Commit the remote lock**. A module pulled with `?ref=`
+  leaves a `.task/remote/*.checksum` that Task checks before running, and it is
+  the only thing standing between a moved tag and your build — but most
+  repositories ignore `.task/` and throw it away.
+
 ## [3.2.2] — 2026-09-07
 
 ### Changed
@@ -591,6 +620,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[3.3.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.3.0
 [3.2.2]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.2
 [3.2.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.1
 [3.2.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.2.0
