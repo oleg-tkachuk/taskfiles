@@ -1,0 +1,6 @@
+apiVersion: v2
+name: taskfiles-demo
+description: The taskfiles library's own demo service
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

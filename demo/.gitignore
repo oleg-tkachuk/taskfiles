@@ -1,0 +1,10 @@
+.task/
+coverage/
+bin/
+deploy/info.env
+# The cosign module's own convention is to commit cosign.pub and keep only
+# cosign.key out of the repo — right for a real project with one shared
+# signing identity. This demo has no "team": everyone who runs it signs
+# against their own disposable local registry, so the whole key pair is
+# generated fresh by `task sign` and none of it belongs in git.
+deploy/sigstore/

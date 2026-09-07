@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+spec:
+  # One replica on purpose: two registry pods with no shared storage would
+  # each hold half the pushed layers, and a pull would 404 depending on which
+  # pod answered. Fine for a demo; a real registry needs S3/GCS storage
+  # configured through REGISTRY_STORAGE and is out of scope here.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: registry
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.port }}
+          readinessProbe:
+            tcpSocket:
+              port: http
+          # Ephemeral: emptyDir, not a PVC. Pushed images vanish when the pod
+          # restarts, which is the correct tradeoff for demo infrastructure
+          # that only needs to outlive one `task` invocation.
+          volumeMounts:
+            - name: storage
+              mountPath: /var/lib/registry
+      volumes:
+        - name: storage
+          emptyDir: {}

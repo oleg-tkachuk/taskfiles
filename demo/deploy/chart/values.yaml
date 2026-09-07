@@ -1,0 +1,19 @@
+replicaCount: 1
+
+image:
+  # Matches REGISTRY in ../../Taskfile.yaml.
+  repository: localhost:5050/taskfiles-demo
+  tag: ""
+  pullPolicy: IfNotPresent
+
+service:
+  port: 80
+  targetPort: 8080
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

@@ -1,0 +1,8 @@
+image:
+  repository: registry
+  tag: "2"
+
+# The port both the container and the Service listen on.
+port: 5000
+# Must match kind-config.yaml's extraPortMappings.containerPort.
+nodePort: 30500

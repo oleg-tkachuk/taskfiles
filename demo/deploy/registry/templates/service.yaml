@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+spec:
+  # NodePort, matched to the hostPort kind's extraPortMappings forwards to it
+  # (see ../../kind-config.yaml) — localhost:5050 on the host reaches this pod
+  # without a port-forward tunnel that has to stay running.
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.port }}
+      targetPort: http
+      nodePort: {{ .Values.nodePort }}

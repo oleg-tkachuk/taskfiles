@@ -20,19 +20,23 @@ vars:
   # Discovered for the same reason PARSE_MODULES is: the hand-written list had
   # gone four modules stale (checkov, codegen, helm, sealed-secrets), and a
   # module missing from it walked past the README gate rather than failing it.
+  #
+  # demo/ is excluded from every list below: it is a consumer of this library,
+  # not a module in it — its Taskfile owns bare var names the way a real
+  # consumer's does, and has no README of its own to require.
   MODULES:
-    sh: ls -d */Taskfile.yaml 2>/dev/null | sed "s|/Taskfile.yaml||" | sort | tr "\n" " "
+    sh: ls -d */Taskfile.yaml 2>/dev/null | grep -v '^demo/' | sed "s|/Taskfile.yaml||" | sort | tr "\n" " "
   # Everything that must parse, the runtime variants included.
   # Discovered, not listed: a hand-maintained list is one a new module can be
   # left out of, and a module outside it escapes the parse gate in silence.
   PARSE_MODULES:
-    sh: ls -d */Taskfile.yaml */*/Taskfile.yaml 2>/dev/null | sed "s|/Taskfile.yaml||" | sort | tr "\n" " "
+    sh: ls -d */Taskfile.yaml */*/Taskfile.yaml 2>/dev/null | grep -v '^demo/' | sed "s|/Taskfile.yaml||" | sort | tr "\n" " "
   # Every YAML the modules are made of, for the file-level checks.
   MODULE_FILES:
-    sh: ls */Taskfile.yaml */*/Taskfile.yaml 2>/dev/null | sort -u | tr '\n' ' '
+    sh: ls */Taskfile.yaml */*/Taskfile.yaml 2>/dev/null | grep -v '^demo/' | sort -u | tr '\n' ' '
   # runtime, python — the directories that hold variants rather than a module.
   FAMILIES:
-    sh: ls -d */*/Taskfile.yaml 2>/dev/null | cut -d/ -f1 | sort -u | tr '\n' ' '
+    sh: ls -d */*/Taskfile.yaml 2>/dev/null | grep -v '^demo/' | cut -d/ -f1 | sort -u | tr '\n' ' '
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _LIB_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'

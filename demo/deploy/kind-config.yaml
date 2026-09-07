@@ -1,0 +1,19 @@
+# kubectl port-forward's tunnel is fine for a single curl but flakes under a
+# real registry client's keep-alive, chunked-upload push — this maps the host
+# port straight to the node instead, the same way a NodePort reaches a bare-
+# metal cluster in production, so localhost:5050 needs nothing running to
+# stay up between commands.
+#
+# 5050, not the library's default 5000: macOS's AirPlay Receiver and
+# OrbStack's own proxy both already claim 5000 on plenty of machines, and the
+# failure mode is a registry that looks reachable and answers every request
+# with the wrong service's 404 — a confusing thing to debug on someone else's
+# first run of this demo. See REGISTRY in ../Taskfile.yaml.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30500
+        hostPort: 5050
+        protocol: TCP
