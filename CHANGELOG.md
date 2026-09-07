@@ -16,6 +16,18 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [5.1.0] — 2026-09-07
+
+### Added
+
+- `security:trivy` takes **`TRIVY_SKIP_DIRS`**, defaulting to
+  `--skip-dirs .claude`. trivy walks the filesystem itself, so it was scanning
+  the throwaway agent worktrees under `.claude/` and reporting every finding
+  twice — once against code that ships and once against a copy nobody builds.
+  find-based discovery already pruned them through `SCAN_EXCLUDE`; this is the
+  same rule for the scanner that does its own walking. Point it at a repository's
+  other vendored trees to widen it: `--skip-dirs .claude --skip-dirs .ocp`.
+
 ## [5.0.1] — 2026-09-07
 
 ### Fixed
@@ -781,6 +793,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[5.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v5.1.0
 [5.0.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v5.0.1
 [5.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v5.0.0
 [4.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v4.1.0

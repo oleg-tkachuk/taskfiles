@@ -25,6 +25,7 @@ version: "3"
 #   TRIVY_SCANNERS     default "--scanners vuln,secret"
 #   TRIVY_SUBCOMMAND   default "fs"; "image" to scan a built image instead
 #   TRIVY_TARGET       what to scan              (default ".")
+#   TRIVY_SKIP_DIRS    directories trivy walks past       (default ".claude")
 #   TRIVY_FLAGS        extra trivy flags
 #   BUF_BREAKING_FLAGS extra buf breaking flags
 #   HADOLINT_FLAGS     hadolint flags (default "--failure-threshold error")
@@ -51,6 +52,11 @@ vars:
   _SEC_TRIVY_SCAN: '{{.TRIVY_SCANNERS | default "--scanners vuln,secret"}}'
   _SEC_TRIVY_SUB: '{{.TRIVY_SUBCOMMAND | default "fs"}}'
   _SEC_TRIVY_TARGET: '{{.TRIVY_TARGET | default "."}}'
+  # Agent worktrees under .claude are throwaway copies of this repository, so
+  # every finding arrives twice — once against code that ships and once against
+  # a tree nobody builds. find-based discovery prunes them through _SEC_PRUNE;
+  # trivy walks the filesystem itself and has to be told separately.
+  _SEC_TRIVY_SKIP: '{{.TRIVY_SKIP_DIRS | default "--skip-dirs .claude"}}'
   _SEC_TRIVY_FLAGS: '{{.TRIVY_FLAGS | default ""}}'
   _SEC_BUF_FLAGS: '{{.BUF_BREAKING_FLAGS | default ""}}'
   # What discovery never looks inside. Vendored trees and throwaway agent
@@ -142,10 +148,10 @@ tasks:
         msg: "trivy is not installed — https://github.com/aquasecurity/trivy#installation"
     cmds:
       - echo "{{._SEC_RUN}} sec · trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_TARGET}}"
-      - trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_SCAN}} --exit-code 1 --quiet {{._SEC_TRIVY_FLAGS}} {{._SEC_TRIVY_TARGET}}
+      - trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_SCAN}} --exit-code 1 --quiet {{._SEC_TRIVY_SKIP}} {{._SEC_TRIVY_FLAGS}} {{._SEC_TRIVY_TARGET}}
       # Misconfiguration findings are informational: they are dense, noisy, and
       # blocking on them would stop every release for a Kubernetes default.
-      - trivy config --exit-code 0 --quiet .
+      - trivy config --exit-code 0 --quiet {{._SEC_TRIVY_SKIP}} .
       - echo "{{._SEC_OK}} sec · trivy clean"
 
   proto:breaking:

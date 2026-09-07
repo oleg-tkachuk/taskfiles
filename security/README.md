@@ -39,6 +39,7 @@ workspace — tasks then read `sec:<task>`.
 | `TRIVY_SUBCOMMAND` | `fs` | `image` to scan a built image instead |
 | `TRIVY_SCANNERS` | `--scanners vuln,secret` | which scanners run; `--scanners misconfig` for IaC |
 | `TRIVY_TARGET` | `.` | what to scan |
+| `TRIVY_SKIP_DIRS` | `--skip-dirs .claude` | directories trivy walks past |
 | `TRIVY_FLAGS` | — | extra trivy flags |
 | `BUF_BREAKING_FLAGS` | — | extra buf breaking flags |
 | `GITLEAKS_BASELINE` | — | findings accepted as known, so the gate reports only new ones |
