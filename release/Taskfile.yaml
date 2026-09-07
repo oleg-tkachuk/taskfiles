@@ -40,6 +40,8 @@ version: "3"
 #   CHART_DIR            default ./deploy/chart
 #   CHART_APP_VERSION    appVersion when the image is upstream's, not ours
 #   CHART_MIN_RESOURCES  render-gate floor              (default 1)
+#   K8S_VERSION          schema version chart:validate checks against
+#   KUBECONFORM_FLAGS    extra kubeconform flags
 #   HELM_FLAGS           extra flags for every helm registry call
 #   HELM_LINT_FLAGS      extra flags for `helm lint`
 #   HELM_TEMPLATE_FLAGS  extra flags for `helm template`
@@ -130,6 +132,8 @@ vars:
   _REL_HELM_LINT_FLAGS: '{{.HELM_LINT_FLAGS | default ""}}'
   _REL_HELM_TPL_FLAGS: '{{.HELM_TEMPLATE_FLAGS | default ""}}'
   _REL_HELM_PKG_FLAGS: '{{.HELM_PACKAGE_FLAGS | default ""}}'
+  _REL_K8S_VERSION: '{{.K8S_VERSION | default ""}}'
+  _REL_KUBECONFORM_FLAGS: '{{.KUBECONFORM_FLAGS | default ""}}'
   _REL_LATEST: '{{.IMAGE_LATEST | default "0"}}'
   _REL_DIRTY:
     sh: git status --porcelain 2>/dev/null | head -c1
@@ -432,6 +436,44 @@ tasks:
     cmds:
       - mkdir -p {{dir ._REL_RENDER}}
       - helm template {{._REL_HELM_TPL_FLAGS}} {{._REL_SVC}} {{._REL_CHART_DIR}} --namespace {{._REL_K8S_NS}} > {{._REL_RENDER}}
+
+  chart:validate:
+    desc: "Check the rendered manifests against the Kubernetes schemas"
+    # helm lint reads the chart, chart:render reads the YAML — neither knows
+    # whether the apiVersions exist. A resource on an apiVersion the target
+    # cluster dropped renders, parses, lints clean and fails at apply.
+    #
+    # Missing schemas are NOT ignored by default. `-ignore-missing-schemas`
+    # turns an apiVersion the cluster no longer serves into a *skip*, which is
+    # the exact case this gate exists for — a chart on apps/v1beta1 renders,
+    # lints, and passes while validating nothing. A chart that ships custom
+    # resources adds `-ignore-missing-schemas` or `-skip <Kind>` through
+    # KUBECONFORM_FLAGS, deliberately and where a reader can see it.
+    preconditions:
+      - sh: command -v helm >/dev/null
+        msg: "helm is not installed — https://helm.sh/docs/intro/install/"
+      - sh: command -v kubeconform >/dev/null
+        msg: "kubeconform is not installed — https://github.com/yannh/kubeconform#installation"
+    cmds:
+      # Renders into its own file rather than reusing chart:render's: that one
+      # deletes its output when it finishes, and two tasks sharing a path race
+      # whenever both are asked for in the same run.
+      - cmd: |-
+          set -eu
+          # A directory, not `mktemp -t …​.yaml`: BSD mktemp appends its
+          # randomness AFTER the template, so the file ends up without a .yaml
+          # extension and kubeconform skips it — reporting 0 resources checked
+          # and exiting 0. A gate that passes by validating nothing.
+          d="$(mktemp -d)"
+          trap 'rm -rf "$d"' EXIT
+          out="$d/render.yaml"
+          helm template {{._REL_HELM_TPL_FLAGS}} {{._REL_SVC}} {{._REL_CHART_DIR}} \
+            --namespace {{._REL_K8S_NS}} > "$out"
+          echo "{{._REL_RUN}} {{._REL_SVC}} · chart · kubeconform{{if ._REL_K8S_VERSION}} against k8s {{._REL_K8S_VERSION}}{{end}}"
+          kubeconform -summary \
+            {{if ._REL_K8S_VERSION}}-kubernetes-version {{._REL_K8S_VERSION}} {{end}}{{._REL_KUBECONFORM_FLAGS}} \
+            "$out"
+          echo "{{._REL_OK}} {{._REL_SVC}} · chart · manifests match the Kubernetes schemas"
 
   chart:package:
     desc: "helm package the chart at the derived version"

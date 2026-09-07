@@ -20,6 +20,8 @@ workspace — tasks then read `sec:<task>`.
 | `all` | Run every scan: vulnerabilities, lint, secrets, SAST, filesystem |
 | `lint` | golangci-lint across every Go module, limited to issues new since main |
 | `gosec` | gosec — insecure patterns the compiler is happy with; part of `all` |
+| `pyvuln` | pip-audit across every Python project — the govulncheck of the Python side |
+| `dockerfile` | hadolint over the Dockerfiles this repository ships |
 | `secrets` | gitleaks — committed credentials anywhere in the history |
 | `trivy` | trivy — vulnerable dependencies and secrets (blocking) plus IaC misconfig (report-only) |
 | `vuln` | govulncheck across every Go module — vulnerabilities the code actually reaches |
@@ -30,6 +32,11 @@ workspace — tasks then read `sec:<task>`.
 | Var | Default | Meaning |
 |---|---|---|
 | `GO_MODULES` | `.` | whitespace-separated module directories for the Go scans; one without a `go.mod` is skipped, not failed |
+| `PY_PROJECTS` | `.` | project directories for the Python scan |
+| `DOCKERFILES` | `./Dockerfile` | Dockerfiles to lint |
+| `PIP_AUDIT_CMD` | `pip-audit` | how pip-audit is reached — `uvx pip-audit` needs no install |
+| `PIP_AUDIT_FLAGS` | — | extra pip-audit flags |
+| `HADOLINT_FLAGS` | `--failure-threshold error` | hadolint flags |
 | `GOVULNCHECK_FLAGS` | — | extra govulncheck flags |
 | `GOLANGCI_FLAGS` | — | extra golangci-lint flags |
 | `GITLEAKS_FLAGS` | — | extra gitleaks flags |
@@ -88,6 +95,19 @@ need govulncheck installed, while a Go repository that lacks it stops with an
 install hint rather than passing quietly. The skip is printed rather than done
 with `status:`, which is silent — a typo in `GO_MODULES` has to be visible, or
 the scan it disables is one nobody notices is gone.
+
+## Two defaults chosen so the gates can pass
+
+**hadolint blocks on errors only.** Its out-of-the-box threshold flags every
+note; across this workspace that is 113 findings in 48 Dockerfiles, of which 3
+are errors. A gate that is red everywhere the day it lands is one people learn
+to skip. The rest still print. Tighten with
+`HADOLINT_FLAGS: --failure-threshold warning` once a repository has caught up.
+
+**pip-audit is given the project directory.** With no path it audits whatever
+is installed in the ambient environment — on a machine with no venv active,
+nothing at all, and it exits 0. `PIP_AUDIT_CMD` exists for repositories that
+would rather not install it: `uvx pip-audit` works with no setup.
 
 ## Why lint is new-findings-only
 

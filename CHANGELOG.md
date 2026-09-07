@@ -16,6 +16,33 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [4.1.0] — 2026-09-07
+
+### Added
+
+Three checks for gaps this workspace had: 19 Python projects with no
+vulnerability scan while Go had `govulncheck`, 48 Dockerfiles with no lint, and
+52 charts rendered but never validated against the Kubernetes schemas.
+
+- **`security:pyvuln`** — pip-audit across `PY_PROJECTS`. Skips a directory
+  with no `pyproject.toml`, fails when there is one and the tool is missing,
+  same rule as the Go scans. `PIP_AUDIT_CMD` lets a repository use
+  `uvx pip-audit` rather than installing it.
+- **`security:dockerfile`** — hadolint over `DOCKERFILES`. Blocks on
+  error-level findings only by default: hadolint's own threshold flags 113
+  findings in this workspace's 48 Dockerfiles, of which 3 are errors, and a
+  gate that is red everywhere on day one is one people learn to skip.
+- **`release:chart:validate`** — kubeconform over the rendered chart. It
+  renders into its own temporary file rather than reusing `chart:render`'s,
+  which deletes its output when it finishes.
+
+Two defaults are deliberate and were chosen after watching the obvious ones
+pass while checking nothing: `pip-audit` is given the project directory,
+because with no path it audits the ambient environment and exits 0 on a
+machine with no venv; and `chart:validate` does **not** pass
+`-ignore-missing-schemas`, because that turns a dead `apps/v1beta1` into a
+skip — the exact case the gate exists for.
+
 ## [4.0.1] — 2026-09-07
 
 ### Fixed
@@ -721,6 +748,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[4.1.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v4.1.0
 [4.0.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v4.0.1
 [4.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v4.0.0
 [3.6.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.6.0

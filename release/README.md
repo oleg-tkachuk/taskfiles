@@ -31,6 +31,7 @@ workspace — tasks then read `release:<task>`.
 | `chart:verify` | Lint the chart and render it through the multi-doc separator gate |
 | `chart:lint` | helm lint the chart |
 | `chart:render` | Render the chart and fail on glued separators, unparseable YAML, or a resource drop |
+| `chart:validate` | Check the rendered manifests against the Kubernetes schemas (kubeconform) |
 | `chart:package` | helm package the chart at the derived version |
 | `chart:push` | Package and push the chart (skipped when that version is already published) |
 | `chart:clean` | Remove packaged chart tarballs from the component directory |
@@ -52,6 +53,8 @@ workspace — tasks then read `release:<task>`.
 | `CHART_DIR` | `./deploy/chart` | the chart every chart task reads |
 | `CHART_APP_VERSION` | derived version | pin it when the image is upstream's |
 | `CHART_MIN_RESOURCES` | `1` | render-gate floor |
+| `K8S_VERSION` | — | schema version `chart:validate` checks against |
+| `KUBECONFORM_FLAGS` | — | extra kubeconform flags |
 | `HELM_FLAGS` | — | e.g. `--insecure-skip-tls-verify` for a self-signed registry |
 | `HELM_LINT_FLAGS` | — | extra flags for `helm lint` |
 | `HELM_TEMPLATE_FLAGS` | — | extra flags for `helm template` |
@@ -191,6 +194,17 @@ It checks the mistakes that have actually happened here:
 
 ---
 
+
+## chart:validate does not ignore missing schemas
+
+`-ignore-missing-schemas` turns an apiVersion the cluster no longer serves into
+a *skip* — a chart on `apps/v1beta1` renders, lints, and passes while nothing
+is checked. Verified: with the flag that chart reports `Skipped: 1` and exits
+0; without it, `Errors: 1` and exit 1, while a real chart still validates
+12 of 12 clean.
+
+A chart that ships custom resources adds `-ignore-missing-schemas` or
+`-skip <Kind>` through `KUBECONFORM_FLAGS`, where a reader can see it.
 
 ## `:latest` is off by default
 
