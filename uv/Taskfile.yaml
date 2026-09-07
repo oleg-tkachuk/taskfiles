@@ -68,7 +68,7 @@ tasks:
     desc: "pytest"
     deps: [install]
     cmds:
-      - echo "▸ {{._UV_NAME}} · uv · pytest"
+      - echo "▸ {{._UV_NAME}} · uv · {{._UV_TEST_CMD}}"
       - uv run {{._UV_TEST_CMD}} {{._UV_TEST_FLAGS}}
       - echo "✔ {{._UV_NAME}} · uv · tests pass"
 
@@ -76,7 +76,7 @@ tasks:
     desc: "ruff check"
     deps: [install]
     cmds:
-      - echo "▸ {{._UV_NAME}} · uv · ruff check"
+      - echo "▸ {{._UV_NAME}} · uv · {{._UV_LINT_CMD}}"
       - uv run {{._UV_LINT_CMD}} {{._UV_SRC}}
       - echo "✔ {{._UV_NAME}} · uv · lint clean"
 
@@ -95,7 +95,7 @@ tasks:
     status:
       - "! uv run python -c 'import {{._UV_TC_MOD}}' >/dev/null 2>&1"
     cmds:
-      - echo "▸ {{._UV_NAME}} · uv · mypy"
+      - echo "▸ {{._UV_NAME}} · uv · {{._UV_TC_CMD}}"
       - uv run {{._UV_TC_CMD}} {{._UV_SRC}}
       - echo "✔ {{._UV_NAME}} · uv · types clean"
 

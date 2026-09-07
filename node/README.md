@@ -42,6 +42,7 @@ workspace — tasks then read `node:<task>`.
 | `SCRIPT_GENERATE` | `generate` | |
 | `LINT_FIX_FLAGS` | `--fix` | what `lint:fix` appends |
 | `PM_INSTALL` | — | override the install command outright |
+| `E2E_SETUP` | `exec playwright install --with-deps chromium` | run before the suite; `none` to skip |
 
 ## Examples
 
@@ -75,6 +76,12 @@ package.json should fail the install, not be quietly rewritten. Override
 Every task calls the script of the same name — `dev`, `build`, `lint`, `test`,
 `generate`. A project whose script is named differently should call it directly
 rather than bending the module.
+
+## `none`, not the empty string
+
+`E2E_SETUP=none` skips the preparation step. An empty value will not: Task's
+`default` filter fires on an empty variable as well as an unset one, so `""`
+hands back the default rather than switching it off.
 
 ---
 

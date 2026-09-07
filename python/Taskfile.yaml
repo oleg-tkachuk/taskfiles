@@ -68,14 +68,14 @@ tasks:
   test:
     desc: "pytest"
     cmds:
-      - echo "▸ {{._PY_NAME}} · py · pytest"
+      - echo "▸ {{._PY_NAME}} · py · {{._PY_TEST_CMD}}"
       - poetry run {{._PY_TEST_CMD}} {{._PY_TEST_FLAGS}}
       - echo "✔ {{._PY_NAME}} · py · tests pass"
 
   lint:
     desc: "ruff check"
     cmds:
-      - echo "▸ {{._PY_NAME}} · py · ruff check"
+      - echo "▸ {{._PY_NAME}} · py · {{._PY_LINT_CMD}}"
       - poetry run {{._PY_LINT_CMD}} {{._PY_SRC}}
       - echo "✔ {{._PY_NAME}} · py · lint clean"
 
@@ -93,7 +93,7 @@ tasks:
     status:
       - "! poetry run python -c 'import {{._PY_TC_MOD}}' >/dev/null 2>&1"
     cmds:
-      - echo "▸ {{._PY_NAME}} · py · mypy"
+      - echo "▸ {{._PY_NAME}} · py · {{._PY_TC_CMD}}"
       - poetry run {{._PY_TC_CMD}} {{._PY_SRC}}
       - echo "✔ {{._PY_NAME}} · py · types clean"
 

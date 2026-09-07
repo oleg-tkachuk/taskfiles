@@ -21,6 +21,11 @@ version: "3"
 #   SCRIPT_LINT       default lint
 #   SCRIPT_TEST       default test
 #   SCRIPT_E2E        default test:e2e
+#   E2E_SETUP         run before the suite; "none" to skip it
+#                     (default "exec playwright install --with-deps chromium").
+#                     "none" and not "": Task's `default` filter fires on an
+#                     empty value as well as an unset one, so an empty string
+#                     cannot turn anything off here.
 #   SCRIPT_GENERATE   default generate
 #   LINT_FIX_FLAGS    what `lint:fix` appends       (default --fix)
 #
@@ -39,6 +44,7 @@ vars:
   _NODE_LINT: '{{.SCRIPT_LINT | default "lint"}}'
   _NODE_TEST: '{{.SCRIPT_TEST | default "test"}}'
   _NODE_E2E: '{{.SCRIPT_E2E | default "test:e2e"}}'
+  _NODE_E2E_SETUP: '{{.E2E_SETUP | default "exec playwright install --with-deps chromium"}}'
   _NODE_GEN: '{{.SCRIPT_GENERATE | default "generate"}}'
   _NODE_FIX: '{{.LINT_FIX_FLAGS | default "--fix"}}'
 
@@ -101,10 +107,15 @@ tasks:
       - echo "✔ {{._NODE_NAME}} · node · tests pass"
 
   test:e2e:
-    desc: "Run the Playwright suite, installing chromium when it is missing"
+    desc: "Run the end-to-end suite, preparing its browser first"
     cmds:
-      - echo "▸ {{._NODE_NAME}} · node · playwright"
-      - "{{._NODE_PM}} exec playwright install --with-deps chromium >/dev/null"
+      - echo "▸ {{._NODE_NAME}} · node · {{._NODE_E2E}}"
+      # Playwright needs its browser downloaded before the first run and says so
+      # only by failing. Another runner prepares differently, or not at all, so
+      # the step is an input — set E2E_SETUP to "none" when there is nothing to
+      # do. Not "": `default` fires on an empty value too, so an empty string
+      # would silently give back the default rather than switching it off.
+      - '{{if ne ._NODE_E2E_SETUP "none"}}{{._NODE_PM}} {{._NODE_E2E_SETUP}} >/dev/null{{end}}'
       - "{{._NODE_PM}} run {{._NODE_E2E}}"
       - echo "✔ {{._NODE_NAME}} · node · e2e pass"
 
