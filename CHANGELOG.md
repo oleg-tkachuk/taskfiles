@@ -16,6 +16,16 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [4.0.1] — 2026-09-07
+
+### Fixed
+
+- This repository's own CI and release fixtures still included `python` and
+  still used the two-variable `{{.TASKLIB}}name{{.TASKLIB_REF}}` form that the
+  library stopped documenting in 2.2.1. Both went red on the 4.0.0 tag, so
+  **v4.0.0 has no GitHub release** — the tag itself resolves and is safe to
+  pin, but v4.0.1 is the one to use.
+
 ## [4.0.0] — 2026-09-07
 
 A major because two modules moved. The upgrade is one line per consumer.
@@ -711,6 +721,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[4.0.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v4.0.1
 [4.0.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v4.0.0
 [3.6.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.6.0
 [3.5.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.5.0

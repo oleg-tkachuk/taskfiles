@@ -159,25 +159,25 @@ jobs:
           version: "3"
           silent: true
           vars:
-            TASKLIB: ../taskfiles/
+            TASKLIB: '../taskfiles/%s'
             PROJECT_NAME: smoke
             IMAGE_NAMESPACE: acme
             K8S_NAMESPACE: smoke-ns
             REGISTRY: registry.example.com
             VERSION_BASE: 9.9.9
           includes:
-            release:  { taskfile: '{{.TASKLIB}}release{{.TASKLIB_REF}}', dir: . }
-            k8s:      { taskfile: '{{.TASKLIB}}k8s{{.TASKLIB_REF}}', dir: . }
-            go:       { taskfile: '{{.TASKLIB}}go{{.TASKLIB_REF}}', dir: . }
-            python:   { taskfile: '{{.TASKLIB}}python{{.TASKLIB_REF}}', dir: . }
-            node:     { taskfile: '{{.TASKLIB}}node{{.TASKLIB_REF}}', dir: . }
-            compose:  { taskfile: '{{.TASKLIB}}compose{{.TASKLIB_REF}}', dir: . }
-            security: { taskfile: '{{.TASKLIB}}security{{.TASKLIB_REF}}', dir: . }
-            monorepo: { taskfile: '{{.TASKLIB}}monorepo{{.TASKLIB_REF}}', dir: . }
-            argocd:   { taskfile: '{{.TASKLIB}}argocd{{.TASKLIB_REF}}', dir: . }
-            auth:     { taskfile: '{{.TASKLIB}}auth{{.TASKLIB_REF}}', dir: . }
-            codegen:  { taskfile: '{{.TASKLIB}}codegen{{.TASKLIB_REF}}', dir: . }
-            local:    { taskfile: '{{.TASKLIB}}runtime/orbstack{{.TASKLIB_REF}}', dir: . }
+            release:  { taskfile: '{{printf .TASKLIB "release"}}', dir: . }
+            k8s:      { taskfile: '{{printf .TASKLIB "k8s"}}', dir: . }
+            go:       { taskfile: '{{printf .TASKLIB "go"}}', dir: . }
+            python:   { taskfile: '{{printf .TASKLIB "python/poetry"}}', dir: . }
+            node:     { taskfile: '{{printf .TASKLIB "node"}}', dir: . }
+            compose:  { taskfile: '{{printf .TASKLIB "compose"}}', dir: . }
+            security: { taskfile: '{{printf .TASKLIB "security"}}', dir: . }
+            monorepo: { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: . }
+            argocd:   { taskfile: '{{printf .TASKLIB "argocd"}}', dir: . }
+            auth:     { taskfile: '{{printf .TASKLIB "auth"}}', dir: . }
+            codegen:  { taskfile: '{{printf .TASKLIB "codegen"}}', dir: . }
+            local:    { taskfile: '{{printf .TASKLIB "runtime/orbstack"}}', dir: . }
           tasks: {}
           YAML
 
