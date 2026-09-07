@@ -16,6 +16,16 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [3.5.0] — 2026-09-07
+
+### Added
+
+- `release` takes `IMAGE_NAME`, the symmetric partner of `CHART_NAME`: the
+  image name when it differs from `PROJECT_NAME`. A component whose log label
+  is not what its image is called no longer has to choose between the two.
+  `cosign` follows it, since it reads the image reference the release module
+  derives.
+
 ## [3.4.0] — 2026-09-07
 
 ### Added
@@ -638,6 +648,7 @@ First release.
   `main`, and `python3` is whatever the host resolves. Set `REGISTRY`,
   `TIMEZONE`, `BASE` and `PY` for yours.
 
+[3.5.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.5.0
 [3.4.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.4.0
 [3.3.1]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.3.1
 [3.3.0]: https://github.com/oleg-tkachuk/taskfiles/releases/tag/v3.3.0

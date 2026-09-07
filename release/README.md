@@ -41,6 +41,7 @@ workspace — tasks then read `release:<task>`.
 |---|---|---|
 | `PROJECT_NAME` | `service` | image and chart name, and the label in every log line |
 | `CHART_NAME` | `PROJECT_NAME` | when the chart is not named after the component |
+| `IMAGE_NAME` | `PROJECT_NAME` | image name when it differs from the label in the log lines |
 | `REGISTRY` | `localhost:5000` | OCI host |
 | `GLOBAL_REGISTRY` | — | a monorepo-wide override; wins over `REGISTRY` |
 | `IMAGE_NAMESPACE` | — | path between host and name |

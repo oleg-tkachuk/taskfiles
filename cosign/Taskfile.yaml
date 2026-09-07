@@ -24,6 +24,7 @@ version: "3"
 #   REGISTRY           OCI host                        (default localhost:5000)
 #   IMAGE_NAMESPACE    path between host and name
 #   CHART_NAME         when the chart is not named after PROJECT_NAME
+#   IMAGE_NAME         when the image is not named after PROJECT_NAME
 #   COSIGN_DIR         where the key pair lives        (default deploy/sigstore)
 #   COSIGN_KEY         private key       (default <COSIGN_DIR>/cosign.key)
 #   COSIGN_PUB         public key        (default <COSIGN_DIR>/cosign.pub)

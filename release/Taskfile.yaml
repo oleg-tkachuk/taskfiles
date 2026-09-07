@@ -26,6 +26,7 @@ version: "3"
 #
 #   PROJECT_NAME         image + chart name, and the label in every log line
 #   CHART_NAME           chart name when it differs from PROJECT_NAME
+#   IMAGE_NAME           image name when it differs from PROJECT_NAME
 #   REGISTRY             OCI host                     (default localhost:5000)
 #   GLOBAL_REGISTRY      monorepo-wide override, wins over REGISTRY
 #   IMAGE_NAMESPACE      path between host and name     (default none)
@@ -63,7 +64,7 @@ vars:
   # wins over a component's own REGISTRY.
   _REL_REG: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}'
   _REL_NS: '{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}'
-  _REL_IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.PROJECT_NAME | default "service"}}'
+  _REL_IMAGE: '{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/{{.IMAGE_NAME | default .PROJECT_NAME | default "service"}}'
   _REL_CHART_REPO: 'oci://{{.GLOBAL_REGISTRY | default .REGISTRY | default "localhost:5000"}}{{if .IMAGE_NAMESPACE}}/{{.IMAGE_NAMESPACE}}{{end}}/charts'
   # A registry serving a certificate strict oras clients reject — a wildcard
   # that does not cover the apex, say — needs --insecure-skip-tls-verify here.
