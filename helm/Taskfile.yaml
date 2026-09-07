@@ -38,11 +38,22 @@ tasks:
 
   list:
     desc: "Show every Helm release on the cluster"
+    # Skipped, not failed, when there is no cluster to talk to. The guard sits
+    # here rather than on the internal task because Task evaluates
+    # preconditions BEFORE status, so a status guard cannot skip past the
+    # internal task's own preconditions — a status meant to no-op this on a
+    # laptop with no cluster running would otherwise still demand helm be
+    # installed just to decide there was nothing to list.
+    status:
+      - "! kubectl{{._HELM_CTX}} version --request-timeout=3s >/dev/null 2>&1"
+    cmds:
+      - task: _list
+
+  _list:
+    internal: true
     preconditions:
       - sh: command -v helm >/dev/null
         msg: "helm is not installed — https://helm.sh/docs/intro/install/"
-    status:
-      - "! kubectl{{._HELM_CTX}} version --request-timeout=3s >/dev/null 2>&1"
     cmds:
       - helm list{{._HELM_CTX}} {{._HELM_SCOPE}}
 
