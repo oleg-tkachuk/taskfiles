@@ -14,7 +14,17 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- Status markers are now `◉` starting work, `✔` done, `○` nothing to do, `▲`
+  worth reading, `✖` failed. Each is a single codepoint, coloured with ANSI
+  rather than by the character itself, so the line reads the same width
+  everywhere and still reads once a log has been stripped of escapes. Set
+  `NO_COLOR` to any value for the bare glyphs.
+- `○` and `▲` split what was previously one marker. A step that had nothing to
+  do (an image already built, a deployment that is not there) now reads
+  differently from one worth stopping at (a dirty tree, an unreachable
+  registry, a gate that could not run because `yq` is missing).
 
 ## [2.1.2] — 2026-09-07
 

@@ -245,8 +245,26 @@ single line.
 Component-scoped modules print `<marker> <component> · <area> ·
 <what happened>`; repo-scoped ones (`security`, `monorepo`, `argocd`) print
 `<marker> <module> · <what happened>`, because there is no one component to
-name. The markers are `🔵` starting work, `✅` done, `🟡` skipped on purpose and
-`❌` failed — one codepoint each, so every line starts the same width.
+name.
+
+The marker vocabulary:
+
+| Marker | Means | Colour |
+| --- | --- | --- |
+| `◉` | starting work | cyan |
+| `✔` | done | green |
+| `○` | nothing to do — skipped on purpose | grey |
+| `▲` | worth reading, but not fatal | yellow |
+| `✖` | failed | red |
+
+The shape carries the meaning and the colour only reinforces it, so a line
+still reads in a log that has been stripped of ANSI. Each marker is a single
+codepoint — no variation selector — so every line starts the same width in
+every terminal. Set `NO_COLOR` to any value to get the glyphs without the
+escapes.
+
+`·` separates the fields of a line and `→` marks a result, both from the same
+vocabulary.
 
 ### Versioning
 

@@ -62,7 +62,7 @@ jobs:
             git fetch --quiet origin main:refs/remotes/origin/main
           fi
           if git merge-base --is-ancestor HEAD origin/main; then
-            echo "✅ $TAG is a commit on main"
+            echo "✔ $TAG is a commit on main"
             exit 0
           fi
           echo "::error::Releases must be cut from main. $TAG points at a commit main does not contain, so it would publish a tree that never passed CI on main — and consumers pinning ?ref=$TAG would fetch exactly that tree."
@@ -93,18 +93,18 @@ jobs:
           tag="$TAG"
           version="${tag#v}"
           if [ ! -f CHANGELOG.md ]; then
-            echo "❌ $tag has no CHANGELOG.md in its tree" >&2
+            echo "✖ $tag has no CHANGELOG.md in its tree" >&2
             echo "  Tags cut before the changelog existed cannot pass this gate," >&2
             echo "  and do not need to: release from a tag that contains it." >&2
             exit 1
           fi
           if ! grep -qF "## [$version]" CHANGELOG.md; then
-            echo "❌ CHANGELOG.md has no '## [$version]' section" >&2
+            echo "✖ CHANGELOG.md has no '## [$version]' section" >&2
             echo "  Add one — what a consumer has to do about this release —" >&2
             echo "  and move anything under [Unreleased] into it." >&2
             exit 1
           fi
-          echo "✅ $tag is documented in CHANGELOG.md"
+          echo "✔ $tag is documented in CHANGELOG.md"
 
       - name: 'Guard: the README pins this tag'
         # The quickstart is written to be copied as-is, so the version in it is
@@ -115,7 +115,7 @@ jobs:
         run: |
           set -euo pipefail
           if grep -qF "?ref=$TAG" README.md; then
-            echo "✅ README pins $TAG"
+            echo "✔ README pins $TAG"
             exit 0
           fi
           found=$(grep -oE '\?ref=v[0-9]+\.[0-9]+\.[0-9]+' README.md | head -1 || true)
@@ -132,8 +132,8 @@ jobs:
           set -euo pipefail
           tag="$TAG"
           case "$tag" in
-            v[0-9]*.[0-9]*.[0-9]*) echo "✅ $tag is SemVer-shaped" ;;
-            *) echo "❌ $tag is not vMAJOR.MINOR.PATCH" >&2; exit 1 ;;
+            v[0-9]*.[0-9]*.[0-9]*) echo "✔ $tag is SemVer-shaped" ;;
+            *) echo "✖ $tag is not vMAJOR.MINOR.PATCH" >&2; exit 1 ;;
           esac
 
   consumable:
@@ -213,8 +213,8 @@ jobs:
           task --yes --list-all > /dev/null
           version=$(task --yes release:version)
           case "$version" in
-            9.9.9-dev.*) echo "✅ the published tag includes and resolves ($version)" ;;
-            *) echo "❌ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
+            9.9.9-dev.*) echo "✔ the published tag includes and resolves ($version)" ;;
+            *) echo "✖ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
           esac
 
   publish:
@@ -245,8 +245,8 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "✅ release $TAG already exists"
+            echo "✔ release $TAG already exists"
             exit 0
           fi
           gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
-          echo "✅ released $TAG"
+          echo "✔ released $TAG"

@@ -53,8 +53,8 @@ tasks:
 ```console
 $ task argocd:list APP_PREFIX=acme-
 $ task deploy:sync
-✅ argocd · hard-refreshed acme-api
-✅ argocd · hard-refreshed acme-worker
+✔ argocd · hard-refreshed acme-api
+✔ argocd · hard-refreshed acme-worker
 ```
 
 ## APP_PREFIX has no default

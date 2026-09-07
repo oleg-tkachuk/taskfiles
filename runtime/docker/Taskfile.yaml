@@ -30,6 +30,10 @@ vars:
   _RT_CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
   _RT_K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
   _RT_CTX: '{{.K8S_CONTEXT | default "docker-desktop"}}'
+  # Status markers. The shape carries the meaning, so a line still reads in
+  # a monochrome log; the colour sits on top and drops out under NO_COLOR.
+  _RT_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
+  _RT_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
 
 tasks:
 
@@ -41,7 +45,7 @@ tasks:
       - sh: kubectl config get-contexts -o name | grep -qx '{{._RT_CTX}}'
         msg: "there is no '{{._RT_CTX}}' kube context — enable Kubernetes in Docker Desktop, or set K8S_CONTEXT"
     cmds:
-      - echo "✅ {{._RT_SVC}} · local · Docker Desktop ready ({{._RT_CTX}})"
+      - echo "{{._RT_OK}} {{._RT_SVC}} · local · Docker Desktop ready ({{._RT_CTX}})"
 
   image:load:
     desc: "No-op — Docker Desktop runs containers from the same image store the build wrote to"
@@ -49,7 +53,7 @@ tasks:
     # image is already visible. The task exists so a consumer can call
     # `local:image:load` without caring which runtime is underneath.
     cmds:
-      - echo "✅ {{._RT_SVC}} · local · {{._REL_VERSION}} already visible to Docker Desktop"
+      - echo "{{._RT_OK}} {{._RT_SVC}} · local · {{._REL_VERSION}} already visible to Docker Desktop"
 
   install:
     desc: "helm upgrade --install from the chart directory, running the local image"
@@ -58,7 +62,7 @@ tasks:
     deps: [check]
     cmds:
       - task: image:load
-      - echo "🔵 {{._RT_SVC}} · local · helm upgrade --install into {{._RT_CTX}}/{{._RT_K8S_NS}}"
+      - echo "{{._RT_RUN}} {{._RT_SVC}} · local · helm upgrade --install into {{._RT_CTX}}/{{._RT_K8S_NS}}"
       - >-
         helm upgrade --install {{._RT_SVC}} {{._RT_CHART_DIR}}
         --kube-context {{._RT_CTX}}
@@ -67,4 +71,4 @@ tasks:
         --set image.pullPolicy=IfNotPresent
         {{.HELM_UPGRADE_FLAGS | default ""}}
         {{if .VALUES}}--values {{.VALUES}}{{end}}
-      - echo "✅ {{._RT_SVC}} · local · {{._REL_VERSION}} installed into {{._RT_CTX}}"
+      - echo "{{._RT_OK}} {{._RT_SVC}} · local · {{._REL_VERSION}} installed into {{._RT_CTX}}"

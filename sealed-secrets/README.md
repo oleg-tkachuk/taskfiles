@@ -41,7 +41,7 @@ includes:
 $ task sealed-secrets:seal namespace=billing name=api-keys \
     key=STRIPE_KEY value=sk_test_123 \
     output=deploy/secrets/billing-api-keys.yaml
-✅ sealed-secrets · billing/api-keys → deploy/secrets/billing-api-keys.yaml
+✔ sealed-secrets · billing/api-keys → deploy/secrets/billing-api-keys.yaml
 
 $ task sealed-secrets:seal:file namespace=billing name=api-env \
     file=.env.production output=deploy/secrets/billing-env.yaml

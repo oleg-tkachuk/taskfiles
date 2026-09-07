@@ -30,6 +30,10 @@ vars:
   # also answer, and a consumer on podman had no way to say so.
   _CMP_CMD: '{{.COMPOSE_ENGINE | default "docker compose"}} -f {{.COMPOSE_FILE | default "docker-compose.yaml"}}'
   _CMP_NAME: '{{.PROJECT_NAME | default "stack"}}'
+  # Status markers. The shape carries the meaning, so a line still reads in
+  # a monochrome log; the colour sits on top and drops out under NO_COLOR.
+  _CMP_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
+  _CMP_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
 
 tasks:
 
@@ -39,29 +43,29 @@ tasks:
       - sh: test -f {{._CMP_FILE}}
         msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     cmds:
-      - echo "🔵 {{._CMP_NAME}} · compose · up ({{._CMP_FILE}})"
+      - echo "{{._CMP_RUN}} {{._CMP_NAME}} · compose · up ({{._CMP_FILE}})"
       - "{{._CMP_CMD}} up -d --wait"
       - task: ps
-      - echo "✅ {{._CMP_NAME}} · compose · stack healthy"
+      - echo "{{._CMP_OK}} {{._CMP_NAME}} · compose · stack healthy"
 
   build:
     desc: "Rebuild the images the stack is composed of, then start it"
     cmds:
       - "{{._CMP_CMD}} up -d --build --wait"
-      - echo "✅ {{._CMP_NAME}} · compose · rebuilt and healthy"
+      - echo "{{._CMP_OK}} {{._CMP_NAME}} · compose · rebuilt and healthy"
 
   down:
     desc: "Stop the stack. Volumes are preserved."
     cmds:
       - "{{._CMP_CMD}} down"
-      - echo "✅ {{._CMP_NAME}} · compose · stopped (volumes kept)"
+      - echo "{{._CMP_OK}} {{._CMP_NAME}} · compose · stopped (volumes kept)"
 
   reset:
     desc: "Stop the stack and DELETE its volumes — local data is lost"
     prompt: "Delete every volume of {{._CMP_FILE}}? Local database contents are lost."
     cmds:
       - "{{._CMP_CMD}} down -v"
-      - echo "✅ {{._CMP_NAME}} · compose · torn down, volumes dropped"
+      - echo "{{._CMP_OK}} {{._CMP_NAME}} · compose · torn down, volumes dropped"
 
   ps:
     desc: "Show what is running"

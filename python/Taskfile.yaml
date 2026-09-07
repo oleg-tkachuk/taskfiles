@@ -44,6 +44,10 @@ vars:
   _PY_TC_MOD: '{{.TYPECHECK_MODULE | default "mypy"}}'
   _PY_TEST_FLAGS: '{{.PY_TEST_FLAGS | default "-q"}}'
   _PY_INSTALL_FLAGS: '{{.POETRY_INSTALL_FLAGS | default "--no-interaction"}}'
+  # Status markers. The shape carries the meaning, so a line still reads in
+  # a monochrome log; the colour sits on top and drops out under NO_COLOR.
+  _PY_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
+  _PY_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
 
 tasks:
 
@@ -60,24 +64,24 @@ tasks:
       - sh: command -v {{._PY_BIN}} >/dev/null
         msg: "{{._PY_BIN}} is not on PATH — install it or pass PY=<interpreter>"
     cmds:
-      - echo "🔵 {{._PY_NAME}} · py · poetry install ({{._PY_BIN}})"
+      - echo "{{._PY_RUN}} {{._PY_NAME}} · py · poetry install ({{._PY_BIN}})"
       - poetry env use {{._PY_BIN}} >/dev/null
       - poetry install {{._PY_INSTALL_FLAGS}}
-      - echo "✅ {{._PY_NAME}} · py · dependencies installed"
+      - echo "{{._PY_OK}} {{._PY_NAME}} · py · dependencies installed"
 
   test:
     desc: "pytest"
     cmds:
-      - echo "🔵 {{._PY_NAME}} · py · {{._PY_TEST_CMD}}"
+      - echo "{{._PY_RUN}} {{._PY_NAME}} · py · {{._PY_TEST_CMD}}"
       - poetry run {{._PY_TEST_CMD}} {{._PY_TEST_FLAGS}}
-      - echo "✅ {{._PY_NAME}} · py · tests pass"
+      - echo "{{._PY_OK}} {{._PY_NAME}} · py · tests pass"
 
   lint:
     desc: "ruff check"
     cmds:
-      - echo "🔵 {{._PY_NAME}} · py · {{._PY_LINT_CMD}}"
+      - echo "{{._PY_RUN}} {{._PY_NAME}} · py · {{._PY_LINT_CMD}}"
       - poetry run {{._PY_LINT_CMD}} {{._PY_SRC}}
-      - echo "✅ {{._PY_NAME}} · py · lint clean"
+      - echo "{{._PY_OK}} {{._PY_NAME}} · py · lint clean"
 
   fmt:
     desc: "ruff format"
@@ -86,32 +90,32 @@ tasks:
     aliases: [format]
     cmds:
       - poetry run {{._PY_FMT_CMD}} {{._PY_SRC}}
-      - echo "✅ {{._PY_NAME}} · py · formatted"
+      - echo "{{._PY_OK}} {{._PY_NAME}} · py · formatted"
 
   typecheck:
     desc: "mypy (skipped when mypy is not a project dependency)"
     status:
       - "! poetry run python -c 'import {{._PY_TC_MOD}}' >/dev/null 2>&1"
     cmds:
-      - echo "🔵 {{._PY_NAME}} · py · {{._PY_TC_CMD}}"
+      - echo "{{._PY_RUN}} {{._PY_NAME}} · py · {{._PY_TC_CMD}}"
       - poetry run {{._PY_TC_CMD}} {{._PY_SRC}}
-      - echo "✅ {{._PY_NAME}} · py · types clean"
+      - echo "{{._PY_OK}} {{._PY_NAME}} · py · types clean"
 
   lock:
     desc: "Regenerate poetry.lock"
     cmds:
       - poetry env use {{._PY_BIN}} >/dev/null
       - poetry lock
-      - echo "✅ {{._PY_NAME}} · py · poetry.lock regenerated"
+      - echo "{{._PY_OK}} {{._PY_NAME}} · py · poetry.lock regenerated"
 
   deps:update:
     desc: "Bump dependencies within their pyproject constraints, then refresh the lock"
     # Stays inside the caret/tilde ranges already written in pyproject.toml.
     # Widening those is deps:update:latest.
     cmds:
-      - echo "🔵 {{._PY_NAME}} · py · poetry update"
+      - echo "{{._PY_RUN}} {{._PY_NAME}} · py · poetry update"
       - poetry update --no-interaction
-      - echo "✅ {{._PY_NAME}} · py · deps bumped — review poetry.lock, then lint + test"
+      - echo "{{._PY_OK}} {{._PY_NAME}} · py · deps bumped — review poetry.lock, then lint + test"
 
   deps:update:latest:
     desc: "Widen constraints and bump everything, majors included"
@@ -120,9 +124,9 @@ tasks:
     cmds:
       # Idempotent — `poetry self add` on an installed plugin is a no-op.
       - poetry self add poetry-plugin-up >/dev/null
-      - echo "🔵 {{._PY_NAME}} · py · poetry up --latest (majors included)"
+      - echo "{{._PY_RUN}} {{._PY_NAME}} · py · poetry up --latest (majors included)"
       - poetry up --latest
-      - echo "✅ {{._PY_NAME}} · py · review pyproject.toml + poetry.lock, then lint + test"
+      - echo "{{._PY_OK}} {{._PY_NAME}} · py · review pyproject.toml + poetry.lock, then lint + test"
 
   deps:outdated:
     desc: "Show dependencies with a newer version available (read-only)"

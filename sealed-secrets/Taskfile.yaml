@@ -37,6 +37,9 @@ vars:
   _SS_CTRL: '{{.SEALED_SECRETS_CONTROLLER | default "sealed-secrets-controller"}}'
   _SS_KUBECTL: 'kubectl{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT}}{{end}}'
   _SS_SEAL: 'kubeseal --controller-namespace {{.SEALED_SECRETS_NS | default "sealed-secrets"}} --controller-name {{.SEALED_SECRETS_CONTROLLER | default "sealed-secrets-controller"}} --format yaml'
+  # Status markers. The shape carries the meaning, so a line still reads in
+  # a monochrome log; the colour sits on top and drops out under NO_COLOR.
+  _SS_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
 
 tasks:
 
@@ -55,7 +58,7 @@ tasks:
         --from-literal={{ printf "%s=%s" .key .value | q }}
         --dry-run=client -o yaml
         | {{._SS_SEAL}} > {{.output | q}}
-      - echo "✅ sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
+      - echo "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
 
   seal:file:
     desc: "Seal every key in an env file into one SealedSecret manifest"
@@ -74,7 +77,7 @@ tasks:
         --from-env-file={{.file | q}}
         --dry-run=client -o yaml
         | {{._SS_SEAL}} > {{.output | q}}
-      - echo "✅ sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
+      - echo "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
 
   pubkey:
     desc: "Print the controller's public certificate, for sealing without a cluster"

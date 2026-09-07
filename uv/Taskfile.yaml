@@ -48,6 +48,10 @@ vars:
   # uv picks an interpreter from .python-version or the pyproject constraint
   # unless one is named; pin PY to the version the deployed image runs.
   _UV_PY: '{{if .PY}} --python {{.PY}}{{end}}'
+  # Status markers. The shape carries the meaning, so a line still reads in
+  # a monochrome log; the colour sits on top and drops out under NO_COLOR.
+  _UV_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
+  _UV_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
 
 tasks:
 
@@ -60,25 +64,25 @@ tasks:
       - sh: command -v uv >/dev/null
         msg: "uv is not installed — https://docs.astral.sh/uv/getting-started/installation/"
     cmds:
-      - echo "🔵 {{._UV_NAME}} · uv · sync"
+      - echo "{{._UV_RUN}} {{._UV_NAME}} · uv · sync"
       - uv sync {{._UV_SYNC}}{{._UV_PY}}
-      - echo "✅ {{._UV_NAME}} · uv · dependencies installed"
+      - echo "{{._UV_OK}} {{._UV_NAME}} · uv · dependencies installed"
 
   test:
     desc: "pytest"
     deps: [install]
     cmds:
-      - echo "🔵 {{._UV_NAME}} · uv · {{._UV_TEST_CMD}}"
+      - echo "{{._UV_RUN}} {{._UV_NAME}} · uv · {{._UV_TEST_CMD}}"
       - uv run {{._UV_TEST_CMD}} {{._UV_TEST_FLAGS}}
-      - echo "✅ {{._UV_NAME}} · uv · tests pass"
+      - echo "{{._UV_OK}} {{._UV_NAME}} · uv · tests pass"
 
   lint:
     desc: "ruff check"
     deps: [install]
     cmds:
-      - echo "🔵 {{._UV_NAME}} · uv · {{._UV_LINT_CMD}}"
+      - echo "{{._UV_RUN}} {{._UV_NAME}} · uv · {{._UV_LINT_CMD}}"
       - uv run {{._UV_LINT_CMD}} {{._UV_SRC}}
-      - echo "✅ {{._UV_NAME}} · uv · lint clean"
+      - echo "{{._UV_OK}} {{._UV_NAME}} · uv · lint clean"
 
   fmt:
     desc: "ruff format"
@@ -88,30 +92,30 @@ tasks:
     deps: [install]
     cmds:
       - uv run {{._UV_FMT_CMD}} {{._UV_SRC}}
-      - echo "✅ {{._UV_NAME}} · uv · formatted"
+      - echo "{{._UV_OK}} {{._UV_NAME}} · uv · formatted"
 
   typecheck:
     desc: "mypy (skipped when mypy is not a project dependency)"
     status:
       - "! uv run python -c 'import {{._UV_TC_MOD}}' >/dev/null 2>&1"
     cmds:
-      - echo "🔵 {{._UV_NAME}} · uv · {{._UV_TC_CMD}}"
+      - echo "{{._UV_RUN}} {{._UV_NAME}} · uv · {{._UV_TC_CMD}}"
       - uv run {{._UV_TC_CMD}} {{._UV_SRC}}
-      - echo "✅ {{._UV_NAME}} · uv · types clean"
+      - echo "{{._UV_OK}} {{._UV_NAME}} · uv · types clean"
 
   lock:
     desc: "Regenerate uv.lock without changing any version"
     cmds:
       - uv lock
-      - echo "✅ {{._UV_NAME}} · uv · uv.lock regenerated"
+      - echo "{{._UV_OK}} {{._UV_NAME}} · uv · uv.lock regenerated"
 
   deps:update:
     desc: "Bump dependencies within their pyproject constraints, then refresh the lock"
     cmds:
-      - echo "🔵 {{._UV_NAME}} · uv · lock --upgrade"
+      - echo "{{._UV_RUN}} {{._UV_NAME}} · uv · lock --upgrade"
       - uv lock --upgrade
       - uv sync {{._UV_SYNC}}
-      - echo "✅ {{._UV_NAME}} · uv · deps bumped — review uv.lock, then lint + test"
+      - echo "{{._UV_OK}} {{._UV_NAME}} · uv · deps bumped — review uv.lock, then lint + test"
 
   deps:outdated:
     desc: "Show dependencies with a newer version available (read-only)"
