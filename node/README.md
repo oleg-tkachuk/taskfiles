@@ -21,6 +21,7 @@ workspace — tasks then read `node:<task>`.
 | `generate` | Run the codegen script |
 | `install` | Install dependencies from the lockfile (skipped when the manifests are unchanged) |
 | `lint` | Run the lint script (read-only) |
+| `typecheck` | Run the typecheck script, skipped where the project declares none |
 | `test` | Run the test script |
 | `verify` | Lint then build — the pre-push gate |
 | `deps` | outdated:       Show dependencies with a newer version available (read-only) |
@@ -39,6 +40,7 @@ workspace — tasks then read `node:<task>`.
 | `SCRIPT_BUILD` | `build` | what `build` runs |
 | `SCRIPT_LINT` | `lint` | what `lint` and `lint:fix` run |
 | `SCRIPT_TEST` | `test` | what `test` runs |
+| `SCRIPT_TYPECHECK` | `typecheck` | what `typecheck` runs |
 | `SCRIPT_E2E` | `test:e2e` | what `test:e2e` runs |
 | `SCRIPT_GENERATE` | `generate` | what `generate` runs |
 | `LINT_FIX_FLAGS` | `--fix` | what `lint:fix` appends |

@@ -28,6 +28,12 @@ Nothing yet.
   same rule for the scanner that does its own walking. Point it at a repository's
   other vendored trees to widen it: `--skip-dirs .claude --skip-dirs .ocp`.
 
+- **`node:typecheck`**, running the project's `typecheck` script and printing
+  `○ … skipped` where package.json declares none. Two apps were already calling
+  it in their `verify` gate against a task that did not exist, so the gate
+  failed on the reference rather than on the types. `SCRIPT_TYPECHECK` renames
+  the script.
+
 ## [5.0.1] — 2026-09-07
 
 ### Fixed
