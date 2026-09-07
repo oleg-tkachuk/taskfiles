@@ -42,6 +42,7 @@ jobs:
     # pinned to a mutable tag. Two of those had already shipped here.
     name: Workflow audit
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: 'Setup: check out the repository'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,6 +58,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: 'Setup: check out the repository'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -74,6 +76,26 @@ jobs:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: 'Notice: a newer Task exists'
+        # Dependabot watches `uses:` pins and cannot see TASK_VERSION, so this
+        # is the only thing that would ever mention a new Task. A notice rather
+        # than a gate: the pin is deliberate — a silent upgrade is how a green
+        # check stops meaning what it meant — so this reports and moves on.
+        #
+        # continue-on-error keeps a rate-limited API call from failing the job.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PINNED: ${{ env.TASK_VERSION }}
+        run: |
+          set -euo pipefail
+          latest=$(gh release view --repo go-task/task --json tagName --jq '.tagName' | sed 's/^v//')
+          if [ "$latest" != "$PINNED" ]; then
+            echo "::notice::Task $latest is out; this repository pins $PINNED. Bump TASK_VERSION in both workflows after reading the changelog."
+          else
+            echo "✔ TASK_VERSION $PINNED is the current release"
+          fi
+
       - name: 'Guard: every module lints'
         run: task lint
 
@@ -84,6 +106,7 @@ jobs:
     # repository being present.
     name: Consumer smoke
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: 'Setup: check out the repository'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

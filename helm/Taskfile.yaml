@@ -67,9 +67,15 @@ tasks:
       # view rather than from memory.
       - echo "▸ helm · about to uninstall:"
       - helm list{{._HELM_CTX}} {{._HELM_SCOPE}} -q | sed 's/^/    /'
+      # awk over helm's table rather than a JSON parse: a release name is a DNS
+      # label, so the first two columns cannot contain a space, and this asks
+      # nothing of the machine that helm has not already asked. The earlier
+      # version piped through python3 — an interpreter this module has no reason
+      # to require, and whose absence would surface only after the prompt had
+      # been answered.
       - cmd: |-
-          helm list{{._HELM_CTX}} {{._HELM_SCOPE}} -o json \
-            | python3 -c 'import json,sys;[print(r["name"], r["namespace"]) for r in json.load(sys.stdin)]' \
+          helm list{{._HELM_CTX}} {{._HELM_SCOPE}} \
+            | awk 'NR > 1 { print $1, $2 }' \
             | while read -r name ns; do
                 helm uninstall{{._HELM_CTX}} "$name" --namespace "$ns" >/dev/null \
                   && echo "✔ helm · uninstalled $ns/$name"

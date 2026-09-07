@@ -32,6 +32,7 @@ jobs:
   gate:
     name: Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: 'Setup: check out the tag'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -139,6 +140,7 @@ jobs:
     name: Consumable over git
     needs: gate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: 'Setup: Task'
         uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
@@ -219,6 +221,7 @@ jobs:
     name: Publish
     needs: [gate, consumable]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       # The only job in either workflow that needs more than read, which is why
       # the elevation sits here rather than at the top of the file.
