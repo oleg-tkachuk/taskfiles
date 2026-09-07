@@ -1,7 +1,7 @@
 version: "3"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# runtime/orbstack — making a locally built image runnable by a OrbStack cluster,
+# runtime/orbstack — making a locally built image runnable by an OrbStack cluster,
 # with no registry in the loop.
 #
 #   includes:

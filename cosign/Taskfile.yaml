@@ -31,7 +31,7 @@ version: "3"
 #   COSIGN_SIGNING_CONFIG  signing config (default <COSIGN_DIR>/signing-config.json)
 #   COSIGN_SIGN        set to "0" to make every task here a no-op
 #   COSIGN_SIGN_FLAGS  extra flags for sign/attest
-#   COSIGN_VERIFY_FLAGS  extra flags for verify   (default --insecure-ignore-tlog)
+#   COSIGN_VERIFY_FLAGS  extra flags for verify   (default --insecure-ignore-tlog=true)
 #   SBOM_FORMAT        syft output format             (default spdx-json)
 #   SYFT_FLAGS         verbatim extra syft flags
 #   SBOM_INSECURE      "1" when the registry serves a certificate syft rejects
@@ -41,7 +41,7 @@ version: "3"
 # `task cosign:keygen` writes both the keys and a signing config that has no
 # Rekor, Fulcio, TSA or OIDC in it. Publishing to a public registry instead?
 # Drop COSIGN_KEY, pass keyless flags through COSIGN_SIGN_FLAGS, and take
-# `--insecure-ignore-tlog` back out of COSIGN_VERIFY_FLAGS.
+# `--insecure-ignore-tlog=true` back out of COSIGN_VERIFY_FLAGS.
 #
 # Missing key or missing syft is an ERROR, not a skip. An artifact that is
 # quietly unsigned is the whole failure mode this module exists to prevent; if

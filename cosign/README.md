@@ -86,7 +86,7 @@ turning signing off is something you say out loud, with `COSIGN_SIGN=0`.
 `keygen` writes a signing config with no Rekor, Fulcio, TSA or OIDC, because a
 private registry cannot verify against the public log anyway. Publishing to a
 public registry instead? Drop `COSIGN_KEY`, pass keyless flags through
-`COSIGN_SIGN_FLAGS`, and take `--insecure-ignore-tlog` back out of
+`COSIGN_SIGN_FLAGS`, and take `--insecure-ignore-tlog=true` back out of
 `COSIGN_VERIFY_FLAGS`.
 
 ## keygen refuses to overwrite
