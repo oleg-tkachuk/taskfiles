@@ -2,6 +2,8 @@
 coverage/
 bin/
 deploy/info.env
+.DS_Store
+*.tgz
 # The cosign module's own convention is to commit cosign.pub and keep only
 # cosign.key out of the repo — right for a real project with one shared
 # signing identity. This demo has no "team": everyone who runs it signs
