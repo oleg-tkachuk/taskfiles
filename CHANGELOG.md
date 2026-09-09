@@ -14,6 +14,10 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [5.2.4] — 2026-09-10
+
 ### Fixed
 
 - **`release.yml` merged into `ci.yml`** — a tag push used to trigger both as
