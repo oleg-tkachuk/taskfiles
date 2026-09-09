@@ -25,6 +25,7 @@ workspace — tasks then read `k8s:<task>`.
 | `restart` | Roll the deployment (no-op when the namespace or deployment is absent) |
 | `status` | Show the deployment and its pods |
 | `upgrade` | helm upgrade --install the release from the local chart directory |
+| `uninstall` | helm uninstall this component's release — asks first |
 
 ## Inputs
 
@@ -35,6 +36,7 @@ workspace — tasks then read `k8s:<task>`.
 | `K8S_DEPLOYMENT_NAME` | `PROJECT_NAME` | when the deployment is not named after the component |
 | `K8S_CONTEXT` | current context | pin a cluster |
 | `CHART_DIR` | `./deploy/chart` | for `upgrade` |
+| `VALUES` | — | a values file for `upgrade` |
 | `ROLLOUT_TIMEOUT` | `2m` | how long `restart` waits |
 | `HELM_UPGRADE_FLAGS` | — | extra flags for `upgrade` |
 
@@ -62,6 +64,22 @@ $ task k8s:port-forward PORT=8080
 $ task k8s:port-forward PORT=8081 TARGET_PORT=80    # container listens on :80
 $ task k8s:logs TAIL=500
 ```
+
+## Your chart's Deployment must be named after the release
+
+Every task addresses the Deployment directly — `deploy/<name>` — rather than
+discovering it through a selector, and that name has to be exactly
+`K8S_DEPLOYMENT_NAME` (`PROJECT_NAME` by default). `helm create`'s own
+scaffold does not do this: it names the resource `<release>-<chart>` through
+its "fullname" helper. Skip that helper and set `metadata.name` to
+`{{ .Release.Name }}` directly — one component, one release, one name — the
+way this library's own [demo/](../demo/README.md) chart does.
+
+`status`'s pod list has the same requirement one label over: it selects on
+`app.kubernetes.io/instance`, which Helm's own recommended labels (and
+`helm create`) set to the release name. `app.kubernetes.io/name` is the
+wrong one to match on here — it is the chart's identity, constant across
+every release of it, not this component's.
 
 ## Absent is not an error
 
