@@ -116,15 +116,18 @@ tasks:
 
   status:
     desc: "Show the deployment and its pods"
-    # app.kubernetes.io/instance, not /name: Helm's own recommended labels
-    # (and helm create's scaffold) set /name to the CHART's name, constant
-    # across every release of it, and /instance to THIS release — which is
-    # {{._K8S_DEPLOY}}. A chart that only sets /name would silently return no
-    # pods here, for a chart-identity label that was never this component's
-    # name to begin with.
+    # The pod list reads its selector from the Deployment itself rather than
+    # guessing a label convention (app.kubernetes.io/instance, /name, or
+    # something a chart invented) — whatever spec.selector.matchLabels says,
+    # because that is what actually decides which pods belong to it. Immune
+    # to what a consumer's chart happens to label things, by construction
+    # rather than by convention.
     cmds:
       - "{{._K8S_KUBECTL}} -n {{._K8S_NS}} get deploy/{{._K8S_DEPLOY}} -o wide"
-      - "{{._K8S_KUBECTL}} -n {{._K8S_NS}} get pods -l app.kubernetes.io/instance={{._K8S_DEPLOY}} -o wide"
+      - cmd: |-
+          set -eu
+          sel=$({{._K8S_KUBECTL}} -n {{._K8S_NS}} get deploy/{{._K8S_DEPLOY}} -o go-template='{{"{{"}}range $k,$v := .spec.selector.matchLabels{{"}}"}}{{"{{"}}$k{{"}}"}}={{"{{"}}$v{{"}}"}},{{"{{"}}end{{"}}"}}' | sed 's/,$//')
+          {{._K8S_KUBECTL}} -n {{._K8S_NS}} get pods -l "$sel" -o wide
 
   port-forward:
     desc: "Port-forward the deployment (PORT local, TARGET_PORT in the pod)"

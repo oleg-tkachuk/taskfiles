@@ -75,11 +75,10 @@ its "fullname" helper. Skip that helper and set `metadata.name` to
 `{{ .Release.Name }}` directly — one component, one release, one name — the
 way this library's own [demo/](../demo/README.md) chart does.
 
-`status`'s pod list has the same requirement one label over: it selects on
-`app.kubernetes.io/instance`, which Helm's own recommended labels (and
-`helm create`) set to the release name. `app.kubernetes.io/name` is the
-wrong one to match on here — it is the chart's identity, constant across
-every release of it, not this component's.
+`status`'s pod list does not have that problem: it reads the selector off
+the Deployment itself (`spec.selector.matchLabels`) rather than assuming a
+label convention, so it finds the right pods whatever your chart happens to
+label them.
 
 ## Absent is not an error
 
