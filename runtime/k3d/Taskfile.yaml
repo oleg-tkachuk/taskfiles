@@ -60,6 +60,9 @@ tasks:
     # No registry in the path: the chart is installed from disk and the image
     # is pinned to the tag just built, with IfNotPresent so nothing is pulled.
     deps: [check]
+    preconditions:
+      - sh: command -v helm >/dev/null
+        msg: "helm is not installed — https://helm.sh/docs/intro/install/"
     cmds:
       - task: image:load
       - echo "{{._RT_RUN}} {{._RT_SVC}} · local · helm upgrade --install into {{._RT_CTX}}/{{._RT_K8S_NS}}"
