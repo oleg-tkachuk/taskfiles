@@ -26,6 +26,7 @@ modules, walkthrough included.
   - [Variable scoping](#variable-scoping)
   - [When a module's values are decided](#when-a-modules-values-are-decided)
   - [Task naming](#task-naming)
+  - [A task you don't need](#a-task-you-dont-need)
   - [An empty value turns nothing off](#an-empty-value-turns-nothing-off)
   - [Include naming](#include-naming)
   - [Logging](#logging)
@@ -230,6 +231,38 @@ Public tasks are the plain verb for the work (`build`, `test`,
 `_verb` when they stand alone, or `parent:_variant` when they are one branch of
 a public task — the complementary `image:build:_do` / `image:build:_skipped`
 pair, for instance, where exactly one of the two runs.
+
+### A task you don't need
+
+A module's task list is not all-or-nothing. Task's own `excludes:` on the
+include drops specific tasks from it — not hidden from `--list-all`,
+genuinely gone:
+
+```yaml
+includes:
+  k8s:
+    taskfile: '{{printf .TASKLIB "k8s"}}'
+    dir: .
+    excludes: ["port-forward"]
+```
+
+```console
+$ task k8s:port-forward
+task: Task "k8s:port-forward" does not exist
+```
+
+Real case: an infrastructure repository that only ever runs `k8s:restart`
+and `k8s:status` has no service behind a Deployment to reach through
+`port-forward`, and likely no use for tailing `logs` either — exclude both:
+
+```yaml
+excludes: ["port-forward", "logs"]
+```
+
+Name the task the way the module itself does — `port-forward`, not
+`k8s:port-forward`. The namespaced form matches nothing, and `excludes`
+fails silently: the task stays in the list, with no error saying why the
+exclusion did not take.
 
 ### An empty value turns nothing off
 
