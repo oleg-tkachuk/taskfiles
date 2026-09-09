@@ -16,6 +16,49 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [5.2.0] — 2026-09-09
+
+### Added
+
+- **`k8s:uninstall`** — `helm uninstall` scoped to this component's own
+  release, asking first. `upgrade` had no way back that did not mean
+  emptying the whole cluster through `helm:uninstall-all`.
+- **`VALUES`**, a values file for `k8s:upgrade`, matching the input
+  `runtime/*:install` already had.
+
+### Fixed
+
+- `k8s:status`'s pod list matched on `app.kubernetes.io/instance` — itself
+  a better guess than the `/name` it replaced, but still a guess about a
+  consumer's chart's labels. It now reads the selector straight off the
+  Deployment's own `spec.selector.matchLabels`, so it works regardless of
+  labeling convention. The library's own `Deployment` naming requirement is
+  now documented too: every `k8s` task addresses it by name directly, which
+  needs `metadata.name` to equal the release name — `helm create`'s
+  "fullname" helper (`<release>-<chart>`) will not resolve.
+- `argocd:refresh` reported a cluster with no ArgoCD installed at all
+  (`applications.argoproj.io` CRD missing) identically to a cluster with
+  nothing matching `APP_PREFIX` — both said "no application matches" with
+  the real error thrown away. A reachable cluster now surfaces that error;
+  an unreachable one still no-ops, as before.
+- `go:test`, `go:fmt` and `go:deps:outdated` each used `&&/||` to fall back
+  when a tool was absent, which let a **failure** of that tool fall through
+  the same branch — `go:test` ran the suite a second time through plain
+  `go test` whenever gotestsum reported a real failure, giving a flaky test
+  a second chance to report green.
+- `python/uv:deps:outdated` and `python/poetry:deps:outdated` swallowed a
+  genuine failure (an unresolvable dependency, a missing lockfile) behind
+  `|| true` — copied from `node:deps:outdated`, where it is correct because
+  `pnpm`/`npm` exit non-zero specifically to signal findings. `uv` and
+  `poetry` do not share that behavior and exit 0 on a report either way, so
+  there was nothing legitimate left for `|| true` to protect.
+- `compose`'s `build`, `down`, `reset`, `ps` and `logs` now check
+  `COMPOSE_FILE` exists, the same guard `up` already had, instead of
+  surfacing the compose engine's raw error.
+- `runtime/*:install` (all five variants) now checks `helm` is installed
+  before its first `helm` call, matching `release`, the `helm` module and
+  `k8s:upgrade`/`uninstall`.
+
 ## [5.1.3] — 2026-09-07
 
 ### Added
