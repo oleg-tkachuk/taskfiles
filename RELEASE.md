@@ -31,13 +31,15 @@ ref, so this step alone is still a direct push:
 
 ```bash
 git switch main && git pull
-git tag -a v1.2.0 -m "…" && git push origin v1.2.0  # release.yml takes it from here
+git tag -a v1.2.0 -m "…" && git push origin v1.2.0  # ci.yml takes it from here
 ```
 
 ## What the workflow refuses
 
-Pushing the tag runs [`release.yml`](.github/workflows/release.yml), which will
-not publish a tag that:
+Pushing the tag runs the `gate`, `consumable` and `publish` jobs in
+[`ci.yml`](.github/workflows/ci.yml), which `needs:` the same lint,
+consumer-smoke and workflow-audit jobs an ordinary push runs — a tag whose own
+CI is red never reaches `publish`. Past that, it will not publish a tag that:
 
 - **`main` does not contain** — a tag cut on a side branch would ship a tree
   that CI on main never saw, to consumers who pinned it;

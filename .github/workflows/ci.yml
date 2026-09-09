@@ -1,9 +1,13 @@
-# The same gate the git hooks run, on a machine that has never seen this repo.
+# The same gate the git hooks run, on a machine that has never seen this
+# repo — and, on a tag, the release gate too. `gate`, `consumable` and
+# `publish` below `needs:` the checks above them, so a tag whose own CI run
+# is red cannot reach `gh release create`.
 #
-# Everything here is `task lint` — the checks live in Taskfile.yaml so the hook
-# and the workflow cannot drift apart. What CI adds is a clean environment: a
-# module that only parses because of something left in a developer's checkout
-# fails here.
+# These used to be two workflows, both triggered by the same tag push,
+# running in parallel with no dependency between them. Elsewhere, that exact
+# split let a release ship while its sibling CI run was still red — a job
+# dependency in one workflow closes the gap a second, independent trigger
+# cannot.
 name: CI
 
 on:
@@ -12,15 +16,20 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to verify and release (leave empty for a plain CI run)"
+        required: false
 
 permissions:
   contents: read
 
 concurrency:
-  # A new push supersedes the run in flight for the same ref; nothing here is
-  # worth finishing twice.
+  # A new push supersedes the run in flight for the same ref — except a tag:
+  # a release publish killed halfway is worse than a second run that finds
+  # the release already there and says so.
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 env:
   # Pinned, not floating: remote Taskfiles are only stable from 3.53, and a
@@ -33,6 +42,11 @@ env:
   # a job `container:` — actions/checkout needs both.) Revisit if upstream
   # starts publishing again.
   TASK_VERSION: 3.53.1
+  # What every checkout below resolves: the dispatched tag when there is one,
+  # otherwise whatever triggered this run. workflow_dispatch's own
+  # `github.ref` stays the branch picked in the "Run workflow" UI even when
+  # `tag` is set, so `inputs.tag` has to win explicitly.
+  CHECKOUT_REF: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
 jobs:
   workflows:
@@ -48,6 +62,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: 'Guard: the workflows pass the auditor'
         # pipx rather than uvx: pipx ships on the runner image, uv does not.
@@ -73,6 +88,7 @@ jobs:
           # Nothing here pushes with the checkout credential, so it has no
           # reason to be left behind in .git/config.
           persist-credentials: false
+          ref: ${{ env.CHECKOUT_REF }}
           # The modules resolve git state for their version scheme; the tags
           # are what make that resolution realistic rather than a fallback.
           fetch-depth: 0
@@ -98,7 +114,7 @@ jobs:
           set -euo pipefail
           latest=$(gh release view --repo go-task/task --json tagName --jq '.tagName' | sed 's/^v//')
           if [ "$latest" != "$PINNED" ]; then
-            echo "::notice::Task $latest is out; this repository pins $PINNED. Bump TASK_VERSION in both workflows after reading the changelog."
+            echo "::notice::Task $latest is out; this repository pins $PINNED. Bump TASK_VERSION in this file after reading the changelog."
           else
             echo "✔ TASK_VERSION $PINNED is the current release"
           fi
@@ -128,6 +144,7 @@ jobs:
           # Nothing here pushes with the checkout credential, so it has no
           # reason to be left behind in .git/config.
           persist-credentials: false
+          ref: ${{ env.CHECKOUT_REF }}
           path: taskfiles
 
       - name: 'Setup: Task'
@@ -294,3 +311,226 @@ jobs:
             9.9.9-dev.*) echo "✔ consumer vars reach the modules ($version)" ;;
             *) echo "✖ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
           esac
+
+  # Cutting a tag is the only thing consumers actually see: they pin
+  # `?ref=vX.Y.Z`, so a tag is a promise that this exact tree can be included
+  # and works. `gate`, `consumable` and `publish` below check that promise
+  # before publishing the release — the way a consumer would, over the
+  # network, through the git include path, not from a local checkout — and
+  # only after the checks above them have already passed for this exact ref.
+  gate:
+    name: Gate
+    needs: [workflows, lint, consumer-smoke]
+    # Only meaningful on a tag: an ordinary branch push or PR has nothing to
+    # release, and this is what keeps the release jobs from running at all —
+    # `consumable` and `publish` skip too, since a `needs:` on a skipped job
+    # skips by default.
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 'Setup: check out the tag'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes with the checkout credential, so it has no
+          # reason to be left behind in .git/config.
+          persist-credentials: false
+          ref: ${{ env.CHECKOUT_REF }}
+          fetch-depth: 0
+
+      - name: 'Guard: releases only from main'
+        # github.ref here is refs/tags/vX.Y.Z, never a branch — comparing it to
+        # refs/heads/main would refuse every release. The invariant that
+        # actually matters is that main contains the tagged commit: consumers
+        # pin `?ref=vX.Y.Z` and fetch that exact tree, so a tag cut on a side
+        # branch would publish a tree main never held and CI on main never
+        # saw, forking the released line with nothing to say it had happened.
+        #
+        # HEAD rather than the tag ref: the checkout above is already the
+        # tagged commit, under a tag push and a workflow_dispatch alike.
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet origin/main >/dev/null; then
+            git fetch --quiet origin main:refs/remotes/origin/main
+          fi
+          if git merge-base --is-ancestor HEAD origin/main; then
+            echo "✔ $TAG is a commit on main"
+            exit 0
+          fi
+          echo "::error::Releases must be cut from main. $TAG points at a commit main does not contain, so it would publish a tree that never passed CI on main — and consumers pinning ?ref=$TAG would fetch exactly that tree."
+          exit 1
+
+      - name: 'Guard: the changelog documents this tag'
+        # The notes on the Releases page are generated from merged PRs; this is
+        # the curated half, and the only place an upgrading consumer is told
+        # which names changed and what to set instead. A tag published without
+        # it is a tag nobody can act on.
+        #
+        # The tag arrives through env, never through `${{ }}` inside the script:
+        # an expression is substituted as text before bash parses the line, so a
+        # tag named `v1.0.0$(…)` — git allows that — would run as a command.
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          tag="$TAG"
+          version="${tag#v}"
+          if [ ! -f CHANGELOG.md ]; then
+            echo "✖ $tag has no CHANGELOG.md in its tree" >&2
+            echo "  Tags cut before the changelog existed cannot pass this gate," >&2
+            echo "  and do not need to: release from a tag that contains it." >&2
+            exit 1
+          fi
+          if ! grep -qF "## [$version]" CHANGELOG.md; then
+            echo "✖ CHANGELOG.md has no '## [$version]' section" >&2
+            echo "  Add one — what a consumer has to do about this release —" >&2
+            echo "  and move anything under [Unreleased] into it." >&2
+            exit 1
+          fi
+          echo "✔ $tag is documented in CHANGELOG.md"
+
+      - name: 'Guard: the README pins this tag'
+        # The quickstart is written to be copied as-is, so the version in it is
+        # part of the release rather than decoration — and nothing templates a
+        # README on GitHub, which is why this is a check and not a substitution.
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if grep -qF "?ref=$TAG" README.md; then
+            echo "✔ README pins $TAG"
+            exit 0
+          fi
+          found=$(grep -oE '\?ref=v[0-9]+\.[0-9]+\.[0-9]+' README.md | head -1 || true)
+          echo "::error::README.md still shows ${found:-no pin at all} where it should pin $TAG. Bump it in the release commit, before the tag." >&2
+          exit 1
+
+      - name: 'Guard: the tag is SemVer'
+        # Helm and OCI both reject a chart version that is not SemVer-2, and
+        # the modules mint chart versions from these tags. A tag that cannot be
+        # a chart version is a tag no consumer can use.
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          tag="$TAG"
+          case "$tag" in
+            v[0-9]*.[0-9]*.[0-9]*) echo "✔ $tag is SemVer-shaped" ;;
+            *) echo "✖ $tag is not vMAJOR.MINOR.PATCH" >&2; exit 1 ;;
+          esac
+
+  consumable:
+    name: Consumable over git
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 'Setup: Task'
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
+        with:
+          version: ${{ env.TASK_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 'Setup: git credentials for the include fetch'
+        # Task shells out to the system git for a remote include, so the token
+        # goes in through git's own config rather than into the Taskfile — and
+        # through env rather than `${{ }}`, so it is never substituted into the
+        # rendered script.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+
+      - name: 'Verify: the tag includes the way a consumer does'
+        env:
+          REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        # Deliberately NOT a local checkout: this is the only step that proves
+        # the published tag can be fetched, that every module resolves through
+        # the git include path, and that the trust prompt does not block CI.
+        run: |
+          set -euo pipefail
+          mkdir consumer && cd consumer
+          git init -q
+          git config user.email ci@example.invalid
+          git config user.name CI
+          echo placeholder > README.md
+          git add -A && git commit -qm "chore: seed"
+
+          cat > Taskfile.yaml <<'YAML'
+          version: "3"
+          silent: true
+          vars:
+            TASKLIB: 'https://github.com/OWNER_REPO.git//%s?ref=TAGVALUE'
+            PROJECT_NAME: smoke
+            IMAGE_NAMESPACE: acme
+            K8S_NAMESPACE: smoke-ns
+            REGISTRY: registry.example.com
+            VERSION_BASE: 9.9.9
+          includes:
+            release:  { taskfile: '{{printf .TASKLIB "release"}}', dir: . }
+            k8s:      { taskfile: '{{printf .TASKLIB "k8s"}}', dir: . }
+            go:       { taskfile: '{{printf .TASKLIB "go"}}', dir: . }
+            python:   { taskfile: '{{printf .TASKLIB "python/poetry"}}', dir: . }
+            node:     { taskfile: '{{printf .TASKLIB "node"}}', dir: . }
+            compose:  { taskfile: '{{printf .TASKLIB "compose"}}', dir: . }
+            security: { taskfile: '{{printf .TASKLIB "security"}}', dir: . }
+            monorepo: { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: . }
+            argocd:   { taskfile: '{{printf .TASKLIB "argocd"}}', dir: . }
+            auth:     { taskfile: '{{printf .TASKLIB "auth"}}', dir: . }
+            local:    { taskfile: '{{printf .TASKLIB "runtime/orbstack"}}', dir: . }
+          tasks: {}
+          YAML
+          # python rather than sed: the substitution is literal, so a tag
+          # carrying a `|`, a `&` or a backslash cannot rewrite the expression
+          # or leak into the shell.
+          python3 - "$REPO" "$TAG" <<'SUBST'
+          import sys, pathlib
+          p = pathlib.Path("Taskfile.yaml")
+          p.write_text(p.read_text().replace("OWNER_REPO", sys.argv[1]).replace("TAGVALUE", sys.argv[2]))
+          SUBST
+
+          # --yes accepts the first-fetch trust prompt; unattended, that prompt
+          # is a hang rather than a question.
+          task --yes --list-all > /dev/null
+          version=$(task --yes release:version)
+          case "$version" in
+            9.9.9-dev.*) echo "✔ the published tag includes and resolves ($version)" ;;
+            *) echo "✖ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
+          esac
+
+  publish:
+    name: Publish
+    needs: [gate, consumable]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      # The only job in this file that needs more than read, which is why the
+      # elevation sits here rather than at the top.
+      contents: write # `gh release create` writes the release and its notes
+    steps:
+      - name: 'Setup: check out the tag'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes with the checkout credential, so it has no
+          # reason to be left behind in .git/config.
+          persist-credentials: false
+          ref: ${{ env.CHECKOUT_REF }}
+          fetch-depth: 0
+
+      - name: 'Publish: the GitHub release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        # Notes come from merged PRs since the previous tag, which is why
+        # opening one carries a label — see .github/release.yml.
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "✔ release $TAG already exists"
+            exit 0
+          fi
+          gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
+          echo "✔ released $TAG"

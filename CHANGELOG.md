@@ -6,7 +6,7 @@ Notable changes to the shared task library, newest first. The format follows
 removal is a major bump — these modules are a public API.
 
 This file is **not** generated. The GitHub release notes already list the
-commits — `release.yml` builds them with `--generate-notes` — and repeating
+commits — `ci.yml`'s `publish` job builds them with `--generate-notes` — and repeating
 that here would add nothing. What a generator cannot write is the half that
 matters to someone upgrading: which names changed, what to set now that a
 default is gone, and what to replace a removed task with. That is what lives
@@ -14,7 +14,15 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **`release.yml` merged into `ci.yml`** — a tag push used to trigger both as
+  two independent workflows with no dependency between them; a release could
+  in principle publish while its own CI run was still red, since `publish`
+  never checked. The release jobs (`gate`, `consumable`, `publish`) are now
+  jobs in `ci.yml` that `needs:` the lint, consumer-smoke and workflow-audit
+  jobs, so a red check on the tag blocks the release outright. No consumer
+  change — this only affects how a maintainer cuts a release.
 
 ## [5.2.3] — 2026-09-09
 
