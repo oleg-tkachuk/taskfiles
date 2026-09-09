@@ -50,18 +50,27 @@ tasks:
 
   build:
     desc: "Rebuild the images the stack is composed of, then start it"
+    preconditions:
+      - sh: test -f {{._CMP_FILE}}
+        msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     cmds:
       - "{{._CMP_CMD}} up -d --build --wait"
       - echo "{{._CMP_OK}} {{._CMP_NAME}} · compose · rebuilt and healthy"
 
   down:
     desc: "Stop the stack. Volumes are preserved."
+    preconditions:
+      - sh: test -f {{._CMP_FILE}}
+        msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     cmds:
       - "{{._CMP_CMD}} down"
       - echo "{{._CMP_OK}} {{._CMP_NAME}} · compose · stopped (volumes kept)"
 
   reset:
     desc: "Stop the stack and DELETE its volumes — local data is lost"
+    preconditions:
+      - sh: test -f {{._CMP_FILE}}
+        msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     prompt: "Delete every volume of {{._CMP_FILE}}? Local database contents are lost."
     cmds:
       - "{{._CMP_CMD}} down -v"
@@ -69,11 +78,17 @@ tasks:
 
   ps:
     desc: "Show what is running"
+    preconditions:
+      - sh: test -f {{._CMP_FILE}}
+        msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     cmds:
       - "{{._CMP_CMD}} ps"
 
   logs:
     desc: "Tail the stack's logs (SERVICE=… for one of them)"
     interactive: true
+    preconditions:
+      - sh: test -f {{._CMP_FILE}}
+        msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     cmds:
       - "{{._CMP_CMD}} logs -f --tail={{.TAIL | default \"200\"}} {{.SERVICE | default \"\"}}"
