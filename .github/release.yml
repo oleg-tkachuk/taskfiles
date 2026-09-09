@@ -1,6 +1,6 @@
-# Shapes the notes GitHub generates for a release — `release.yml` in the
-# workflows directory calls `gh release create --generate-notes`, and this is
-# the file that decides what those notes contain.
+# Shapes the notes GitHub generates for a release — the `publish` job in
+# `.github/workflows/ci.yml` calls `gh release create --generate-notes`, and
+# this is the file that decides what those notes contain.
 #
 # It is the mechanical half. The curated half lives in CHANGELOG.md and says
 # what an upgrading consumer has to *do*; this half says what landed and who
