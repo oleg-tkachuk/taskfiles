@@ -14,6 +14,10 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [5.2.3] — 2026-09-09
+
 ### Fixed
 
 - **`argocd:refresh` and `argocd:list` ignored `APP_PREFIX`** and acted on
