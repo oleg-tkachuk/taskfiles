@@ -51,8 +51,9 @@ a module would shadow whatever the consumer set.
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/),
 enforced by a hook: `type(scope): description`, imperative, lowercase, no
 trailing period. Types: `feat fix docs style refactor perf test build ci
-chore revert security`. This is load-bearing, not style — the release notes
-are generated from these.
+chore revert security`. Rebase-merge replays every commit onto `main`
+unchanged, so this is what a reader of `git log` sees — not collapsed into
+whatever the PR was titled.
 
 ## Changing the changelog
 
@@ -65,9 +66,16 @@ for how a change maps to major/minor/patch.
 
 ## Opening a PR
 
-Target `main`. CI runs the same lint, plus a consumer smoke test that
-includes every module side by side and a `zizmor` audit of the workflows
-themselves. All three need to pass.
+`main` is branch-protected — there is no direct push, for anyone, including
+the maintainer. Open a PR; CI runs the lint, a consumer smoke test that
+includes every module side by side, and a `zizmor` audit of the workflows
+themselves. All three are required checks, and the branch merges with rebase
+once they pass, so the individual commits land on `main` as you wrote them.
+
+Label the PR `bug`, `enhancement` or `documentation` — the GitHub release
+notes are generated from merged PRs and sorted by that label (see
+[`.github/release.yml`](.github/release.yml)); an unlabeled PR still merges
+fine, it just lands in "Other Changes".
 
 ## Reporting a security issue
 
