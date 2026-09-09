@@ -60,11 +60,21 @@ tasks:
     status:
       - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
     vars:
+      # The leading version check is deliberate, not redundant with the task's
+      # own status guard: task-level vars are evaluated before status is even
+      # consulted, so on a laptop with no cluster this would otherwise run the
+      # real get below and hard-fail before status ever got a chance to skip
+      # the task quietly. Past that check a cluster answers, so a genuine
+      # failure — the applications.argoproj.io CRD not existing because Argo
+      # itself was never installed here — is a real problem worth failing
+      # loudly on, not something to fold into "no application matched".
       _ARGO_APPS:
-        sh: >-
-          {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} get applications.argoproj.io
-          -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null
-          | grep -E '^{{._ARGO_PREFIX}}' || true
+        sh: |-
+          {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1 || exit 0
+          set -eu -o pipefail
+          {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} get applications.argoproj.io \
+            -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+            | { grep -E '^{{._ARGO_PREFIX}}' || true; }
     cmds:
       - for: { var: _ARGO_APPS }
         cmd: >-
