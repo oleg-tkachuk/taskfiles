@@ -37,9 +37,13 @@ silent: true
 
 vars:
   _ARGO_NS: '{{.ARGOCD_NS | default "argocd"}}'
-  # APP_PREFIX deliberately has no default: a bare prefix would hard-refresh
-  # unrelated applications (infra Postgres, registries) that must not be touched.
-  _ARGO_PREFIX: '{{.APP_PREFIX | default ""}}'
+  # APP_PREFIX is deliberately NOT resolved here. A var in this block is
+  # evaluated in the included file's own scope, which does not yet carry the
+  # vars a caller passes on the task call (`task: argocd:refresh` with
+  # `vars: {APP_PREFIX: …}`) — it resolved to "" there while the task itself
+  # saw the real value, and `grep -E '^'` then matched every application in
+  # the namespace. The tasks below read .APP_PREFIX directly, which works for
+  # a value passed at include time and at call time alike.
   _ARGO_KUBECTL: 'kubectl{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT}}{{end}}'
   _ARGO_SERVER: '{{.ARGOCD_SERVER | default "argocd-server"}}'
   _ARGO_LABEL: '{{.ARGOCD_SERVER_LABEL | default "argocd-server"}}'
@@ -56,6 +60,16 @@ tasks:
     desc: "Hard-refresh every Argo application matching APP_PREFIX"
     requires:
       vars: [APP_PREFIX]
+    preconditions:
+      # `requires` only asserts the var was set; an empty value passes it and
+      # then matches everything. This is the one place where "no filter" and
+      # "filter that matches all" have to be told apart.
+      - sh: '[ -n "{{.APP_PREFIX}}" ]'
+        msg: |-
+          APP_PREFIX is empty — refusing to hard-refresh.
+          An empty prefix matches EVERY application in the namespace,
+          including infra ones (Postgres, registries) that must not be
+          touched. Pass a prefix, e.g. APP_PREFIX=acme-.
     # Skipped, not failed, when there is no cluster to talk to.
     status:
       - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
@@ -74,14 +88,14 @@ tasks:
           set -eu -o pipefail
           {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} get applications.argoproj.io \
             -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
-            | { grep -E '^{{._ARGO_PREFIX}}' || true; }
+            | { grep -E '^{{.APP_PREFIX}}' || true; }
     cmds:
       - for: { var: _ARGO_APPS }
         cmd: >-
           {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} patch application.argoproj.io {{.ITEM}} --type merge
           -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' >/dev/null
           && echo "{{._ARGO_OK}} argocd · hard-refreshed {{.ITEM}}"
-      - '{{if not ._ARGO_APPS}}echo "{{._ARGO_SKIP}} argocd · no application matches {{._ARGO_PREFIX}}* in {{._ARGO_NS}}"{{end}}'
+      - '{{if not ._ARGO_APPS}}echo "{{._ARGO_SKIP}} argocd · no application matches {{.APP_PREFIX}}* in {{._ARGO_NS}}"{{end}}'
 
   list:
     desc: "Show the sync + health state of every application matching APP_PREFIX"
@@ -91,7 +105,7 @@ tasks:
       - >-
         {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} get applications.argoproj.io
         -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status
-        {{if .APP_PREFIX}}| grep -E '^(NAME|{{._ARGO_PREFIX}})'{{end}}
+        {{if .APP_PREFIX}}| grep -E '^(NAME|{{.APP_PREFIX}})'{{end}}
 
   # ═══ the server itself ══════════════════════════════════════════════════════
   #

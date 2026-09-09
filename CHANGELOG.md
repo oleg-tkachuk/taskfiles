@@ -14,7 +14,24 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **`argocd:refresh` and `argocd:list` ignored `APP_PREFIX`** and acted on
+  every application in the namespace. The module resolved the prefix into a
+  top-level `_ARGO_PREFIX` var, which is evaluated in the module's own scope
+  and cannot see a var a caller passes on the task call itself — the common
+  shape, `task: argocd:refresh` with `vars: {APP_PREFIX: …}`. It came back
+  empty, `grep -E '^'` matched everything, and a task documented as touching
+  one release hard-refreshed all 69 applications in the cluster, including
+  the infra ones the module's own comment said must never be touched. It
+  reported success each time. Both tasks now read `.APP_PREFIX` where they
+  use it, which works for a value passed at include time and at call time
+  alike. **No consumer change is needed** — a prefix that was being ignored
+  now takes effect, so a `refresh` that quietly touched siblings will stop.
+
+- **An empty `APP_PREFIX` is refused** rather than matched against everything.
+  `requires:` asserts only that a var was set; `APP_PREFIX=` passed it and
+  then selected the whole namespace.
 
 ## [5.2.2] — 2026-09-09
 

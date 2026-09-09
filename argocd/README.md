@@ -63,6 +63,10 @@ A bare prefix would hard-refresh unrelated applications — the infra Postgres, 
 registry — that must not be touched. Name the family explicitly, and keep the
 prefix narrow enough that it cannot match a sibling.
 
+An empty prefix is refused outright: `requires:` only asserts that the var was
+set, and `APP_PREFIX=` would otherwise select every application in the
+namespace — the exact outcome the rule above exists to prevent.
+
 ## No cluster is not a failure
 
 Every task here no-ops when kubectl cannot reach the cluster, so it is safe to
