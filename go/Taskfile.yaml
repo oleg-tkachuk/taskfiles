@@ -80,11 +80,16 @@ tasks:
     cmds:
       - echo "{{._GO_RUN}} {{._GO_NAME}} · go · test {{._GO_PKG}}"
       # gotestsum when it is installed (one line per package), plain go test
-      # otherwise — neither is worth a hard dependency.
-      - >-
-        command -v gotestsum >/dev/null 2>&1 &&
-        gotestsum --format pkgname --hide-summary skipped -- {{._GO_TEST_FLAGS}} {{._GO_PKG}} ||
-        go test {{._GO_TEST_FLAGS}} {{._GO_PKG}}
+      # otherwise — neither is worth a hard dependency. `&&/||` would run go
+      # test a second time whenever gotestsum found a real failure, not just
+      # when it was absent — a flaky test then gets a second roll of the dice
+      # to pass on, and the run reports green either way.
+      - cmd: |-
+          if command -v gotestsum >/dev/null 2>&1; then
+            gotestsum --format pkgname --hide-summary skipped -- {{._GO_TEST_FLAGS}} {{._GO_PKG}}
+          else
+            go test {{._GO_TEST_FLAGS}} {{._GO_PKG}}
+          fi
       - echo "{{._GO_OK}} {{._GO_NAME}} · go · tests pass"
 
   test:coverage:
@@ -126,7 +131,13 @@ tasks:
     desc: "gofmt -s -w, plus goimports when it is installed"
     cmds:
       - gofmt -s -w .
-      - command -v goimports >/dev/null 2>&1 && goimports -w . || true
+      # `&&/||` would swallow a genuine goimports failure the same way it
+      # would report success on it being absent — presence and success are
+      # checked separately instead.
+      - cmd: |-
+          if command -v goimports >/dev/null 2>&1; then
+            goimports -w .
+          fi
       - echo "{{._GO_OK}} {{._GO_NAME}} · go · formatted"
 
   tidy:
@@ -158,7 +169,14 @@ tasks:
   deps:outdated:
     desc: "List dependencies with a newer version available (read-only)"
     cmds:
-      - go list -u -m all 2>/dev/null | grep '\[' || echo "{{._GO_OK}} {{._GO_NAME}} · go · every dependency current"
+      # Capturing to a variable first, rather than piping go list straight
+      # into grep, is what makes a genuine go list failure (module
+      # unresolvable, no network) abort here instead of reading as "every
+      # dependency current" — the same conclusion an empty match gives.
+      - cmd: |-
+          set -eu
+          out=$(go list -u -m all)
+          printf '%s\n' "$out" | grep '\[' || echo "{{._GO_OK}} {{._GO_NAME}} · go · every dependency current"
 
   bench:
     desc: "Run the benchmarks — no unit tests, just the measurements"
