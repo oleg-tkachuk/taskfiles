@@ -16,6 +16,20 @@ here, and the release gate refuses a tag with no entry.
 
 Nothing yet.
 
+## [5.2.1] — 2026-09-09
+
+### Documentation
+
+- **Excluding a task you don't need** — Task's own `excludes:` on an
+  include drops specific tasks from a module entirely (not just hidden
+  from `--list-all`), documented here for the first time under
+  Conventions. Named after the case that surfaced it: an infrastructure
+  repository with no service behind a Deployment has no use for
+  `k8s:port-forward`. The gotcha worth knowing — `excludes:` takes the
+  task's own name (`port-forward`), not the namespaced one
+  (`k8s:port-forward`); the namespaced form matches nothing and fails
+  silently, with the task still showing up and no error explaining why.
+
 ## [5.2.0] — 2026-09-09
 
 ### Added

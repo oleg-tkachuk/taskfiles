@@ -10,7 +10,7 @@ version: "3"
 # library's own repo, one directory below the modules it includes). A project
 # of your own would instead pin a tag:
 #
-#   TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v5.2.0'
+#   TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v5.2.1'
 #
 # See README.md in this directory for the full walkthrough this Taskfile is
 # built to run.
