@@ -14,6 +14,10 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [5.2.2] — 2026-09-09
+
 ### Documentation
 
 - **Contributor and security docs** — `CONTRIBUTING.md`, `SECURITY.md`,
