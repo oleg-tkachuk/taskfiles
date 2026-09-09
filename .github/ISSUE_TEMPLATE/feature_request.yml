@@ -1,0 +1,19 @@
+name: Feature request
+description: A task, input or module this library doesn't have yet.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What can't you do today
+      description: The concrete task you're reaching for that no existing module covers, and how you're working around it now.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape
+      description: The task name, its inputs, and which module it belongs in (new or existing).
+    validations:
+      required: true

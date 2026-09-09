@@ -1,0 +1,36 @@
+name: Bug report
+description: Something in a module does not behave the way it's documented to.
+labels: [bug]
+body:
+  - type: input
+    id: module
+    attributes:
+      label: Module
+      description: Which one, e.g. `k8s`, `release`, `runtime/kind`.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The `?ref=vX.Y.Z` this was reproduced against.
+    validations:
+      required: true
+
+  - type: textarea
+    id: taskfile
+    attributes:
+      label: Relevant Taskfile.yaml
+      description: The `includes:` block and the vars the module reads.
+      render: yaml
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs. actual
+      description: What you expected to happen, and what happened instead — include the command and its output.
+    validations:
+      required: true
