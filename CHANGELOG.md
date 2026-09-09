@@ -33,6 +33,12 @@ here, and the release gate refuses a tag with no entry.
   `requires:` asserts only that a var was set; `APP_PREFIX=` passed it and
   then selected the whole namespace.
 
+### Added
+
+- **`check:scope`** — refuses a module whose `vars:` block resolves an input
+  some task declares in `requires:`. That is the defect above, made
+  unrepeatable across all modules rather than fixed in the one that had it.
+
 ## [5.2.2] — 2026-09-09
 
 ### Documentation

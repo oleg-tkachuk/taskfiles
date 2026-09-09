@@ -54,6 +54,7 @@ tasks:
     cmds:
       - task: check:parse
       - task: check:vars
+      - task: check:scope
       - task: check:silent
       - task: check:readme
       - task: check:surface
@@ -116,6 +117,59 @@ tasks:
             fi
           done
           [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every module var is scoped to its own module"
+          exit "$fail"
+
+  check:scope:
+    desc: "Refuse a module var that resolves an input the caller passes on the task call"
+    # A var in a module's top-level `vars:` block is evaluated in that file's
+    # own scope. It sees what the CONSUMER set at include time — and nothing a
+    # caller passes on the call itself (`task: argocd:refresh` with
+    # `vars: {APP_PREFIX: …}`). So a module var written to pre-chew such an
+    # input resolves to empty while the task it feeds sees the real value.
+    #
+    # This is silent in the worst way. argocd/refresh filtered applications
+    # with `grep -E {{`'`}}^$_ARGO_PREFIX{{`'`}}`, the prefix came back empty, the pattern
+    # became `^`, and a task documented as touching one release hard-refreshed
+    # all 69 applications in the cluster — including the infra ones its own
+    # comment said must never be touched. It reported success every time.
+    #
+    # An input a task `requires:` is by definition allowed to arrive at call
+    # time. Read it where it is used, not in the vars block.
+    cmds:
+      - cmd: |-
+          set -eu
+          fail=0
+          for f in {{.MODULE_FILES}}; do
+            out=$(awk '
+              /^[[:space:]]*requires:[[:space:]]*$/ { req = 1; next }
+              req && /^[[:space:]]*vars:[[:space:]]*\[/ {
+                line = $0
+                sub(/^[^[]*\[/, "", line); sub(/\].*$/, "", line)
+                n = split(line, a, ",")
+                for (i = 1; i <= n; i++) {
+                  gsub(/[[:space:]]/, "", a[i])
+                  if (a[i] != "") required[a[i]] = 1
+                }
+                req = 0; next
+              }
+              req && /^[[:space:]]*[^[:space:]#]/ { req = 0 }
+              /^vars:/        { inv = 1; next }
+              /^[^[:space:]]/ { inv = 0 }
+              inv && /^  [A-Za-z_][A-Za-z0-9_]*:/ { vline[++nv] = $0 }
+              END {
+                for (i = 1; i <= nv; i++)
+                  for (name in required)
+                    if (vline[i] ~ ("[{][{][[:space:]]*[.]" name "[^A-Za-z0-9_]"))
+                      printf "    %s\n      resolves %s, which a caller may pass on the call\n", vline[i], name
+              }
+            ' "$f")
+            if [ -n "$out" ]; then
+              echo "{{._LIB_ERR}} taskfiles · $f resolves a call-time input in its vars block:" >&2
+              printf '%s\n' "$out" >&2
+              fail=1
+            fi
+          done
+          [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · no module var resolves a call-time input"
           exit "$fail"
 
   check:silent:
