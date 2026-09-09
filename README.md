@@ -403,3 +403,8 @@ whatever the underlying tool prints.
 [MIT](LICENSE) — use it, copy a module into your own repository, change it,
 ship it in something commercial. The one condition is that a copy carries the
 copyright line and the permission notice with it.
+
+---
+
+Changing this library? See [CONTRIBUTING.md](CONTRIBUTING.md). Found a
+vulnerability? See [SECURITY.md](SECURITY.md) rather than a public issue.

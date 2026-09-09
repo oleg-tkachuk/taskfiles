@@ -14,7 +14,13 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
-Nothing yet.
+### Documentation
+
+- **Contributor and security docs** — `CONTRIBUTING.md`, `SECURITY.md`,
+  `CODE_OF_CONDUCT.md`, a PR template, and GitHub issue forms for a bug
+  report and a feature request. None of it changes a module; it exists so a
+  contributor or a security reporter has a documented path instead of
+  guessing one from the code.
 
 ## [5.2.1] — 2026-09-09
 
