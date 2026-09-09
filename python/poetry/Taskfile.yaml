@@ -136,5 +136,9 @@ tasks:
 
   deps:outdated:
     desc: "Show dependencies with a newer version available (read-only)"
+    # Unlike `pnpm outdated`, `poetry show --outdated` does not exit non-zero
+    # just for finding something outdated — it exits 0 either way and only
+    # fails for a real reason (no poetry.lock, an unresolvable dependency),
+    # so nothing here should swallow that.
     cmds:
-      - poetry show --outdated || true
+      - poetry show --outdated

@@ -121,6 +121,9 @@ tasks:
 
   deps:outdated:
     desc: "Show dependencies with a newer version available (read-only)"
+    # `uv tree --outdated` reports without touching the lock. Unlike
+    # `pnpm outdated`, it does not exit non-zero just for finding something
+    # outdated — it exits 0 either way and only fails for a real reason (an
+    # unresolvable dependency, say), so nothing here should swallow that.
     cmds:
-      # `uv tree --outdated` reports without touching the lock.
-      - uv tree --outdated --depth 1 || true
+      - uv tree --outdated --depth 1
