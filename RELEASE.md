@@ -13,10 +13,16 @@ from merged PRs, and a PR with no label falls into "Other Changes".
 
 ## Cutting one
 
-Write the CHANGELOG entry under `## [Unreleased]` as the work lands, then move
-it under the version and bump the README's pin in its own PR:
+`task cut:next` names the version — it runs `semantic-release` in dry-run
+against the commits since the last tag, under the `releaseRules` in
+[`release.config.cjs`](release.config.cjs): a `BREAKING CHANGE:` footer or `!`
+after the type is a major, `feat:` is a minor, everything else is a patch,
+matching [What a version number promises](#what-a-version-number-promises)
+below. Write the CHANGELOG entry under `## [Unreleased]` as the work lands,
+then move it under that version and bump the README's pin in its own PR:
 
 ```bash
+task cut:next                   # e.g. v1.2.0
 git switch -c release/1.2.0
 # move [Unreleased] under ## [1.2.0] — date, bump the README pin
 task lint                       # the gate, also run by the hooks
@@ -26,12 +32,15 @@ gh pr create --fill --label documentation
 gh pr merge --rebase --auto     # merges once the required checks pass
 ```
 
-Once that PR is merged, tag the commit it landed as — tags aren't a protected
-ref, so this step alone is still a direct push:
+Once that PR is merged, `task cut:tag` re-runs the same computation and
+refuses if it no longer matches what the CHANGELOG's top entry names — a
+commit landing on `main` between the two steps is the one thing that could
+make them disagree. On a match, it creates and pushes the tag itself — tags
+aren't a protected ref, so this is still, underneath, a direct push:
 
 ```bash
 git switch main && git pull
-git tag -a v1.2.0 -m "…" && git push origin v1.2.0  # ci.yml takes it from here
+task cut:tag                    # tags and pushes v1.2.0 — ci.yml takes it from here
 ```
 
 ## What the workflow refuses
@@ -68,6 +77,11 @@ Renaming or removing a task is a major bump: these modules are a public API,
 and `?ref=` is the only thing standing between a rename here and a consumer's
 broken Taskfile. Adding a task or an input is a minor. Everything else —
 documentation, CI, a message a tool prints — is a patch.
+
+`task cut:next` reads that policy off the commits themselves, so a rename or
+removal needs to be marked as such: `!` after the type, or a `BREAKING
+CHANGE:` footer — see [Commit messages](CONTRIBUTING.md#commit-messages).
+Conventional Commits has no type of its own for it.
 
 ---
 

@@ -21,6 +21,10 @@ The hooks call the same tools CI does: `gitleaks`, `zizmor`, `task` itself.
 Without them installed, the pre-commit hook fails loudly rather than passing
 silently — see [lefthook.yml](lefthook.yml) for what each hook checks and why.
 
+Cutting a release also needs `npm install` once — it installs `semantic-release`,
+which `task cut:next` and `task cut:tag` use to compute the version (see
+[RELEASE.md](RELEASE.md)). Nothing else here needs Node.
+
 ## The gate
 
 ```bash
@@ -54,6 +58,12 @@ trailing period. Types: `feat fix docs style refactor perf test build ci
 chore revert security`. Rebase-merge replays every commit onto `main`
 unchanged, so this is what a reader of `git log` sees — not collapsed into
 whatever the PR was titled.
+
+`task cut:next` (see [RELEASE.md](RELEASE.md)) reads these to decide the next
+version, so a commit that renames or removes a task needs `!` after the type
+(`feat(k8s)!: …`) or a `BREAKING CHANGE:` footer — Conventional Commits has no
+type of its own for that case, and without the marker it reads as an ordinary
+`feat`.
 
 ## Changing the changelog
 

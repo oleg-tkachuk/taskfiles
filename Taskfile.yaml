@@ -310,6 +310,64 @@ tasks:
           [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every runtime/* install: task matches"
           exit "$fail"
 
+  # ─── cutting a release ─────────────────────────────────────────────────────
+  #
+  # semantic-release (release.config.cjs) decides the NUMBER, from Conventional
+  # Commits since the last tag. It never decides the MOMENT: both tasks below
+  # are run by hand, only when a maintainer has already written the CHANGELOG
+  # entry for that number — see RELEASE.md. Wiring semantic-release into CI on
+  # every push to main would remove that moment entirely: every rebase-merged
+  # commit is release-worthy under this file's own releaseRules (a deliberate
+  # match to RELEASE.md's "everything else is a patch"), so an automatic run
+  # would cut a release per merged PR, undoing the batching [Unreleased] exists
+  # for.
+
+  cut:next:
+    desc: "Print the version semantic-release would cut from commits since the last tag"
+    preconditions:
+      - sh: command -v npx >/dev/null
+        msg: "npx (Node.js) is not installed — https://nodejs.org/"
+      - sh: test -d node_modules/semantic-release
+        msg: "semantic-release is not installed — npm install"
+    cmds:
+      - cmd: |-
+          set -eu
+          out=$(npx semantic-release --dry-run --no-ci 2>&1) || { printf '%s\n' "$out" >&2; exit 1; }
+          version=$(printf '%s\n' "$out" | sed -nE 's/.*next release version is ([0-9]+\.[0-9]+\.[0-9]+).*/v\1/p' | tail -1)
+          if [ -z "$version" ]; then
+            printf '%s\n' "$out" >&2
+            echo "{{._LIB_WARN}} taskfiles · no release-worthy commits since the last tag" >&2
+            exit 1
+          fi
+          echo "$version"
+
+  cut:tag:
+    desc: "Tag and push the release CHANGELOG.md already documents — refuses on a mismatch"
+    preconditions:
+      - sh: command -v npx >/dev/null
+        msg: "npx (Node.js) is not installed — https://nodejs.org/"
+      - sh: test -d node_modules/semantic-release
+        msg: "semantic-release is not installed — npm install"
+    cmds:
+      - cmd: |-
+          set -eu
+          out=$(npx semantic-release --dry-run --no-ci 2>&1) || { printf '%s\n' "$out" >&2; exit 1; }
+          computed=$(printf '%s\n' "$out" | sed -nE 's/.*next release version is ([0-9]+\.[0-9]+\.[0-9]+).*/v\1/p' | tail -1)
+          if [ -z "$computed" ]; then
+            printf '%s\n' "$out" >&2
+            echo "{{._LIB_WARN}} taskfiles · no release-worthy commits since the last tag" >&2
+            exit 1
+          fi
+
+          documented=$(sed -nE 's/^## \[([0-9]+\.[0-9]+\.[0-9]+)\].*/v\1/p' CHANGELOG.md | head -1)
+          if [ "$computed" != "$documented" ]; then
+            echo "{{._LIB_ERR}} taskfiles · semantic-release would cut ${computed}, but CHANGELOG.md's top entry is ${documented:-none} — cut the docs PR for ${computed} first (RELEASE.md)" >&2
+            exit 1
+          fi
+
+          echo "{{._LIB_OK}} taskfiles · tagging ${documented}"
+          npx semantic-release --no-ci
+
   # ─── docs ───────────────────────────────────────────────────────────────────
 
   surface:
