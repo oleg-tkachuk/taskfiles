@@ -24,6 +24,7 @@ workspace — tasks then read `go:<task>`.
 | `build` | Compile the command packages into the bin directory |
 | `compile` | Type-check every package without writing a binary (for library modules) |
 | `fmt` | gofmt -s -w, plus goimports when it is installed |
+| `fmt:check` | Fail if gofmt -s would change any file — the CI-safe half of fmt |
 | `lint` | golangci-lint over the module |
 | `test` | Run the unit suite |
 | `tidy` | go mod tidy the way CI resolves the module — standalone |

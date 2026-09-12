@@ -14,7 +14,14 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **`go:fmt:check`** — fails if `gofmt -s` would change any file, without
+  writing to the tree. `go:fmt` mutates the tree, which a CI gate should not
+  do, and `go:lint` does not cover this: golangci-lint's default linters do
+  not include `gofmt`/`goimports`. `gofmt -l` itself exits 0 regardless of
+  what it finds, so a consumer that shelled out to it directly and trusted the
+  exit code was not actually gated.
 
 ## [5.2.4] — 2026-09-10
 
