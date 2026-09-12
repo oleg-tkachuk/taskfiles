@@ -294,10 +294,29 @@ jobs:
         run: |
           set -euo pipefail
           task go:fmt
+          task go:fmt:check
           task go:compile
           task go:test
           task go:tidy
           echo "✔ the go module's tasks run against a real module"
+
+      - name: 'Verify: go:fmt:check catches what go:fmt would rewrite'
+        working-directory: consumer
+        # gofmt -l exits 0 whether or not it found anything — a wrapper task
+        # that only checked "did the command run" rather than "did it list a
+        # file" would pass on dirty code every time. Un-formatting a file and
+        # asserting the non-zero exit is the only way to prove the wrapper's
+        # own pass/fail logic, not just that gofmt runs.
+        run: |
+          set -euo pipefail
+          printf 'package smoke\nfunc   Bad ( )   {}\n' > badfmt.go
+          if task go:fmt:check; then
+            echo "✖ go:fmt:check passed on a file gofmt -l would list" >&2
+            exit 1
+          fi
+          rm badfmt.go
+          task go:fmt:check
+          echo "✔ go:fmt:check fails on unformatted code and passes on clean code"
 
       - name: "Verify: the consumer's vars reach the modules"
         working-directory: consumer

@@ -44,6 +44,7 @@ vars:
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _GO_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
   _GO_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
+  _GO_ERR: '{{if .NO_COLOR}}✖{{else}}{{"\x1b[31m✖\x1b[0m"}}{{end}}'
 
 env:
   GOWORK: '{{.GOWORK | default "off"}}'
@@ -139,6 +140,24 @@ tasks:
             goimports -w .
           fi
       - echo "{{._GO_OK}} {{._GO_NAME}} · go · formatted"
+
+  fmt:check:
+    desc: "Fail if gofmt -s would change any file — the CI-safe half of fmt"
+    # gofmt -l reports nothing on stderr and exits 0 whether or not it found
+    # anything to list — it is a formatter's exit code, not a checker's. `fmt`
+    # itself cannot be the gate: it mutates the tree, which is fine on a
+    # laptop and wrong in CI, where a step that rewrites files and still exits
+    # 0 hides the very drift it should fail on.
+    cmds:
+      - cmd: |-
+          set -eu
+          unformatted=$(gofmt -s -l .)
+          if [ -n "$unformatted" ]; then
+            echo "{{._GO_ERR}} {{._GO_NAME}} · go · not gofmt -s clean:" >&2
+            printf '%s\n' "$unformatted" >&2
+            exit 1
+          fi
+          echo "{{._GO_OK}} {{._GO_NAME}} · go · gofmt -s clean"
 
   tidy:
     desc: "go mod tidy the way CI resolves the module — standalone"
