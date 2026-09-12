@@ -14,6 +14,10 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [5.3.0] — 2026-09-13
+
 ### Added
 
 - **`go:fmt:check`** — fails if `gofmt -s` would change any file, without
