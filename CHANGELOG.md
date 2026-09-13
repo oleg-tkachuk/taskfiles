@@ -14,6 +14,16 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
+### Changed
+
+- **Every module prints with `printf`, not `echo`.** No task names or inputs
+  change and no output changes: this is the same lines through a builtin that
+  behaves the same everywhere. `echo` does not — whether it interprets `\n`
+  depends on the shell and on bash's `xpg_echo`, `echo -e` prints `-e` on
+  dash, and an argument beginning with `-` is read as a flag. The text is
+  always an argument to `%s`, never the format, so a `%` in the data cannot
+  be read as a directive.
+
 ### Added
 
 - **`hcloud/`** — the power state of a project's Hetzner Cloud servers:

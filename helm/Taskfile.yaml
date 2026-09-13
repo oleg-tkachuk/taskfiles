@@ -81,7 +81,7 @@ tasks:
     cmds:
       # Listed before removing, so the prompt above is answered with the list in
       # view rather than from memory.
-      - echo "{{._HELM_RUN}} helm · about to uninstall:"
+      - printf '%s\n' "{{._HELM_RUN}} helm · about to uninstall:"
       - helm list{{._HELM_CTX}} {{._HELM_SCOPE}} -q | sed 's/^/    /'
       # awk over helm's table rather than a JSON parse: a release name is a DNS
       # label, so the first two columns cannot contain a space, and this asks
@@ -94,6 +94,6 @@ tasks:
             | awk 'NR > 1 { print $1, $2 }' \
             | while read -r name ns; do
                 helm uninstall{{._HELM_CTX}} {{._HELM_UNINSTALL_FLAGS}} "$name" --namespace "$ns" >/dev/null \
-                  && echo "{{._HELM_OK}} helm · uninstalled $ns/$name"
+                  && printf '%s\n' "{{._HELM_OK}} helm · uninstalled $ns/$name"
               done
-      - echo "{{._HELM_OK}} helm · nothing left in scope"
+      - printf '%s\n' "{{._HELM_OK}} helm · nothing left in scope"

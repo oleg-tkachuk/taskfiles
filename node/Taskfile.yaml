@@ -76,37 +76,37 @@ tasks:
       - node_modules/.modules.yaml
       - node_modules/.package-lock.json
     cmds:
-      - echo "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_PM}} install"
+      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_PM}} install"
       - >-
         {{if .PM_INSTALL}}{{.PM_INSTALL}}{{else if eq ._NODE_PM "npm"}}npm ci{{else}}{{._NODE_PM}} install --frozen-lockfile{{end}}
-      - echo "{{._NODE_OK}} {{._NODE_NAME}} · node · dependencies installed"
+      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · dependencies installed"
 
   dev:
     desc: "Start the dev server"
     interactive: true
     cmds:
-      - echo "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_PM}} run {{._NODE_DEV}}"
+      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_PM}} run {{._NODE_DEV}}"
       - "{{._NODE_PM}} run {{._NODE_DEV}}"
 
   build:
     desc: "Build the production bundle"
     cmds:
-      - echo "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_PM}} run {{._NODE_BUILD}}"
+      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_PM}} run {{._NODE_BUILD}}"
       - "{{._NODE_PM}} run {{._NODE_BUILD}}"
-      - echo "{{._NODE_OK}} {{._NODE_NAME}} · node · bundle built"
+      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · bundle built"
 
   lint:
     desc: "Run the lint script (read-only)"
     cmds:
-      - echo "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_LINT}}"
+      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_LINT}}"
       - "{{._NODE_PM}} run {{._NODE_LINT}}"
-      - echo "{{._NODE_OK}} {{._NODE_NAME}} · node · lint clean"
+      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · lint clean"
 
   lint:fix:
     desc: "Run the lint script with --fix"
     cmds:
       - "{{._NODE_PM}} run {{._NODE_LINT}} {{._NODE_FIX}}"
-      - echo "{{._NODE_OK}} {{._NODE_NAME}} · node · lint fixed"
+      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · lint fixed"
 
   typecheck:
     desc: "Run the typecheck script, skipped where the project declares none"
@@ -116,24 +116,24 @@ tasks:
       - cmd: |-
           set -eu
           if ! node -e 'process.exit(require("./package.json").scripts?.["{{._NODE_TYPECHECK}}"] ? 0 : 1)' 2>/dev/null; then
-            echo "{{._NODE_SKIP}} {{._NODE_NAME}} · node · no {{._NODE_TYPECHECK}} script — skipped"
+            printf '%s\n' "{{._NODE_SKIP}} {{._NODE_NAME}} · node · no {{._NODE_TYPECHECK}} script — skipped"
             exit 0
           fi
-          echo "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_TYPECHECK}}"
+          printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_TYPECHECK}}"
           {{._NODE_PM}} run {{._NODE_TYPECHECK}}
-          echo "{{._NODE_OK}} {{._NODE_NAME}} · node · types check"
+          printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · types check"
 
   test:
     desc: "Run the test script"
     cmds:
-      - echo "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_TEST}}"
+      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_TEST}}"
       - "{{._NODE_PM}} run {{._NODE_TEST}}"
-      - echo "{{._NODE_OK}} {{._NODE_NAME}} · node · tests pass"
+      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · tests pass"
 
   test:e2e:
     desc: "Run the end-to-end suite, preparing its browser first"
     cmds:
-      - echo "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_E2E}}"
+      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_E2E}}"
       # Playwright needs its browser downloaded before the first run and says so
       # only by failing. Another runner prepares differently, or not at all, so
       # the step is an input — set E2E_SETUP to "none" when there is nothing to
@@ -141,7 +141,7 @@ tasks:
       # would silently give back the default rather than switching it off.
       - '{{if ne ._NODE_E2E_SETUP "none"}}{{._NODE_PM}} {{._NODE_E2E_SETUP}} >/dev/null{{end}}'
       - "{{._NODE_PM}} run {{._NODE_E2E}}"
-      - echo "{{._NODE_OK}} {{._NODE_NAME}} · node · e2e pass"
+      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · e2e pass"
 
   verify:
     desc: "Lint then build — the pre-push gate"
@@ -153,19 +153,19 @@ tasks:
   generate:
     desc: "Run the codegen script"
     cmds:
-      - echo "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_GEN}}"
+      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_GEN}}"
       - "{{._NODE_PM}} run {{._NODE_GEN}}"
-      - echo "{{._NODE_OK}} {{._NODE_NAME}} · node · generated"
+      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · generated"
 
   deps:update:
     desc: "Bump dependencies to the latest minor/patch (no majors), then reinstall"
     cmds:
-      - echo "{{._NODE_RUN}} {{._NODE_NAME}} · node · npm-check-updates --target minor"
+      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · npm-check-updates --target minor"
       # `dlx` is pnpm's; npm spells the same thing `npx`. Hardcoding one of
       # them made this task fail with "Unknown command: dlx" on every npm repo.
       - "{{._NODE_EXEC}} npm-check-updates --target minor --upgrade"
       - "{{._NODE_PM}} install"
-      - echo "{{._NODE_OK}} {{._NODE_NAME}} · node · deps bumped — review the lockfile diff, then verify"
+      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · deps bumped — review the lockfile diff, then verify"
 
   deps:outdated:
     desc: "Show dependencies with a newer version available (read-only)"

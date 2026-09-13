@@ -47,7 +47,7 @@ tasks:
     internal: true
     dir: "{{.COMPONENT}}"
     cmds:
-      - echo "── {{.COMPONENT}} · {{.TARGET}}"
+      - printf '%s\n' "── {{.COMPONENT}} · {{.TARGET}}"
       # A child `task` process rather than a namespaced reference: the
       # component owns its own Taskfile, its own vars and its own includes, and
       # this file must not need to know any of them.
@@ -81,7 +81,7 @@ tasks:
     preconditions:
       - sh: >-
           case "$(curl -sk --max-time 10 -o /dev/null -w '%{http_code}'
-          https://{{._MONO_REG}}/v2/ 2>/dev/null || echo 000)" in
+          https://{{._MONO_REG}}/v2/ 2>/dev/null || printf '%s' 000)" in
             200|401|403) true ;; *) false ;;
           esac
         msg: |-
@@ -89,4 +89,4 @@ tasks:
           Bring the OCI registry up, or point the run somewhere else with
           GLOBAL_REGISTRY=<host> task …
     cmds:
-      - echo "{{._MONO_OK}} registry {{._MONO_REG}} reachable"
+      - printf '%s\n' "{{._MONO_OK}} registry {{._MONO_REG}} reachable"

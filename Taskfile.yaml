@@ -71,13 +71,13 @@ tasks:
       - for: { var: PARSE_MODULES }
         task: _parse
         vars: { MODULE: "{{.ITEM}}" }
-      - echo "{{._LIB_OK}} taskfiles · every module parses"
+      - printf '%s\n' "{{._LIB_OK}} taskfiles · every module parses"
 
   _parse:
     internal: true
     cmds:
       - task -t {{.MODULE}}/Taskfile.yaml --list-all >/dev/null
-      - echo "  {{._LIB_OK}} {{.MODULE}}"
+      - printf '%s\n' "  {{._LIB_OK}} {{.MODULE}}"
 
   check:vars:
     desc: "Refuse a module var that is not prefixed, or a module that uses two prefixes"
@@ -105,18 +105,18 @@ tasks:
 
             bare=$(printf '%s\n' "$vars" | grep -vE '^_[A-Z0-9]+_' || true)
             if [ -n "$bare" ]; then
-              echo "{{._LIB_ERR}} taskfiles · $f declares vars that are not <_PREFIX_>-scoped:" >&2
+              printf '%s\n' "{{._LIB_ERR}} taskfiles · $f declares vars that are not <_PREFIX_>-scoped:" >&2
               printf '    %s\n' $bare >&2
               fail=1
             fi
 
             prefixes=$(printf '%s\n' "$vars" | sed -nE 's/^(_[A-Z0-9]+_).*/\1/p' | sort -u)
             if [ "$(printf '%s\n' "$prefixes" | grep -c .)" -gt 1 ]; then
-              echo "{{._LIB_ERR}} taskfiles · $f mixes prefixes: $(printf '%s ' $prefixes)" >&2
+              printf '%s\n' "{{._LIB_ERR}} taskfiles · $f mixes prefixes: $(printf '%s ' $prefixes)" >&2
               fail=1
             fi
           done
-          [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every module var is scoped to its own module"
+          [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every module var is scoped to its own module"
           exit "$fail"
 
   check:scope:
@@ -164,12 +164,12 @@ tasks:
               }
             ' "$f")
             if [ -n "$out" ]; then
-              echo "{{._LIB_ERR}} taskfiles · $f resolves a call-time input in its vars block:" >&2
+              printf '%s\n' "{{._LIB_ERR}} taskfiles · $f resolves a call-time input in its vars block:" >&2
               printf '%s\n' "$out" >&2
               fail=1
             fi
           done
-          [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · no module var resolves a call-time input"
+          [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · no module var resolves a call-time input"
           exit "$fail"
 
   check:silent:
@@ -182,9 +182,9 @@ tasks:
           set -eu
           fail=0
           for f in {{.MODULE_FILES}}; do
-            grep -qE '^silent: true$' "$f" || { echo "{{._LIB_ERR}} taskfiles · $f does not declare 'silent: true'" >&2; fail=1; }
+            grep -qE '^silent: true$' "$f" || { printf '%s\n' "{{._LIB_ERR}} taskfiles · $f does not declare 'silent: true'" >&2; fail=1; }
           done
-          [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every module runs quiet"
+          [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every module runs quiet"
           exit "$fail"
 
   check:readme:
@@ -197,21 +197,21 @@ tasks:
           set -eu
           fail=0
           for m in {{.MODULES}}; do
-            [ -f "$m/README.md" ] || { echo "{{._LIB_ERR}} taskfiles · $m/ has no README.md" >&2; fail=1; }
+            [ -f "$m/README.md" ] || { printf '%s\n' "{{._LIB_ERR}} taskfiles · $m/ has no README.md" >&2; fail=1; }
             grep -q "($m/README.md)" README.md || {
-              echo "{{._LIB_ERR}} taskfiles · README.md does not link $m/README.md" >&2; fail=1; }
+              printf '%s\n' "{{._LIB_ERR}} taskfiles · README.md does not link $m/README.md" >&2; fail=1; }
           done
           # A family shares one README for all its variants.
           for fam in {{.FAMILIES}}; do
-            [ -f "$fam/README.md" ] || { echo "{{._LIB_ERR}} taskfiles · $fam/ has no README.md" >&2; fail=1; }
+            [ -f "$fam/README.md" ] || { printf '%s\n' "{{._LIB_ERR}} taskfiles · $fam/ has no README.md" >&2; fail=1; }
             grep -q "($fam/README.md)" README.md || {
-              echo "{{._LIB_ERR}} taskfiles · README.md does not link $fam/README.md" >&2; fail=1; }
+              printf '%s\n' "{{._LIB_ERR}} taskfiles · README.md does not link $fam/README.md" >&2; fail=1; }
           done
           # And the reverse: a link to a README that is not on disk.
           for f in $(grep -oE '\(([a-z0-9-]+/)+README\.md\)' README.md | tr -d '()' | sort -u); do
-            [ -f "$f" ] || { echo "{{._LIB_ERR}} taskfiles · README.md links $f, which is not in the repo" >&2; fail=1; }
+            [ -f "$f" ] || { printf '%s\n' "{{._LIB_ERR}} taskfiles · README.md links $f, which is not in the repo" >&2; fail=1; }
           done
-          [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every module has a README and the index links it"
+          [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every module has a README and the index links it"
           exit "$fail"
 
   check:surface:
@@ -269,19 +269,19 @@ tasks:
 
               if [ -z "$first" ]; then first="$v"; base="$got"; basedeps="$deps"; continue; fi
               if [ "$got" != "$base" ]; then
-                echo "{{._LIB_ERR}} taskfiles · $v and $first do not expose the same tasks:" >&2
+                printf '%s\n' "{{._LIB_ERR}} taskfiles · $v and $first do not expose the same tasks:" >&2
                 diff <(printf '%s\n' "$base") <(printf '%s\n' "$got") | sed 's/^/    /' >&2
                 fail=1
               fi
               if [ "$have_yq" = 1 ] && [ "$deps" != "$basedeps" ]; then
-                echo "{{._LIB_ERR}} taskfiles · $v and $first disagree on which shared tasks declare deps::" >&2
+                printf '%s\n' "{{._LIB_ERR}} taskfiles · $v and $first disagree on which shared tasks declare deps::" >&2
                 diff <(printf '%s\n' "$basedeps") <(printf '%s\n' "$deps") | sed 's/^/    /' >&2
                 fail=1
               fi
             done
           done
-          [ "$have_yq" = 1 ] || echo "{{._LIB_WARN}} taskfiles · yq absent, deps: parity within families not checked" >&2
-          [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every family's variants expose the same tasks and agree on deps:"
+          [ "$have_yq" = 1 ] || printf '%s\n' "{{._LIB_WARN}} taskfiles · yq absent, deps: parity within families not checked" >&2
+          [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every family's variants expose the same tasks and agree on deps:"
           exit "$fail"
 
   check:runtime-install:
@@ -302,12 +302,12 @@ tasks:
             block=$(sed -n '/^  install:/,$p' "$f")
             if [ -z "$first" ]; then first="$f"; base="$block"; continue; fi
             if [ "$block" != "$base" ]; then
-              echo "{{._LIB_ERR}} taskfiles · $f's install: has drifted from $first's:" >&2
+              printf '%s\n' "{{._LIB_ERR}} taskfiles · $f's install: has drifted from $first's:" >&2
               diff <(printf '%s\n' "$base") <(printf '%s\n' "$block") | sed 's/^/    /' >&2
               fail=1
             fi
           done
-          [ "$fail" = 0 ] && echo "{{._LIB_OK}} taskfiles · every runtime/* install: task matches"
+          [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every runtime/* install: task matches"
           exit "$fail"
 
   # ─── cutting a release ─────────────────────────────────────────────────────
@@ -336,10 +336,10 @@ tasks:
           version=$(printf '%s\n' "$out" | sed -nE 's/.*next release version is ([0-9]+\.[0-9]+\.[0-9]+).*/v\1/p' | tail -1)
           if [ -z "$version" ]; then
             printf '%s\n' "$out" >&2
-            echo "{{._LIB_WARN}} taskfiles · no release-worthy commits since the last tag" >&2
+            printf '%s\n' "{{._LIB_WARN}} taskfiles · no release-worthy commits since the last tag" >&2
             exit 1
           fi
-          echo "$version"
+          printf '%s\n' "$version"
 
   cut:tag:
     desc: "Tag and push the release CHANGELOG.md already documents — refuses on a mismatch"
@@ -355,17 +355,17 @@ tasks:
           computed=$(printf '%s\n' "$out" | sed -nE 's/.*next release version is ([0-9]+\.[0-9]+\.[0-9]+).*/v\1/p' | tail -1)
           if [ -z "$computed" ]; then
             printf '%s\n' "$out" >&2
-            echo "{{._LIB_WARN}} taskfiles · no release-worthy commits since the last tag" >&2
+            printf '%s\n' "{{._LIB_WARN}} taskfiles · no release-worthy commits since the last tag" >&2
             exit 1
           fi
 
           documented=$(sed -nE 's/^## \[([0-9]+\.[0-9]+\.[0-9]+)\].*/v\1/p' CHANGELOG.md | head -1)
           if [ "$computed" != "$documented" ]; then
-            echo "{{._LIB_ERR}} taskfiles · semantic-release would cut ${computed}, but CHANGELOG.md's top entry is ${documented:-none} — cut the docs PR for ${computed} first (RELEASE.md)" >&2
+            printf '%s\n' "{{._LIB_ERR}} taskfiles · semantic-release would cut ${computed}, but CHANGELOG.md's top entry is ${documented:-none} — cut the docs PR for ${computed} first (RELEASE.md)" >&2
             exit 1
           fi
 
-          echo "{{._LIB_OK}} taskfiles · tagging ${documented}"
+          printf '%s\n' "{{._LIB_OK}} taskfiles · tagging ${documented}"
           npx semantic-release --no-ci
 
   # ─── docs ───────────────────────────────────────────────────────────────────
