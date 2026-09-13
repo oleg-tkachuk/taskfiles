@@ -14,6 +14,10 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [5.4.0] — 2026-09-13
+
 ### Changed
 
 - **Every module prints with `printf`, not `echo`.** No task names or inputs
