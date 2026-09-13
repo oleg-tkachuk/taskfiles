@@ -14,7 +14,27 @@ here, and the release gate refuses a tag with no entry.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **`hcloud/`** — the power state of a project's Hetzner Cloud servers:
+  `servers`, `poweron`, `shutdown`, `reboot`, `poweroff`, `reset` and
+  `console`. Everything but `console` acts on every server a label selector
+  matches, so one command works on one server and on five.
+
+  `HCLOUD_SELECTOR` is required and an empty one is refused rather than
+  widened — an empty selector matches every server in the project, which for a
+  power command is the difference between one component and all of them. The
+  four destructive verbs ask before they run.
+
+  Two inputs take a command rather than a value, for a project whose selector
+  or token has to be looked up: `HCLOUD_SELECTOR_CMD` and `HCLOUD_TOKEN_CMD`.
+  Both run inside the task rather than in an `env:` stanza, which Task
+  evaluates before preconditions — a token fetched there runs before the check
+  that would have said why it could not be.
+
+  `console` takes one `HCLOUD_SERVER` and refuses a name the selector does not
+  cover: `hcloud server request-console` on a server outside it works
+  perfectly, which is the failure worth preventing rather than reporting.
 
 ## [5.3.0] — 2026-09-13
 
