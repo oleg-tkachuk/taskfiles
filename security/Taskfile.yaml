@@ -135,12 +135,12 @@ tasks:
       - sh: command -v gitleaks >/dev/null
         msg: "gitleaks is not installed — https://github.com/gitleaks/gitleaks#installing"
     cmds:
-      - echo "{{._SEC_RUN}} sec · gitleaks"
+      - printf '%s\n' "{{._SEC_RUN}} sec · gitleaks"
       # A repository with accepted historical findings passes a baseline; without
       # one every old finding is reported again on every run, and a gate that
       # always fails is a gate nobody reads.
       - gitleaks git . --no-banner --redact{{if ._SEC_GL_BASE}} --baseline-path {{._SEC_GL_BASE}}{{end}} {{._SEC_GL_FLAGS}}
-      - echo "{{._SEC_OK}} sec · no secrets in history"
+      - printf '%s\n' "{{._SEC_OK}} sec · no secrets in history"
 
   trivy:
     desc: "trivy — vulnerable dependencies and secrets (blocking) plus IaC misconfig (report-only)"
@@ -148,12 +148,12 @@ tasks:
       - sh: command -v trivy >/dev/null
         msg: "trivy is not installed — https://github.com/aquasecurity/trivy#installation"
     cmds:
-      - echo "{{._SEC_RUN}} sec · trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_TARGET}}"
+      - printf '%s\n' "{{._SEC_RUN}} sec · trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_TARGET}}"
       - trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_SCAN}} --exit-code 1 --quiet {{._SEC_TRIVY_SKIP}} {{._SEC_TRIVY_FLAGS}} {{._SEC_TRIVY_TARGET}}
       # Misconfiguration findings are informational: they are dense, noisy, and
       # blocking on them would stop every release for a Kubernetes default.
       - trivy config --exit-code 0 --quiet {{._SEC_TRIVY_SKIP}} .
-      - echo "{{._SEC_OK}} sec · trivy clean"
+      - printf '%s\n' "{{._SEC_OK}} sec · trivy clean"
 
   proto:breaking:
     desc: "buf breaking — refuse incompatible proto changes against {{._SEC_BASE}}"
@@ -161,9 +161,9 @@ tasks:
       - sh: command -v buf >/dev/null
         msg: "buf is not installed — https://buf.build/docs/installation/"
     cmds:
-      - echo "{{._SEC_RUN}} sec · buf breaking vs {{._SEC_BASE}}"
+      - printf '%s\n' "{{._SEC_RUN}} sec · buf breaking vs {{._SEC_BASE}}"
       - buf breaking --against '.git#branch={{._SEC_BASE}}' {{._SEC_BUF_FLAGS}}
-      - echo "{{._SEC_OK}} sec · proto contract compatible"
+      - printf '%s\n' "{{._SEC_OK}} sec · proto contract compatible"
 
   # The single place the Go scans decide whether there is anything to scan.
   # A directory with no go.mod is skipped and says so — the repository is not
@@ -177,10 +177,10 @@ tasks:
       - cmd: |-
           set -eu
           if [ ! -f go.mod ]; then
-            echo "{{._SEC_SKIP}} sec · {{.LABEL}} · {{.MODULE}} is not a Go module — skipped"
+            printf '%s\n' "{{._SEC_SKIP}} sec · {{.LABEL}} · {{.MODULE}} is not a Go module — skipped"
             exit 0
           fi
-          echo "{{._SEC_RUN}} sec · {{.LABEL}} · {{.MODULE}}"
+          printf '%s\n' "{{._SEC_RUN}} sec · {{.LABEL}} · {{.MODULE}}"
           {{.CMD}}
 
 
@@ -202,16 +202,16 @@ tasks:
         cmd: |-
           set -eu
           if [ ! -f {{.ITEM}} ]; then
-            echo "{{._SEC_SKIP}} sec · hadolint · {{.ITEM}} not found — skipped"
+            printf '%s\n' "{{._SEC_SKIP}} sec · hadolint · {{.ITEM}} not found — skipped"
             exit 0
           fi
           command -v hadolint >/dev/null || {
-            echo "{{._SEC_ERR}} sec · hadolint is not installed — https://github.com/hadolint/hadolint#install" >&2
+            printf '%s\n' "{{._SEC_ERR}} sec · hadolint is not installed — https://github.com/hadolint/hadolint#install" >&2
             exit 1
           }
-          echo "{{._SEC_RUN}} sec · hadolint · {{.ITEM}}"
+          printf '%s\n' "{{._SEC_RUN}} sec · hadolint · {{.ITEM}}"
           hadolint {{._SEC_HADOLINT_FLAGS}} {{.ITEM}}
-          echo "{{._SEC_OK}} sec · hadolint · {{.ITEM}} clean"
+          printf '%s\n' "{{._SEC_OK}} sec · hadolint · {{.ITEM}} clean"
 
   gosec:
     desc: "gosec — insecure patterns the compiler is happy with"

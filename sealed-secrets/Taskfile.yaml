@@ -59,7 +59,7 @@ tasks:
         --from-literal={{ printf "%s=%s" .key .value | q }}
         --dry-run=client -o yaml
         | {{._SS_SEAL}} > {{.output | q}}
-      - echo "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
+      - printf '%s\n' "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
 
   seal:file:
     desc: "Seal every key in an env file into one SealedSecret manifest"
@@ -78,7 +78,7 @@ tasks:
         --from-env-file={{.file | q}}
         --dry-run=client -o yaml
         | {{._SS_SEAL}} > {{.output | q}}
-      - echo "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
+      - printf '%s\n' "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
 
   seal:literals:
     desc: "Seal several key/value pairs into one SealedSecret manifest"
@@ -100,7 +100,7 @@ tasks:
           {{._SS_KUBECTL}} create secret generic {{.name | q}} \
             --namespace {{.namespace | q}} "$@" --dry-run=client -o yaml \
             | {{._SS_SEAL}} > {{.output | q}}
-      - echo "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
+      - printf '%s\n' "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} → {{.output}}"
 
   seal:merge:
     desc: "Seal one key and merge it into an existing SealedSecret, leaving the rest"
@@ -121,7 +121,7 @@ tasks:
         --from-literal={{ printf "%s=%s" .key .value | q }}
         --dry-run=client -o yaml
         | {{._SS_SEAL}} --merge-into {{.output | q}}
-      - echo "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} · {{.key}} merged → {{.output}}"
+      - printf '%s\n' "{{._SS_OK}} sealed-secrets · {{.namespace}}/{{.name}} · {{.key}} merged → {{.output}}"
 
   pubkey:
     desc: "Print the controller's public certificate, for sealing without a cluster"

@@ -63,23 +63,23 @@ tasks:
       - sh: command -v go >/dev/null
         msg: "go is not installed — https://go.dev/doc/install"
     cmds:
-      - echo "{{._GO_RUN}} {{._GO_NAME}} · go · build {{._GO_MAIN}}"
+      - printf '%s\n' "{{._GO_RUN}} {{._GO_NAME}} · go · build {{._GO_MAIN}}"
       - go build {{._GO_BUILD_FLAGS}} -o {{._GO_BIN}}/ {{._GO_MAIN}}
-      - echo "{{._GO_OK}} {{._GO_NAME}} · go · built → {{._GO_BIN}}"
+      - printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · built → {{._GO_BIN}}"
 
   compile:
     desc: "Type-check every package without writing a binary (for library modules)"
     cmds:
-      - echo "{{._GO_RUN}} {{._GO_NAME}} · go · compile {{._GO_PKG}}"
+      - printf '%s\n' "{{._GO_RUN}} {{._GO_NAME}} · go · compile {{._GO_PKG}}"
       # -o /dev/null compiles every package but writes nothing, so a main under
       # ./cmd cannot collide with the cmd/ directory itself.
       - go build -o /dev/null {{._GO_PKG}}
-      - echo "{{._GO_OK}} {{._GO_NAME}} · go · compiles clean"
+      - printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · compiles clean"
 
   test:
     desc: "Run the unit suite"
     cmds:
-      - echo "{{._GO_RUN}} {{._GO_NAME}} · go · test {{._GO_PKG}}"
+      - printf '%s\n' "{{._GO_RUN}} {{._GO_NAME}} · go · test {{._GO_PKG}}"
       # gotestsum when it is installed (one line per package), plain go test
       # otherwise — neither is worth a hard dependency. `&&/||` would run go
       # test a second time whenever gotestsum found a real failure, not just
@@ -91,7 +91,7 @@ tasks:
           else
             go test {{._GO_TEST_FLAGS}} {{._GO_PKG}}
           fi
-      - echo "{{._GO_OK}} {{._GO_NAME}} · go · tests pass"
+      - printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · tests pass"
 
   test:coverage:
     desc: "Run the unit suite with coverage; HTML report lands in coverage/"
@@ -99,14 +99,14 @@ tasks:
       - mkdir -p coverage
       - go test -coverprofile=coverage/cover.out {{._GO_PKG}}
       - go tool cover -html=coverage/cover.out -o coverage/cover.html
-      - echo "{{._GO_OK}} {{._GO_NAME}} · go · coverage report → coverage/cover.html"
+      - printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · coverage report → coverage/cover.html"
 
   test:integration:
     desc: "Run the integration suite (build tag, needs Docker)"
     cmds:
-      - echo "{{._GO_RUN}} {{._GO_NAME}} · go · integration tests"
+      - printf '%s\n' "{{._GO_RUN}} {{._GO_NAME}} · go · integration tests"
       - go test -race -tags={{._GO_TAGS}} {{._GO_PKG}}
-      - echo "{{._GO_OK}} {{._GO_NAME}} · go · integration tests pass"
+      - printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · integration tests pass"
 
   test:tagged:compile:
     desc: "Type-check build-tagged suites that the default test run never compiles"
@@ -114,9 +114,9 @@ tasks:
     # does not run, and nothing notices it has rotted until someone needs it.
     # `go vet` with the tag takes seconds and catches exactly that.
     cmds:
-      - echo "{{._GO_RUN}} {{._GO_NAME}} · go · vet -tags={{._GO_TAGS}}"
+      - printf '%s\n' "{{._GO_RUN}} {{._GO_NAME}} · go · vet -tags={{._GO_TAGS}}"
       - go vet -tags={{._GO_TAGS}} {{._GO_PKG}}
-      - echo "{{._GO_OK}} {{._GO_NAME}} · go · tagged suites compile"
+      - printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · tagged suites compile"
 
   lint:
     desc: "golangci-lint over the module"
@@ -124,9 +124,9 @@ tasks:
       - sh: command -v golangci-lint >/dev/null
         msg: "golangci-lint is not installed — https://golangci-lint.run/docs/welcome/install/"
     cmds:
-      - echo "{{._GO_RUN}} {{._GO_NAME}} · go · golangci-lint"
+      - printf '%s\n' "{{._GO_RUN}} {{._GO_NAME}} · go · golangci-lint"
       - golangci-lint run {{._GO_LINT_FLAGS}} {{._GO_PKG}}
-      - echo "{{._GO_OK}} {{._GO_NAME}} · go · lint clean"
+      - printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · lint clean"
 
   fmt:
     desc: "gofmt -s -w, plus goimports when it is installed"
@@ -139,7 +139,7 @@ tasks:
           if command -v goimports >/dev/null 2>&1; then
             goimports -w .
           fi
-      - echo "{{._GO_OK}} {{._GO_NAME}} · go · formatted"
+      - printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · formatted"
 
   fmt:check:
     desc: "Fail if gofmt -s would change any file — the CI-safe half of fmt"
@@ -153,17 +153,17 @@ tasks:
           set -eu
           unformatted=$(gofmt -s -l .)
           if [ -n "$unformatted" ]; then
-            echo "{{._GO_ERR}} {{._GO_NAME}} · go · not gofmt -s clean:" >&2
+            printf '%s\n' "{{._GO_ERR}} {{._GO_NAME}} · go · not gofmt -s clean:" >&2
             printf '%s\n' "$unformatted" >&2
             exit 1
           fi
-          echo "{{._GO_OK}} {{._GO_NAME}} · go · gofmt -s clean"
+          printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · gofmt -s clean"
 
   tidy:
     desc: "go mod tidy the way CI resolves the module — standalone"
     cmds:
       - go mod tidy
-      - echo "{{._GO_OK}} {{._GO_NAME}} · go · go.mod tidy"
+      - printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · go.mod tidy"
 
   vuln:
     desc: "govulncheck — vulnerabilities this module's code actually reaches"
@@ -171,7 +171,7 @@ tasks:
       - sh: command -v govulncheck >/dev/null
         msg: "govulncheck is not installed — go install golang.org/x/vuln/cmd/govulncheck@latest"
     cmds:
-      - echo "{{._GO_RUN}} {{._GO_NAME}} · go · govulncheck"
+      - printf '%s\n' "{{._GO_RUN}} {{._GO_NAME}} · go · govulncheck"
       - govulncheck {{._GO_PKG}}
 
   deps:update:
@@ -179,11 +179,11 @@ tasks:
     # Majors are deliberately not crossed: they need an import-path /vN edit and
     # a read of the upstream CHANGELOG.
     cmds:
-      - echo "{{._GO_RUN}} {{._GO_NAME}} · go · go get -u ./..."
+      - printf '%s\n' "{{._GO_RUN}} {{._GO_NAME}} · go · go get -u ./..."
       - go get -u ./...
       - go mod tidy
       - go build -o /dev/null {{._GO_PKG}}
-      - echo "{{._GO_OK}} {{._GO_NAME}} · go · deps bumped — review git diff go.mod go.sum"
+      - printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · deps bumped — review git diff go.mod go.sum"
 
   deps:outdated:
     desc: "List dependencies with a newer version available (read-only)"
@@ -195,7 +195,7 @@ tasks:
       - cmd: |-
           set -eu
           out=$(go list -u -m all)
-          printf '%s\n' "$out" | grep '\[' || echo "{{._GO_OK}} {{._GO_NAME}} · go · every dependency current"
+          printf '%s\n' "$out" | grep '\[' || printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · every dependency current"
 
   bench:
     desc: "Run the benchmarks — no unit tests, just the measurements"
@@ -205,7 +205,7 @@ tasks:
     # Benchmarks that need a database sit behind a build tag, which is why the
     # tags the tagged-compile gate already knows about are passed here too.
     cmds:
-      - echo "{{._GO_RUN}} {{._GO_NAME}} · go · benchmarks in {{._GO_BENCH_PKG}}"
+      - printf '%s\n' "{{._GO_RUN}} {{._GO_NAME}} · go · benchmarks in {{._GO_BENCH_PKG}}"
       - >-
         go test -tags={{._GO_TAGS}} -run='^$' -bench={{.BENCH | default "."}}
         {{._GO_BENCH_FLAGS}} {{._GO_BENCH_PKG}}

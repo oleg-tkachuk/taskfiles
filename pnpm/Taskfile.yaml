@@ -70,22 +70,22 @@ tasks:
             pm=$(cd "$a" && node -p "require('./package.json').packageManager || ''" 2>/dev/null)
             case "$pm" in
               pnpm@*) ;;
-              *) echo "{{._PNPM_ERR}} pnpm · $a has no pnpm pin" >&2; rc=1; continue ;;
+              *) printf '%s\n' "{{._PNPM_ERR}} pnpm · $a has no pnpm pin" >&2; rc=1; continue ;;
             esac
             v=${pm#pnpm@}; v=${v%%+*}; pins="$pins $v"
             # corepack resolves the shim per directory, so this is the version
             # an install in that app would really use.
             got=$(cd "$a" && pnpm --version 2>/dev/null)
             if [ "$got" != "$v" ]; then
-              echo "{{._PNPM_ERR}} pnpm · $a pins $v but reports ${got:-<none>} — a global pnpm is shadowing the corepack shim" >&2
+              printf '%s\n' "{{._PNPM_ERR}} pnpm · $a pins $v but reports ${got:-<none>} — a global pnpm is shadowing the corepack shim" >&2
               rc=1
             fi
           done
           if [ "$(printf '%s\n' $pins | sort -u | grep -c .)" -gt 1 ]; then
-            echo "{{._PNPM_ERR}} pnpm · the apps disagree on the pin:$pins" >&2
+            printf '%s\n' "{{._PNPM_ERR}} pnpm · the apps disagree on the pin:$pins" >&2
             rc=1
           fi
-          [ "$rc" = 0 ] && echo "{{._PNPM_OK}} pnpm · every app pinned at$(printf '%s\n' $pins | sort -u | head -1 | sed 's/^/ /')"
+          [ "$rc" = 0 ] && printf '%s\n' "{{._PNPM_OK}} pnpm · every app pinned at$(printf '%s\n' $pins | sort -u | head -1 | sed 's/^/ /')"
           exit "$rc"
 
   _pin:to:
@@ -101,13 +101,13 @@ tasks:
             pm=$(cd "$a" && node -p "require('./package.json').packageManager || ''" 2>/dev/null)
             case "$pm" in
               pnpm@*) ;;
-              *) echo "{{._PNPM_ERR}} pnpm · $a carries no pnpm \"packageManager\" pin" >&2; exit 1 ;;
+              *) printf '%s\n' "{{._PNPM_ERR}} pnpm · $a carries no pnpm \"packageManager\" pin" >&2; exit 1 ;;
             esac
             v=${pm#pnpm@}; pins="$pins ${v%%+*}"
           done
           current=$(printf '%s\n' $pins | sort -u)
           if [ "$(printf '%s\n' "$current" | grep -c .)" != "1" ]; then
-            echo "{{._PNPM_ERR}} pnpm · the apps disagree on the pin:$pins — reconcile with pnpm:pin:check" >&2
+            printf '%s\n' "{{._PNPM_ERR}} pnpm · the apps disagree on the pin:$pins — reconcile with pnpm:pin:check" >&2
             exit 1
           fi
 
@@ -116,25 +116,25 @@ tasks:
           target=$(npm view "pnpm@$spec" version --json 2>/dev/null | node -p 'const v=JSON.parse(require("fs").readFileSync(0,"utf8"));Array.isArray(v)?v[v.length-1]:v' 2>/dev/null)
           case "$target" in
             [0-9]*.[0-9]*.[0-9]*) ;;
-            *) echo "{{._PNPM_ERR}} pnpm · the registry gave no stable version for '$spec'" >&2; exit 1 ;;
+            *) printf '%s\n' "{{._PNPM_ERR}} pnpm · the registry gave no stable version for '$spec'" >&2; exit 1 ;;
           esac
 
           if [ "$target" = "$current" ]; then
-            echo "{{._PNPM_OK}} pnpm · already pinned at $current in every app"
+            printf '%s\n' "{{._PNPM_OK}} pnpm · already pinned at $current in every app"
           else
-            echo "{{._PNPM_RUN}} pnpm · $current → $target"
+            printf '%s\n' "{{._PNPM_RUN}} pnpm · $current → $target"
             for a in {{._PNPM_APPS}}; do
               ( cd "$a" && corepack use "pnpm@$target" ) || {
-                echo "{{._PNPM_ERR}} pnpm · $a: corepack use pnpm@$target failed — the other apps may already be bumped" >&2
+                printf '%s\n' "{{._PNPM_ERR}} pnpm · $a: corepack use pnpm@$target failed — the other apps may already be bumped" >&2
                 exit 1
               }
             done
-            echo "{{._PNPM_OK}} pnpm · pinned at $target everywhere — review the package.json and lockfile diff"
+            printf '%s\n' "{{._PNPM_OK}} pnpm · pinned at $target everywhere — review the package.json and lockfile diff"
           fi
 
           # A held-back major is reported, never taken silently.
           newest=$(npm view pnpm@latest version 2>/dev/null)
           if [ -n "$newest" ] && [ "${newest%%.*}" != "${target%%.*}" ]; then
-            echo "{{._PNPM_WARN}} pnpm · $newest is out and this task stays inside major ${target%%.*}" >&2
-            echo "         cross it deliberately: task pnpm:pin:update:major -- ${newest%%.*}" >&2
+            printf '%s\n' "{{._PNPM_WARN}} pnpm · $newest is out and this task stays inside major ${target%%.*}" >&2
+            printf '%s\n' "         cross it deliberately: task pnpm:pin:update:major -- ${newest%%.*}" >&2
           fi

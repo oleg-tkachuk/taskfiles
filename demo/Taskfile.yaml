@@ -75,27 +75,27 @@ tasks:
     status:
       - kind get clusters 2>/dev/null | grep -qx {{.KIND_CLUSTER}}
     cmds:
-      - echo "{{._RUN}} demo · kind · creating cluster {{.KIND_CLUSTER}}"
+      - printf '%s\n' "{{._RUN}} demo · kind · creating cluster {{.KIND_CLUSTER}}"
       - kind create cluster --name {{.KIND_CLUSTER}} --config ./deploy/kind-config.yaml
-      - echo "{{._OK}} demo · kind · cluster {{.KIND_CLUSTER}} ready (context {{.K8S_CONTEXT}})"
+      - printf '%s\n' "{{._OK}} demo · kind · cluster {{.KIND_CLUSTER}} ready (context {{.K8S_CONTEXT}})"
 
   cluster:down:
     desc: "Delete the kind cluster and everything on it"
     cmds:
       - kind delete cluster --name {{.KIND_CLUSTER}}
-      - echo "{{._OK}} demo · kind · cluster {{.KIND_CLUSTER}} removed"
+      - printf '%s\n' "{{._OK}} demo · kind · cluster {{.KIND_CLUSTER}} removed"
 
   registry:up:
     desc: "Install the in-cluster registry (helm upgrade --install, idempotent)"
     deps: [cluster:up]
     cmds:
-      - echo "{{._RUN}} demo · registry · helm upgrade --install"
+      - printf '%s\n' "{{._RUN}} demo · registry · helm upgrade --install"
       - >-
         helm upgrade --install registry ./deploy/registry
         --kube-context {{.K8S_CONTEXT}}
         --namespace {{.K8S_NAMESPACE}} --create-namespace
         --wait --timeout 60s
-      - echo "{{._OK}} demo · registry · installed in {{.K8S_NAMESPACE}}"
+      - printf '%s\n' "{{._OK}} demo · registry · installed in {{.K8S_NAMESPACE}}"
 
   registry:down:
     desc: "Remove the in-cluster registry"
@@ -121,7 +121,7 @@ tasks:
       - sh: >-
           ok=0;
           for _ in 1 2 3 4 5 6 7 8 9 10; do
-            case "$(curl -s --max-time 2 -o /dev/null -w '%{http_code}' http://{{.REGISTRY}}/v2/ 2>/dev/null || echo 000)" in
+            case "$(curl -s --max-time 2 -o /dev/null -w '%{http_code}' http://{{.REGISTRY}}/v2/ 2>/dev/null || printf '%s' 000)" in
               200|401|403) ok=1; break ;;
             esac;
             sleep 1;
@@ -132,7 +132,7 @@ tasks:
           Run `task up` first — it creates the kind cluster and the registry
           together, with the port already mapped.
     cmds:
-      - echo "{{._OK}} demo · registry · {{.REGISTRY}} reachable"
+      - printf '%s\n' "{{._OK}} demo · registry · {{.REGISTRY}} reachable"
 
   up:
     desc: "Bring up the cluster and the registry — run this first"
@@ -140,7 +140,7 @@ tasks:
       - task: cluster:up
       - task: registry:up
       - task: registry:check
-      - echo "{{._OK}} demo · ready — {{.REGISTRY}} is live, task deploy next"
+      - printf '%s\n' "{{._OK}} demo · ready — {{.REGISTRY}} is live, task deploy next"
 
   down:
     desc: "Tear down everything this demo created"
@@ -177,7 +177,7 @@ tasks:
       - task: release:deploy
       - task: local:image:load
       - task: local:install
-      - echo "{{._OK}} demo · deployed — task k8s:port-forward to reach it"
+      - printf '%s\n' "{{._OK}} demo · deployed — task k8s:port-forward to reach it"
 
   sign:
     desc: "Sign the published image and chart, then verify both"
