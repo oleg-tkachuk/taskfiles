@@ -22,7 +22,7 @@ workspace — tasks then read `all:<task>`.
 | `each` | Run TARGET in every component (TARGET=test, TARGET=deploy, …) |
 | `lint` | Run `task lint` in every component |
 | `test` | Run `task test` in every component |
-| `registry` | check:       Fail fast when localhost:5000 is not reachable |
+| `registry:check` | Fail fast when localhost:5000 is not reachable |
 
 ## Inputs
 
