@@ -21,9 +21,9 @@ The hooks call the same tools CI does: `gitleaks`, `zizmor`, `task` itself.
 Without them installed, the pre-commit hook fails loudly rather than passing
 silently — see [lefthook.yml](lefthook.yml) for what each hook checks and why.
 
-Cutting a release also needs `npm install` once — it installs `semantic-release`,
-which `task cut:next` and `task cut:tag` use to compute the version (see
-[RELEASE.md](RELEASE.md)). Nothing else here needs Node.
+Releasing needs no local setup at all — it runs entirely in CI (see
+[RELEASE.md](RELEASE.md)). `package.json` exists only so that workflow
+installs the exact `semantic-release` version this repository has pinned.
 
 ## The gate
 
@@ -59,20 +59,11 @@ chore revert security`. Rebase-merge replays every commit onto `main`
 unchanged, so this is what a reader of `git log` sees — not collapsed into
 whatever the PR was titled.
 
-`task cut:next` (see [RELEASE.md](RELEASE.md)) reads these to decide the next
-version, so a commit that renames or removes a task needs `!` after the type
-(`feat(k8s)!: …`) or a `BREAKING CHANGE:` footer — Conventional Commits has no
-type of its own for that case, and without the marker it reads as an ordinary
-`feat`.
-
-## Changing the changelog
-
-If the change is something a consumer needs to act on when upgrading — a
-renamed input, a removed task, a new one worth knowing about — add an entry
-under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) in the same PR. A
-maintainer moves it under a version number at release time; see
-[What a version number promises](RELEASE.md#what-a-version-number-promises)
-for how a change maps to major/minor/patch.
+`semantic-release` (see [RELEASE.md](RELEASE.md)) reads these to decide the
+next version automatically once a PR merges, so a commit that renames or
+removes a task needs `!` after the type (`feat(k8s)!: …`) or a `BREAKING
+CHANGE:` footer — Conventional Commits has no type of its own for that case,
+and without the marker it reads as an ordinary `feat`.
 
 ## Opening a PR
 

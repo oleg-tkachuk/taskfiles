@@ -13,35 +13,17 @@ from merged PRs, and a PR with no label falls into "Other Changes".
 
 ## Cutting one
 
-`task cut:next` names the version — it runs `semantic-release` in dry-run
-against the commits since the last tag, under the `releaseRules` in
-[`release.config.cjs`](release.config.cjs): a `BREAKING CHANGE:` footer or `!`
-after the type is a major, `feat:` is a minor, everything else is a patch,
-matching [What a version number promises](#what-a-version-number-promises)
-below. Write the CHANGELOG entry under `## [Unreleased]` as the work lands,
-then move it under that version and bump the README's pin in its own PR:
+Fully automatic — there is no command to run. Once a PR merges to `main` and
+every check passes, `ci.yml`'s `release` job dispatches
+[`release.yml`](.github/workflows/release.yml), which runs `semantic-release`
+(config in [`release.config.cjs`](release.config.cjs)) against the commits
+since the last tag. If any of them are release-worthy — see
+[What a version number promises](#what-a-version-number-promises) — it
+computes the next version, creates the tag and pushes it. If none are,
+nothing happens: no tag, no error, just a run that says so.
 
-```bash
-task cut:next                   # e.g. v1.2.0
-git switch -c release/1.2.0
-# move [Unreleased] under ## [1.2.0] — date, bump the README pin
-task lint                       # the gate, also run by the hooks
-git commit -am "docs: cut 1.2.0"
-git push -u origin release/1.2.0
-gh pr create --fill --label documentation
-gh pr merge --rebase --auto     # merges once the required checks pass
-```
-
-Once that PR is merged, `task cut:tag` re-runs the same computation and
-refuses if it no longer matches what the CHANGELOG's top entry names — a
-commit landing on `main` between the two steps is the one thing that could
-make them disagree. On a match, it creates and pushes the tag itself — tags
-aren't a protected ref, so this is still, underneath, a direct push:
-
-```bash
-git switch main && git pull
-task cut:tag                    # tags and pushes v1.2.0 — ci.yml takes it from here
-```
+The pushed tag re-triggers `ci.yml`, whose `gate`, `consumable` and `publish`
+jobs pick it up from there.
 
 ## What the workflow refuses
 
@@ -53,33 +35,32 @@ CI is red never reaches `publish`. Past that, it will not publish a tag that:
 - **`main` does not contain** — a tag cut on a side branch would ship a tree
   that CI on main never saw, to consumers who pinned it;
 - **is not `vMAJOR.MINOR.PATCH`** — helm and OCI both reject a chart version
-  that is not SemVer-2, and the modules mint chart versions from these tags;
-- **has no [CHANGELOG](CHANGELOG.md) entry** for its version;
-- **the README does not pin** — the quickstart is written to be copied, so the
-  version in it is part of what a release ships.
+  that is not SemVer-2, and the modules mint chart versions from these tags.
 
 It then includes the published tag **over the network**, the way a consumer
 does. That is the only check that proves the tag is actually fetchable, and it
 is why the workflow is slower than a lint.
 
-## Notes and changelog are different things
+## Notes live on GitHub, not in the repository
 
-The GitHub release notes are generated from merged pull requests and list what
-changed — see [`.github/release.yml`](.github/release.yml) for how a PR's
-label sorts it into a category. The changelog says what to do about it — which
-names moved, what to set now that a default is gone, what replaces a removed
-task. A generator cannot write the second, which is why the gate refuses a tag
-without one.
+The GitHub release notes are generated from merged pull requests — see
+[`.github/release.yml`](.github/release.yml) for how a PR's label sorts it
+into a category. There is no hand-written changelog to keep in sync with
+that: [CHANGELOG.md](CHANGELOG.md) is a frozen historical record through
+5.4.0, the last version cut by hand before this workflow existed.
 
 ## What a version number promises
 
 Renaming or removing a task is a major bump: these modules are a public API,
 and `?ref=` is the only thing standing between a rename here and a consumer's
-broken Taskfile. Adding a task or an input is a minor. Everything else —
-documentation, CI, a message a tool prints — is a patch.
+broken Taskfile. Adding a task or an input is a minor. A fix or a performance
+change is a patch. Documentation, CI, refactors, tests and other internal
+changes release nothing on their own — this is the plain
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) preset
+in `release.config.cjs`, unmodified.
 
-`task cut:next` reads that policy off the commits themselves, so a rename or
-removal needs to be marked as such: `!` after the type, or a `BREAKING
+`semantic-release` reads that policy off the commits themselves, so a rename
+or removal needs to be marked as such: `!` after the type, or a `BREAKING
 CHANGE:` footer — see [Commit messages](CONTRIBUTING.md#commit-messages).
 Conventional Commits has no type of its own for it.
 

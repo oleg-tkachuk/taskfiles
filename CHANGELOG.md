@@ -1,20 +1,16 @@
 # Changelog
 
-Notable changes to the shared task library, newest first. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
-[SemVer](https://semver.org/): consumers pin `?ref=vX.Y.Z`, so a rename or a
-removal is a major bump — these modules are a public API.
+Historical record through 5.4.0, newest first, in
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format. Versions
+follow [SemVer](https://semver.org/): consumers pin `?ref=vX.Y.Z`, so a
+rename or a removal is a major bump — these modules are a public API.
 
-This file is **not** generated. The GitHub release notes already list the
-commits — `ci.yml`'s `publish` job builds them with `--generate-notes` — and repeating
-that here would add nothing. What a generator cannot write is the half that
-matters to someone upgrading: which names changed, what to set now that a
-default is gone, and what to replace a removed task with. That is what lives
-here, and the release gate refuses a tag with no entry.
-
-## [Unreleased]
-
-Nothing yet.
+Releases are cut automatically now (see [RELEASE.md](RELEASE.md)), so nothing
+lands here past 5.4.0 — **the
+[GitHub Releases page](https://github.com/oleg-tkachuk/taskfiles/releases) is
+the changelog going forward**, generated from merged PRs the same way it
+always was (see [`.github/release.yml`](.github/release.yml)). This file
+stays as-is for the entries already written by hand.
 
 ## [5.4.0] — 2026-09-13
 

@@ -1,0 +1,87 @@
+name: Release
+
+# Dispatched by CI once every check on a push to main has passed — see the
+# `release` job in ci.yml.
+#
+# workflow_run is the obvious trigger and is not available here: zizmor's
+# dangerous-triggers audit refuses it categorically, and its own docs say no
+# guard satisfies it — "checking github.repository is not effective on
+# workflow_run, since a workflow_run always runs in the context of the target
+# repository." Silencing a high finding to get this file its own row in the
+# Actions tab is not a trade this repository makes.
+#
+# repository_dispatch avoids that without extra cost. GitHub does not start
+# new workflow runs from events triggered by GITHUB_TOKEN — which is why
+# pushing a tag from CI cannot chain a workflow on its own, and why the usual
+# workaround is a long-lived PAT — and repository_dispatch is one of the two
+# documented exceptions that always create a run. So CI dispatches this with
+# its own GITHUB_TOKEN: no extra credential, no dangerous trigger.
+#
+# Deliberately no workflow_dispatch: it would let a maintainer cut a release
+# from an untested main with one click, which is exactly the gate below
+# exists to prevent.
+on:
+  repository_dispatch:
+    types: [release]
+
+# Nothing at the top level — the job below asks for exactly what it needs,
+# and nothing narrows an inherited grant since there is no caller above it.
+permissions: {}
+
+concurrency:
+  # Two dispatches close together would both compute "next version" from the
+  # same last tag and could push conflicting ones — one queue, not per-ref,
+  # since a repository_dispatch payload carries no ref to key on. Never
+  # cancel-in-progress: a semantic-release run killed mid-push can leave a
+  # tag pushed without the release it was for, same reasoning as ci.yml's own
+  # concurrency group for a tag push.
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  semantic-release:
+    name: Compute and push the next tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # semantic-release only creates and pushes the tag — see release.config.cjs
+    steps:
+      # No persist-credentials: false here — semantic-release pushes the tag
+      # it creates, so this is the one checkout in the repository that
+      # genuinely needs its credentials.
+      #
+      # Deliberately no `ref:`. A repository_dispatch run checks out the head
+      # of the default branch, which is a BRANCH — and semantic-release has
+      # to be on one of its configured release branches to release at all.
+      # Checking out the dispatched sha instead would leave a detached HEAD,
+      # where semantic-release finds no release branch and does nothing. The
+      # sha is printed below instead, which is what it was wanted for.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 # zizmor: ignore[artipacked]
+        with:
+          # semantic-release derives the next version from the commit history.
+          fetch-depth: 0
+
+      # Which commit and which CI run asked for this release. A dispatched
+      # run is not linked to its trigger in the UI the way a workflow_run is,
+      # so without this line the run says nothing about where it came from.
+      - name: Say what dispatched this
+        env:
+          SHA: ${{ github.event.client_payload.sha }}
+          CI_RUN: ${{ github.event.client_payload.ci_run_id }}
+        run: |
+          printf 'dispatched by CI run %s for commit %s\n' "${CI_RUN:-unknown}" "${SHA:-unknown}"
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      # package.json/package-lock.json already pin semantic-release and its
+      # conventionalcommits preset, so this installs the exact versions
+      # committed to the repository rather than trusting a marketplace
+      # action's own bundled pin.
+      - run: npm ci
+
+      - run: npx semantic-release --no-ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
