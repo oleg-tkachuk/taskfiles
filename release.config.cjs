@@ -1,37 +1,24 @@
 // Computes the next SemVer from Conventional Commits and creates the git tag
-// — nothing else. `task cut:next` / `task cut:tag` are the only callers; see
-// their comments in Taskfile.yaml for why this runs on demand and never in
-// CI on every push.
+// — nothing else. Run automatically by .github/workflows/release.yml, which
+// .github/workflows/ci.yml dispatches once every check on a push to main has
+// passed (see the `release` job there for why repository_dispatch, not
+// workflow_run or a plain push trigger).
 //
-// No CHANGELOG generation and no GitHub Release here: CHANGELOG.md stays
-// hand-written (see its own header for why — a generator cannot write what a
-// consumer has to *do* about a change), and the GitHub Release is already
-// built by `ci.yml`'s `publish` job from merged pull requests (see
-// .github/release.yml). Only `@semantic-release/commit-analyzer` is
+// No CHANGELOG generation and no GitHub Release here: the GitHub Release is
+// already built by ci.yml's `publish` job from merged pull requests (see
+// .github/release.yml) — arguably better than a generic commit list, since
+// it groups by PR label. Only @semantic-release/commit-analyzer is
 // configured, so semantic-release has nothing to publish anywhere — the tag
 // it creates is the entire effect.
+//
+// Plain `conventionalcommits` preset, no custom releaseRules: feat is a
+// minor, fix/perf/revert are a patch, a `!` or `BREAKING CHANGE:` footer is a
+// major, and docs/style/refactor/test/build/ci/chore release nothing on
+// their own. See RELEASE.md — this replaced a "everything else is a patch"
+// override that existed only to fit the old hand-batched [Unreleased] model.
 module.exports = {
   branches: ["main"],
   tagFormat: "v${version}",
-  plugins: [
-    [
-      "@semantic-release/commit-analyzer",
-      {
-        preset: "conventionalcommits",
-        releaseRules: [
-          // Conventional Commits has no type for "renamed or removed a
-          // task" — RELEASE.md's major-bump case — so that has to be marked
-          // by hand, with `!` after the type or a `BREAKING CHANGE:` footer.
-          // See CONTRIBUTING.md.
-          { breaking: true, release: "major" },
-          { type: "feat", release: "minor" },
-          // RELEASE.md: "documentation, CI, a message a tool prints — is a
-          // patch." The Angular preset's own default would call most of
-          // these "no release" instead, which is a different policy than
-          // this repository's.
-          { type: "*", release: "patch" },
-        ],
-      },
-    ],
-  ],
+  repositoryUrl: "https://github.com/oleg-tkachuk/taskfiles.git",
+  plugins: [["@semantic-release/commit-analyzer", { preset: "conventionalcommits" }]],
 };

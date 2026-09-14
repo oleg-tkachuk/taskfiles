@@ -331,6 +331,46 @@ jobs:
             *) echo "✖ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
           esac
 
+  # Dispatches the release; the release itself is
+  # .github/workflows/release.yml, which computes the version and creates the
+  # tag. This job only decides the MOMENT: every push to main whose checks
+  # passed gets one, and semantic-release itself decides whether the commits
+  # since the last tag are release-worthy at all (see release.config.cjs).
+  #
+  # `needs:` lists only jobs that also run on a push to main — the same three
+  # `gate` below needs. A job that runs on pull_request alone (there are
+  # none among the required checks today) would skip here and take this job
+  # down with it, since a `needs:` on a skipped job skips by default.
+  release:
+    name: Release
+    needs: [workflows, lint, consumer-smoke]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write # POST /repos/{owner}/{repo}/dispatches needs write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # --input rather than -f: client_payload is nested and the form
+          # syntax cannot express that. Both values come from Actions itself,
+          # never from a contributor, and arrive through env rather than an
+          # Actions expression inside the script, so nothing here is
+          # substituted into the shell before it runs.
+          gh api "repos/${GITHUB_REPOSITORY}/dispatches" --input - <<JSON
+          {
+            "event_type": "release",
+            "client_payload": {
+              "sha": "${GITHUB_SHA}",
+              "ci_run_id": "${GITHUB_RUN_ID}"
+            }
+          }
+          JSON
+          printf '%s\n' "dispatched release for ${GITHUB_SHA}"
+
   # Cutting a tag is the only thing consumers actually see: they pin
   # `?ref=vX.Y.Z`, so a tag is a promise that this exact tree can be included
   # and works. `gate`, `consumable` and `publish` below check that promise
@@ -379,51 +419,6 @@ jobs:
             exit 0
           fi
           echo "::error::Releases must be cut from main. $TAG points at a commit main does not contain, so it would publish a tree that never passed CI on main — and consumers pinning ?ref=$TAG would fetch exactly that tree."
-          exit 1
-
-      - name: 'Guard: the changelog documents this tag'
-        # The notes on the Releases page are generated from merged PRs; this is
-        # the curated half, and the only place an upgrading consumer is told
-        # which names changed and what to set instead. A tag published without
-        # it is a tag nobody can act on.
-        #
-        # The tag arrives through env, never through `${{ }}` inside the script:
-        # an expression is substituted as text before bash parses the line, so a
-        # tag named `v1.0.0$(…)` — git allows that — would run as a command.
-        env:
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          tag="$TAG"
-          version="${tag#v}"
-          if [ ! -f CHANGELOG.md ]; then
-            echo "✖ $tag has no CHANGELOG.md in its tree" >&2
-            echo "  Tags cut before the changelog existed cannot pass this gate," >&2
-            echo "  and do not need to: release from a tag that contains it." >&2
-            exit 1
-          fi
-          if ! grep -qF "## [$version]" CHANGELOG.md; then
-            echo "✖ CHANGELOG.md has no '## [$version]' section" >&2
-            echo "  Add one — what a consumer has to do about this release —" >&2
-            echo "  and move anything under [Unreleased] into it." >&2
-            exit 1
-          fi
-          echo "✔ $tag is documented in CHANGELOG.md"
-
-      - name: 'Guard: the README pins this tag'
-        # The quickstart is written to be copied as-is, so the version in it is
-        # part of the release rather than decoration — and nothing templates a
-        # README on GitHub, which is why this is a check and not a substitution.
-        env:
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          if grep -qF "?ref=$TAG" README.md; then
-            echo "✔ README pins $TAG"
-            exit 0
-          fi
-          found=$(grep -oE '\?ref=v[0-9]+\.[0-9]+\.[0-9]+' README.md | head -1 || true)
-          echo "::error::README.md still shows ${found:-no pin at all} where it should pin $TAG. Bump it in the release commit, before the tag." >&2
           exit 1
 
       - name: 'Guard: the tag is SemVer'

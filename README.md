@@ -72,14 +72,14 @@ becomes `localhost:5000/service` and `k8s:restart` rolls something in
 
 **Pin a tag.** Not a branch, or your build changes when someone else commits —
 and never a commit SHA: Task clones with `--depth 1`, and git refuses a bare
-SHA with that flag. The tag above is an example; the current one is on the
-[releases page](https://github.com/oleg-tkachuk/taskfiles/releases), and
-[CHANGELOG.md](CHANGELOG.md) says what moving to it costs.
+SHA with that flag. The tag above is an example; the current one, and what
+moving to it costs, is on the
+[releases page](https://github.com/oleg-tkachuk/taskfiles/releases).
 
 A rename or a removal is a major bump — these modules are a public API, and
 `?ref=` is the only thing between a rename here and your Taskfile. Adding a
-task or an input is a minor; everything else is a patch. How a release is cut
-is in [RELEASE.md](RELEASE.md).
+task or an input is a minor; a fix is a patch. How a release is cut is in
+[RELEASE.md](RELEASE.md).
 
 ### Working on the library itself
 
