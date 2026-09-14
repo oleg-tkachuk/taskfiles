@@ -1,0 +1,7 @@
+# GitHub's language bar counts only `programming`/`markup` languages by
+# default — YAML is classified `data` and is excluded, so this repository's
+# ~230KB of Taskfile YAML counted for nothing next to the one small
+# release.config.cjs, and the bar showed 100% JavaScript. Forcing YAML in
+# overrides that default without touching what release.config.cjs itself is.
+*.yaml linguist-language=YAML
+*.yml linguist-language=YAML
