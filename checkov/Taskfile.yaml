@@ -54,7 +54,18 @@ tasks:
       - checkov --config-file {{._CKV_CFG}} {{._CKV_FLAGS}}
       - printf '%s\n' "{{._CKV_OK}} checkov · no findings outside the baseline"
 
-  all:
+  # Named for what it is, and it used to be called `all`.
+  #
+  # That name said "every target" and meant "every finding" — a MODE of one
+  # scan, not an aggregate of several. Beside `scan` it read as the stronger
+  # gate, while its own description says "never a gate": it ignores the
+  # baseline and the config on purpose, so it always exits 0 with a list. A
+  # consumer reaching for the thorough check found the one that cannot fail.
+  #
+  # This module's own prose already called it the triage view — see
+  # CHECKOV_FRAMEWORKS and CHECKOV_TARGET above. The task name was the last
+  # place still calling it `all`.
+  triage:
     desc: "Every checkov finding, baselined ones included — a triage view, never a gate"
     preconditions:
       - sh: command -v checkov >/dev/null

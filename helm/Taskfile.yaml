@@ -7,7 +7,7 @@ version: "3"
 #     helm: { taskfile: '{{printf .TASKLIB "helm"}}', dir: . }
 #
 # Cluster-wide, not component-scoped: `list` answers "what is on this cluster"
-# and `uninstall-all` empties it. That is why they are not in `k8s`, which acts
+# and `uninstall` can empty it. That is why they are not in `k8s`, which acts
 # on one component's deployment and is included by every component — a
 # cluster-wide delete does not belong in each of their task lists.
 #
@@ -33,6 +33,7 @@ vars:
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _HELM_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
   _HELM_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
+  _HELM_ERR: '{{if .NO_COLOR}}✖{{else}}{{"\x1b[31m✖\x1b[0m"}}{{end}}'
 
 tasks:
 
@@ -57,16 +58,24 @@ tasks:
     cmds:
       - helm list{{._HELM_CTX}} {{._HELM_SCOPE}}
 
-  uninstall-all:
-    desc: "Uninstall every Helm release in scope — destructive, asks first"
-    # Two locks, because one is not enough for a task that empties a cluster.
+  uninstall:
+    desc: "Uninstall one Helm release, or RELEASE=all for every one in scope — destructive, asks first"
+    # One verb, and RELEASE says how much of it.
+    #
+    # It was `uninstall-all`, with no way to remove a single release — so the
+    # only uninstall this module offered was the one that empties a cluster.
+    # RELEASE is required, which keeps that property: the shortest command
+    # cannot be the widest, and `all` has to be typed on purpose.
+    #
+    # Three locks now, because one is not enough for a task that can empty a
+    # cluster.
     #
     # CONFIRM must name the context being emptied. A prompt alone guards against
     # not meaning it; it does nothing about meaning it on the wrong cluster,
     # which is the mistake that actually happens — kubectl's current context is
     # ambient state nobody re-reads before typing a command.
     requires:
-      vars: [CONFIRM]
+      vars: [CONFIRM, RELEASE]
     preconditions:
       - sh: command -v helm >/dev/null
         msg: "helm is not installed — https://helm.sh/docs/intro/install/"
@@ -77,12 +86,15 @@ tasks:
           CONFIRM does not name the context this would empty.
           Re-run with CONFIRM=<the context you mean>, after checking
           which one that is:  kubectl config current-context
-    prompt: "Uninstall EVERY Helm release {{if .HELM_NS}}in {{.HELM_NS}}{{else}}in every namespace{{end}} on {{.CONFIRM}}. This cannot be undone. Continue?"
+    prompt: "Uninstall {{if eq .RELEASE \"all\"}}EVERY Helm release{{else}}the Helm release {{.RELEASE}}{{end}} {{if .HELM_NS}}in {{.HELM_NS}}{{else}}in every namespace{{end}} on {{.CONFIRM}}. This cannot be undone. Continue?"
     cmds:
       # Listed before removing, so the prompt above is answered with the list in
       # view rather than from memory.
       - printf '%s\n' "{{._HELM_RUN}} helm · about to uninstall:"
-      - helm list{{._HELM_CTX}} {{._HELM_SCOPE}} -q | sed 's/^/    /'
+      - cmd: |-
+          helm list{{._HELM_CTX}} {{._HELM_SCOPE}} -q \
+            | awk -v want={{.RELEASE | q}} 'want == "all" || $1 == want' \
+            | sed 's/^/    /'
       # awk over helm's table rather than a JSON parse: a release name is a DNS
       # label, so the first two columns cannot contain a space, and this asks
       # nothing of the machine that helm has not already asked. The earlier
@@ -90,10 +102,38 @@ tasks:
       # to require, and whose absence would surface only after the prompt had
       # been answered.
       - cmd: |-
+          # A release named `all` would be shadowed by the selector. Refuse
+          # rather than silently emptying the cluster instead of removing one
+          # release: a helm release name is a DNS label, so `all` is legal.
+          if [ {{.RELEASE | q}} = all ] \
+             && helm list{{._HELM_CTX}} {{._HELM_SCOPE}} -q | grep -qx all; then
+            printf '%s\n' "{{._HELM_ERR}} helm · a release is named 'all', and RELEASE=all means EVERY release." >&2
+            printf '%s\n' "         Refusing rather than guessing. Scope it with HELM_NS=<namespace>, or rename it." >&2
+            exit 1
+          fi
+
+          # A named release that is not there is a typo, not a no-op: the
+          # operator asked for something to be gone and it never was. Saying so
+          # is the difference between "done" and "you removed nothing".
+          if [ {{.RELEASE | q}} != all ] \
+             && ! helm list{{._HELM_CTX}} {{._HELM_SCOPE}} -q | grep -qx {{.RELEASE | q}}; then
+            printf '%s\n' "{{._HELM_ERR}} helm · no release named {{.RELEASE}} in scope" >&2
+            exit 1
+          fi
+
+          # awk over helm's table rather than a JSON parse: a release name is a
+          # DNS label, so the first two columns cannot contain a space, and
+          # this asks nothing of the machine that helm has not already asked.
+          # The earlier version piped through python3 — an interpreter this
+          # module has no reason to require, and whose absence would surface
+          # only after the prompt had been answered.
           helm list{{._HELM_CTX}} {{._HELM_SCOPE}} \
-            | awk 'NR > 1 { print $1, $2 }' \
+            | awk -v want={{.RELEASE | q}} 'NR > 1 && (want == "all" || $1 == want) { print $1, $2 }' \
             | while read -r name ns; do
                 helm uninstall{{._HELM_CTX}} {{._HELM_UNINSTALL_FLAGS}} "$name" --namespace "$ns" >/dev/null \
                   && printf '%s\n' "{{._HELM_OK}} helm · uninstalled $ns/$name"
               done
-      - printf '%s\n' "{{._HELM_OK}} helm · nothing left in scope"
+      - cmd: |-
+          if [ {{.RELEASE | q}} = all ]; then
+            printf '%s\n' "{{._HELM_OK}} helm · nothing left in scope"
+          fi

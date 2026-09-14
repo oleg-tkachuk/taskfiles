@@ -13,7 +13,7 @@ includes:
 | Task | What it does |
 |---|---|
 | `scan` | Policy-scan against the baseline — the CI gate |
-| `all` | Every finding, baselined ones included — a triage view, never a gate |
+| `triage` | Every finding, baselined ones included — a triage view, never a gate |
 | `baseline` | Regenerate the baseline, after deliberately fixing findings |
 
 ## Inputs
@@ -41,7 +41,7 @@ includes:
 $ task checkov:scan
 ✔ checkov · no findings outside the baseline
 
-$ task checkov:all          # everything, baselined findings included
+$ task checkov:triage       # everything, baselined findings included
 $ task checkov:baseline     # after fixing some, accept what is left
 ```
 

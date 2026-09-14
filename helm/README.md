@@ -12,7 +12,7 @@ includes:
 | Task | What it does |
 |---|---|
 | `list` | Show every Helm release on the cluster |
-| `uninstall-all` | Uninstall every release in scope — destructive, asks first |
+| `uninstall` | Uninstall one release, or `RELEASE=all` for every one in scope — destructive, asks first |
 
 ## Inputs
 
@@ -20,7 +20,8 @@ includes:
 |---|---|---|
 | `K8S_CONTEXT` | current | pin a cluster |
 | `HELM_NS` | every namespace | limit the scope to one namespace |
-| `CONFIRM` | — | required by `uninstall-all`; must name the context being emptied |
+| `CONFIRM` | — | required by `uninstall`; must name the context being emptied |
+| `RELEASE` | — | required by `uninstall`; one release name, or `all` |
 | `HELM_UNINSTALL_FLAGS` | — | verbatim extra flags for `helm uninstall` |
 
 ## Examples
@@ -37,7 +38,8 @@ argo-cd    argocd      13        deployed  argo-cd-10.8.1
 cnpg       cnpg-system 2         deployed  cloudnative-pg-0.29.0
 
 $ task helm:list HELM_NS=argocd            # one namespace
-$ task helm:uninstall-all CONFIRM=minikube # asks before it empties it
+$ task helm:uninstall RELEASE=argo-cd CONFIRM=minikube # one release
+$ task helm:uninstall RELEASE=all CONFIRM=minikube     # asks before it empties it
 ```
 
 ## Why this is not in `k8s`
@@ -51,13 +53,13 @@ Packaging, linting and pushing a chart live in [`release`](../release/README.md)
 installing one component's chart is `k8s:upgrade`. This module is what is
 already there.
 
-## The two locks on `uninstall-all`
+## The three locks on `uninstall`
 
 ```console
-$ task helm:uninstall-all
-task: Task "helm:uninstall-all" cancelled because it is missing required variables: CONFIRM
+$ task helm:uninstall
+task: Task "helm:uninstall" cancelled because it is missing required variables: CONFIRM, RELEASE
 
-$ task helm:uninstall-all CONFIRM=staging
+$ task helm:uninstall RELEASE=all CONFIRM=staging
 task: CONFIRM does not name the context this would empty.
 Re-run with CONFIRM=<the context you mean>, after checking
 which one that is:  kubectl config current-context
