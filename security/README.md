@@ -24,7 +24,7 @@ workspace — tasks then read `sec:<task>`.
 | `secrets` | gitleaks — committed credentials anywhere in the history |
 | `trivy` | trivy — vulnerable dependencies and secrets (blocking) plus IaC misconfig (report-only) |
 | `vuln` | govulncheck across every Go module — vulnerabilities the code actually reaches |
-| `proto` | breaking:       buf breaking — refuse incompatible proto changes against main |
+| `proto:breaking` | buf breaking — refuse incompatible proto changes against main |
 
 ## Inputs
 

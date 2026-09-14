@@ -29,11 +29,12 @@ workspace — tasks then read `go:<task>`.
 | `test` | Run the unit suite |
 | `tidy` | go mod tidy the way CI resolves the module — standalone |
 | `vuln` | govulncheck — vulnerabilities this module's code actually reaches |
-| `deps` | outdated:             List dependencies with a newer version available (read-only) |
-| `deps` | update:               Bump dependencies to the latest minor/patch, tidy, then prove it still builds |
-| `test` | coverage:             Run the unit suite with coverage; HTML report lands in coverage/ |
-| `test` | integration:          Run the integration suite (build tag, needs Docker) |
-| `test` | tagged:compile:       Type-check build-tagged suites that the default test run never compiles |
+| `deps:outdated` | List dependencies with a newer version available (read-only) |
+| `deps:update` | Bump dependencies to the latest minor/patch, tidy, then prove it still builds |
+| `test:coverage` | Run the unit suite with coverage; HTML report lands in coverage/ |
+| `test:integration` | Run the integration suite (build tag, needs Docker) |
+| `test:tagged:compile` | Type-check build-tagged suites that the default test run never compiles |
+| `bench` | Run the benchmarks — no unit tests, just the measurements |
 
 ## Inputs
 

@@ -24,10 +24,10 @@ workspace — tasks then read `node:<task>`.
 | `typecheck` | Run the typecheck script, skipped where the project declares none |
 | `test` | Run the test script |
 | `verify` | Lint then build — the pre-push gate |
-| `deps` | outdated:       Show dependencies with a newer version available (read-only) |
-| `deps` | update:         Bump dependencies to the latest minor/patch (no majors), then reinstall |
-| `lint` | fix:            Run the lint script with --fix |
-| `test` | e2e:            Run the Playwright suite, installing chromium when it is missing |
+| `deps:outdated` | Show dependencies with a newer version available (read-only) |
+| `deps:update` | Bump dependencies to the latest minor/patch (no majors), then reinstall |
+| `lint:fix` | Run the lint script with --fix |
+| `test:e2e` | Run the end-to-end suite, preparing its browser first |
 
 ## Inputs
 
