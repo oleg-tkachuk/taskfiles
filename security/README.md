@@ -31,7 +31,8 @@ workspace — tasks then read `sec:<task>`.
 | Var | Default | Meaning |
 |---|---|---|
 | `GO_MODULES` | `.` | whitespace-separated module directories for the Go scans; one without a `go.mod` is skipped, not failed |
-| `DOCKERFILES` | `./Dockerfile` | Dockerfiles to lint |
+| `DOCKERFILES` | discovered | Dockerfiles to lint; set to skip the `find` and lint exactly these |
+| `SCAN_EXCLUDE` | vendored + throwaway trees | `find(1)` predicates the Dockerfile discovery skips |
 | `HADOLINT_FLAGS` | `--failure-threshold error` | hadolint flags |
 | `GOVULNCHECK_FLAGS` | — | extra govulncheck flags |
 | `GOLANGCI_FLAGS` | — | extra golangci-lint flags |

@@ -39,6 +39,9 @@ workspace — tasks then read `k8s:<task>`.
 | `VALUES` | — | a values file for `upgrade` |
 | `ROLLOUT_TIMEOUT` | `2m` | how long `restart` waits |
 | `HELM_UPGRADE_FLAGS` | — | extra flags for `upgrade` |
+| `PORT` | `8080` | local port for `port-forward` |
+| `TARGET_PORT` | `PORT` | pod-side port for `port-forward`, when it differs |
+| `TAIL` | `100` | line count for `logs` |
 
 ## Examples
 

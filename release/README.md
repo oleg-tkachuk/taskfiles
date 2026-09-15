@@ -50,6 +50,8 @@ workspace — tasks then read `release:<task>`.
 | `DOCKER_CONTEXT` | `.` | build context, when it is not the component directory |
 | `DOCKER_BUILD_FLAGS` | — | verbatim extra buildx flags |
 | `IMAGE_LATEST` | `0` | set to `1` to push a floating `:latest` beside the version tag |
+| `BUILDX_BUILDER` | active builder | which buildx builder `image:gc` prunes |
+| `BUILDX_KEEP_STORAGE` | `8GB` | cache floor `image:gc` trims down to |
 | `CHART_DIR` | `./deploy/chart` | the chart every chart task reads |
 | `CHART_APP_VERSION` | derived version | pin it when the image is upstream's |
 | `CHART_MIN_RESOURCES` | `1` | render-gate floor |
@@ -59,6 +61,7 @@ workspace — tasks then read `release:<task>`.
 | `HELM_LINT_FLAGS` | — | extra flags for `helm lint` |
 | `HELM_TEMPLATE_FLAGS` | — | extra flags for `helm template` |
 | `HELM_PACKAGE_FLAGS` | — | extra flags for `helm package` |
+| `RENDER_OUT` | `.task/render.yaml` | where `chart:render` writes before the gate reads it |
 | `INFO_ENV_FILE` | `./deploy/info.env` | where the build metadata is written |
 | `VERSION_BASE` | `0.1.0` | base for untagged builds |
 | `VERSION_TAG_EXCLUDE` | — | tag glob to keep out of the version, e.g. `api/*` |
