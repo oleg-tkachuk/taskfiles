@@ -209,3 +209,4 @@ tasks:
       - >-
         go test -tags={{._GO_TAGS}} -run='^$' -bench={{.BENCH | default "."}}
         {{._GO_BENCH_FLAGS}} {{._GO_BENCH_PKG}}
+# smoke-test comment, will be removed
