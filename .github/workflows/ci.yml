@@ -79,6 +79,50 @@ jobs:
         # strict run rather than the default one.
         run: pipx run zizmor==1.30.0 --persona=auditor --format=plain .github/workflows/
 
+  # Feeds consumer-smoke's `if:` below. Nothing in that job reads a README, so
+  # a change that only touches *.md gains nothing from a throwaway Go module
+  # being built and tested on two OSes.
+  #
+  # Anything short of "every changed file is markdown" — including a trigger
+  # this cannot diff, like workflow_dispatch — runs the full matrix. Guessing
+  # wrong the expensive way (running it) is fine; guessing wrong the cheap way
+  # (skipping it) is a hole in the gate.
+  changes:
+    name: Detect doc-only changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.diff.outputs.docs_only }}
+    steps:
+      - name: 'Setup: check out the repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.CHECKOUT_REF }}
+          fetch-depth: 0
+
+      - name: 'Decide: does this change touch anything but *.md'
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BASE:-}" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "no usable base for $EVENT — running the full matrix"
+            exit 0
+          fi
+
+          changed=$(git diff --name-only "$BASE" "$HEAD")
+          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '\.md$'; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          fi
+          printf 'changed files:\n%s\n' "${changed:-<none>}"
+
   lint:
     name: Lint
     strategy:
@@ -137,6 +181,8 @@ jobs:
     # defaults. This builds a throwaway one rather than depending on any other
     # repository being present.
     name: Consumer smoke
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     strategy:
       # Both, always: a divergence between BSD and GNU userland is exactly the
       # kind of thing one green check would hide, and knowing which of the two
@@ -348,14 +394,22 @@ jobs:
   # gets one, and semantic-release itself decides whether the commits since
   # the last tag are release-worthy at all (see release.config.cjs).
   #
-  # `needs:` lists only jobs that also run on a push to main — the same three
-  # `gate` below needs. A job that runs on pull_request alone (there are
-  # none among the required checks today) would skip here and take this job
-  # down with it, since a `needs:` on a skipped job skips by default.
+  # `needs:` lists only jobs that also run on a push to main — the same ones
+  # `gate` below needs. A job that runs on pull_request alone (there are none
+  # among the required checks today) would skip here and take this job down
+  # with it, since a `needs:` on a skipped job skips by default — the same
+  # reason `always()` and the explicit results below exist: consumer-smoke
+  # skips on a doc-only change, and that skip must not read as a failure.
   dispatch-release:
     name: Dispatch release
-    needs: [workflows, lint, consumer-smoke]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [changes, workflows, lint, consumer-smoke]
+    if: >-
+      always() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.result == 'success' &&
+      needs.workflows.result == 'success' &&
+      needs.lint.result == 'success' &&
+      (needs['consumer-smoke'].result == 'success' || needs['consumer-smoke'].result == 'skipped')
     permissions:
       contents: write # POST /repos/{owner}/{repo}/dispatches needs write
     runs-on: ubuntu-latest
@@ -390,12 +444,20 @@ jobs:
   # only after the checks above them have already passed for this exact ref.
   gate:
     name: Gate
-    needs: [workflows, lint, consumer-smoke]
+    needs: [changes, workflows, lint, consumer-smoke]
     # Only meaningful on a tag: an ordinary branch push or PR has nothing to
     # release, and this is what keeps the release jobs from running at all —
     # `consumable` and `publish` skip too, since a `needs:` on a skipped job
-    # skips by default.
-    if: startsWith(github.ref, 'refs/tags/v') || inputs.tag != ''
+    # skips by default. always() plus the explicit results below is the same
+    # tolerance dispatch-release needs: consumer-smoke skips on a doc-only
+    # change, and that must read as fine rather than as this job's own skip.
+    if: >-
+      always() &&
+      (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') &&
+      needs.changes.result == 'success' &&
+      needs.workflows.result == 'success' &&
+      needs.lint.result == 'success' &&
+      (needs['consumer-smoke'].result == 'success' || needs['consumer-smoke'].result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
