@@ -36,6 +36,8 @@ workspace — tasks then read `argocd:<task>`.
 | `ARGOCD_PORT` | `8443` | local port for `server:port-forward` |
 | `ARGOCD_NS` | `argocd` | namespace Argo itself runs in |
 | `K8S_CONTEXT` | current | pin a cluster |
+| `ARGOCD_ADMIN_PASSWORD` | — | required by `server:set-password` |
+| `ROLLOUT_TIMEOUT` | `2m` | how long `server:restart` waits |
 
 ## Examples
 
