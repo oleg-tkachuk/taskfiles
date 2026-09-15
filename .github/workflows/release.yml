@@ -45,6 +45,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write # semantic-release only creates and pushes the tag — see release.config.cjs
+      actions: write # dispatches ci.yml for the tag it pushed — see the last step
     steps:
       # No persist-credentials: false here — semantic-release pushes the tag
       # it creates, so this is the one checkout in the repository that
@@ -85,3 +86,41 @@ jobs:
       - run: npx semantic-release --no-ci
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The second hop, and it was missing.
+      #
+      # The note at the top of this file explains that GitHub starts no
+      # workflow run from an event GITHUB_TOKEN caused, and uses
+      # repository_dispatch to get HERE. The same rule applies to what comes
+      # after: ci.yml publishes a release on `push: tags`, semantic-release
+      # pushes the tag with that same token, so the push arrives and starts
+      # nothing. The tag then exists with no GitHub release behind it — which
+      # is exactly what happened to v6.0.0, tagged and unreleased until it was
+      # dispatched by hand.
+      #
+      # Automating the tag removed the very thing that used to trigger the
+      # publish: v5.3.0 and v5.4.0 were pushed by a person, and a person's
+      # push does start a run.
+      #
+      # workflow_dispatch is the other documented exception that always creates
+      # a run, and ci.yml already takes a `tag` input for exactly this — so
+      # this needs no new credential and keeps the gate: ci.yml still verifies
+      # the tag is consumable over git before it publishes anything.
+      - name: Release the tag it just pushed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Read from git rather than parsing semantic-release's prose:
+          # it tags the commit that was checked out, so no new tag here means
+          # no release was due and there is nothing to publish.
+          tag="$(git tag --points-at HEAD | head -1)"
+
+          if [ -z "$tag" ]; then
+            printf '%s\n' "no new tag on this commit — no release was due"
+            exit 0
+          fi
+
+          printf '%s\n' "dispatching ci.yml to verify and publish $tag"
+          gh workflow run ci.yml -f tag="$tag"
