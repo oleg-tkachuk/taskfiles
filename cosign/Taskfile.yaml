@@ -171,7 +171,7 @@ tasks:
 
   verify:
     desc: "Verify the signatures on the published image and chart"
-    # The counterpart of `all`, and the only proof that signing worked: a sign
+    # The counterpart of `sign`, and the only proof that signing worked: a sign
     # step that quietly wrote nothing looks exactly like one that worked.
     # COSIGN_SIGN=0 turns this off. The guard sits here rather than on the
     # internal task because Task evaluates preconditions BEFORE status, so a
