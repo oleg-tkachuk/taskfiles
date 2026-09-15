@@ -25,11 +25,20 @@ permissions:
   contents: read
 
 concurrency:
-  # A new push supersedes the run in flight for the same ref — except a tag:
-  # a release publish killed halfway is worse than a second run that finds
-  # the release already there and says so.
-  group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  # A new push supersedes the run in flight for the same ref — except a
+  # release verification: a release publish killed halfway is worse than a
+  # second run that finds the release already there and says so.
+  #
+  # The release path arrives as workflow_dispatch with `inputs.tag` set, not
+  # as a tag push — GITHUB_TOKEN cannot start a run from the tag push
+  # semantic-release makes, which is why release.yml calls back in with
+  # `-f tag=`. On workflow_dispatch, github.ref is the branch the run was
+  # dispatched against (main here, since nothing passes --ref), not the tag —
+  # so keying and guarding on github.ref alone put every release verification
+  # in the same group as ordinary main pushes and left it cancelable by the
+  # next one. inputs.tag is what actually marks the run as a release.
+  group: ci-${{ inputs.tag || github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') && inputs.tag == '' }}
 
 env:
   # Pinned, not floating: remote Taskfiles are only stable from 3.53, and a
@@ -333,16 +342,18 @@ jobs:
 
   # Dispatches the release; the release itself is
   # .github/workflows/release.yml, which computes the version and creates the
-  # tag. This job only decides the MOMENT: every push to main whose checks
-  # passed gets one, and semantic-release itself decides whether the commits
-  # since the last tag are release-worthy at all (see release.config.cjs).
+  # tag. Named for what it does rather than `release`, so it reads as a step
+  # in the pipeline instead of the release workflow's own name reused for a
+  # job that only decides the MOMENT: every push to main whose checks passed
+  # gets one, and semantic-release itself decides whether the commits since
+  # the last tag are release-worthy at all (see release.config.cjs).
   #
   # `needs:` lists only jobs that also run on a push to main — the same three
   # `gate` below needs. A job that runs on pull_request alone (there are
   # none among the required checks today) would skip here and take this job
   # down with it, since a `needs:` on a skipped job skips by default.
-  release:
-    name: Release
+  dispatch-release:
+    name: Dispatch release
     needs: [workflows, lint, consumer-smoke]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
