@@ -182,9 +182,15 @@ jobs:
     # actually used — included, with the consumer's vars overriding the
     # defaults. This builds a throwaway one rather than depending on any other
     # repository being present.
+    #
+    # The skip below is per-step, not a job-level `if:`. Branch protection
+    # requires "Consumer smoke (ubuntu-latest)"/"(macos-latest)" by name, and
+    # a job-level `if:` that evaluates false skips the matrix expansion itself
+    # — the two named checks never appear at all, which blocks a merge rather
+    # than passing it. Every step skipping instead leaves both checks present
+    # and green in seconds.
     name: Consumer smoke
     needs: changes
-    if: needs.changes.outputs.smoke_skippable != 'true'
     strategy:
       # Both, always: a divergence between BSD and GNU userland is exactly the
       # kind of thing one green check would hide, and knowing which of the two
@@ -196,6 +202,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: 'Setup: check out the repository'
+        if: needs.changes.outputs.smoke_skippable != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Nothing here pushes with the checkout credential, so it has no
@@ -205,12 +212,14 @@ jobs:
           path: taskfiles
 
       - name: 'Setup: Task'
+        if: needs.changes.outputs.smoke_skippable != 'true'
         uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 'Setup: Go'
+        if: needs.changes.outputs.smoke_skippable != 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: stable
@@ -220,6 +229,7 @@ jobs:
           cache: false
 
       - name: 'Setup: a consumer that includes the library'
+        if: needs.changes.outputs.smoke_skippable != 'true'
         run: |
           set -euo pipefail
           mkdir -p consumer && cd consumer
@@ -300,12 +310,14 @@ jobs:
           git add -A && git commit -qm "chore: fixture"
 
       - name: 'Verify: every module loads side by side'
+        if: needs.changes.outputs.smoke_skippable != 'true'
         working-directory: consumer
         # This is the check that catches a module quietly claiming a name
         # another module already uses.
         run: task --list-all > /dev/null
 
       - name: 'Verify: cosign no-ops cleanly with no key and no binary'
+        if: needs.changes.outputs.smoke_skippable != 'true'
         working-directory: consumer
         # cosign is the one module that reads another module's derived vars
         # (_REL_VERSION, _REL_IMAGE) rather than its own — the most likely
@@ -319,6 +331,7 @@ jobs:
           echo "✔ cosign no-ops without a key, syft or the cosign binary"
 
       - name: 'Verify: helm no-ops cleanly with no cluster'
+        if: needs.changes.outputs.smoke_skippable != 'true'
         working-directory: consumer
         # helm:list's own status guard skips it when kubectl cannot reach a
         # cluster, which is always true here — this proves that guard, not the
@@ -329,6 +342,7 @@ jobs:
           echo "✔ helm:list no-ops without a reachable cluster"
 
       - name: 'Verify: codegen actually generates'
+        if: needs.changes.outputs.smoke_skippable != 'true'
         working-directory: consumer
         # `go generate` is the one step of the chain that needs no external
         # tool, so it is the one the library can prove end to end. It also
@@ -343,6 +357,7 @@ jobs:
           echo "✔ codegen:generate wrote the file its directive asks for"
 
       - name: 'Verify: the go module compiles, tests and builds'
+        if: needs.changes.outputs.smoke_skippable != 'true'
         working-directory: consumer
         # Four tasks that do work rather than report it. `build` is left out
         # deliberately: GO_MAIN defaults to ./cmd/..., which this fixture does
@@ -358,6 +373,7 @@ jobs:
           echo "✔ the go module's tasks run against a real module"
 
       - name: 'Verify: go:fmt:check catches what go:fmt would rewrite'
+        if: needs.changes.outputs.smoke_skippable != 'true'
         working-directory: consumer
         # gofmt -l exits 0 whether or not it found anything — a wrapper task
         # that only checked "did the command run" rather than "did it list a
@@ -376,6 +392,7 @@ jobs:
           echo "✔ go:fmt:check fails on unformatted code and passes on clean code"
 
       - name: "Verify: the consumer's vars reach the modules"
+        if: needs.changes.outputs.smoke_skippable != 'true'
         working-directory: consumer
         # The scoping rule the whole library is built around: a var declared in
         # a module would shadow this. VERSION_BASE is the cheapest observable
