@@ -19,7 +19,7 @@ workspace — tasks then read `sec:<task>`.
 |---|---|
 | `scan` | Run every scan: vulnerabilities, lint, secrets, SAST, filesystem |
 | `lint` | golangci-lint across every Go module, limited to issues new since main |
-| `gosec` | gosec — insecure patterns the compiler is happy with; part of `all` |
+| `gosec` | gosec — insecure patterns the compiler is happy with; part of `scan` |
 | `dockerfile` | hadolint over the Dockerfiles this repository ships |
 | `secrets` | gitleaks — committed credentials anywhere in the history |
 | `trivy` | trivy — vulnerable dependencies and secrets (blocking) plus IaC misconfig (report-only) |
@@ -72,7 +72,7 @@ $ task security:proto:breaking
 ## A repository with no Go still gets scanned
 
 Three of the five scans read Go — `vuln`, `lint` and `gosec` — and two apply to
-anything: `secrets` and `trivy`. `all` runs the agnostic pair first, then the
+anything: `secrets` and `trivy`. `scan` runs the agnostic pair first, then the
 Go ones, and a directory in `GO_MODULES` without a `go.mod` is skipped with a
 line saying so:
 
