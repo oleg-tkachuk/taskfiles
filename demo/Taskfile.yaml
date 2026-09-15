@@ -183,5 +183,5 @@ tasks:
     desc: "Sign the published image and chart, then verify both"
     cmds:
       - task: cosign:keygen
-      - task: cosign:all
+      - task: cosign:sign
       - task: cosign:verify

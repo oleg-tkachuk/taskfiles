@@ -228,7 +228,21 @@ way in a consumer and `task deploy REGISTRY=other` works.
 
 Public tasks are the plain verb for the work (`build`, `test`,
 `deploy`, `restart`) namespaced by area when a module has several (`chart:push`,
-`image:build`, `deps:update`). Internal helpers are `internal: true` and named
+`image:build`, `deps:update`).
+
+A module's do-everything task is a verb too, not `all` — `security:scan`,
+`cosign:sign`, `codegen:regenerate`. `all` names how much rather than what, in
+the one place a consumer looks first, and it reads as a quantifier beside
+siblings that are actions. Where the verb is taken by one of the steps, the
+composite takes the area instead: `codegen:regenerate` sits beside the
+`codegen:generate` step it runs.
+
+Nor is a composite a selector. `scan select=<tool>` would need an enumerable
+set of interchangeable items, and in these modules the items ARE the tasks:
+each carries its own description and its own precondition naming the tool it
+needs, and a selector hides both from `--list`. Variants are nested names here
+— `test:coverage`, `fmt:check`, `deps:update` — and one convention for that is
+the point. Internal helpers are `internal: true` and named
 `_verb` when they stand alone, or `parent:_variant` when they are one branch of
 a public task — the complementary `image:build:_do` / `image:build:_skipped`
 pair, for instance, where exactly one of the two runs.

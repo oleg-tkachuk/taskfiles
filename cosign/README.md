@@ -16,7 +16,7 @@ workspace — tasks then read `sign:<task>`.
 
 | Task | What it does |
 |---|---|
-| `all` | Sign the image and the chart, then attest the image's SBOM |
+| `sign` | Sign the image and the chart, then attest the image's SBOM |
 | `chart` | Sign the published chart at the release version |
 | `image` | Sign the published image at the release version |
 | `keygen` | One-time — generate the cosign key pair and a no-transparency-log signing config |
@@ -52,7 +52,7 @@ tasks:
   deploy:
     cmds:
       - task: release:deploy
-      - task: cosign:all          # image + chart + SBOM attestation
+      - task: cosign:sign         # image + chart + SBOM attestation
 ```
 
 ```console

@@ -80,7 +80,7 @@ untrusted registry." That one stays: `localhost:5050` is this demo's own
 throwaway registry, and trivy is right to not know that as trusted.
 `hadolint` finds nothing at all here — a missing `USER` is not a linting
 concern, it is a security-policy one, which is exactly why `trivy config`
-and `hadolint` are two different tasks in `security:all` rather than one.)
+and `hadolint` are two different tasks in `security:scan` rather than one.)
 
 ## 4. Fix it
 
@@ -203,7 +203,7 @@ That is `release`'s idempotency, not something this demo added.
 $ task sign
 ```
 
-`cosign:keygen` writes a local key pair once; `cosign:all` signs the image
+`cosign:keygen` writes a local key pair once; `cosign:sign` signs the image
 and the chart and attests an SBOM; `cosign:verify` checks all three
 signatures against the public key. No transparency log, no OIDC — the
 [cosign module's README](../cosign/README.md) explains why that is the
