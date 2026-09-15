@@ -97,16 +97,19 @@ env:
 
 tasks:
 
-  # `all` stays `all` here, and that is a decision rather than an omission.
+  # A COMPOSITE, named for the work: a fixed, ordered pipeline over sibling
+  # tasks that each exist and each run on their own.
   #
-  # It is a COMPOSITE: a fixed, ordered pipeline over sibling tasks that each
-  # exist and each run on their own. The selector pattern — one verb plus
-  # `thing=all` — needs a verb and an enumerable set of interchangeable items;
-  # here the items ARE the tasks. Applying it would mean inventing a verb,
-  # duplicating every sibling behind it, and hiding each sibling's own
-  # description from `--list`, which is how a consumer discovers what this
-  # module can do.
-  all:
+  # It was `all` until this module's composite took the verb. `all` is a
+  # quantifier, and the naming convention in the README asks for the plain verb
+  # for the work — so `all` described how much rather than what, in the one
+  # place a consumer looks first.
+  #
+  # NOT a selector. `regenerate select=<sibling>` would need an enumerable set of
+  # interchangeable items, and here the items ARE the tasks: each carries its
+  # own description and its own precondition naming the tool it needs, and a
+  # selector would hide both from `--list`.
+  regenerate:
     desc: "Regenerate everything this component ships generated"
     cmds:
       - printf '%s\n' "{{._CG_RUN}} {{._CG_NAME}} · gen · mocks → proto → generate → sqlc"

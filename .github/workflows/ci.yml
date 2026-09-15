@@ -258,7 +258,7 @@ jobs:
         # run would.
         run: |
           set -euo pipefail
-          COSIGN_SIGN=0 task cosign:all cosign:verify
+          COSIGN_SIGN=0 task cosign:sign cosign:verify
           echo "✔ cosign no-ops without a key, syft or the cosign binary"
 
       - name: 'Verify: helm no-ops cleanly with no cluster'

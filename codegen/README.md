@@ -16,7 +16,7 @@ component's directory.
 
 | Task | What it does |
 |---|---|
-| `all` | mocks → proto → generate → sqlc, in that order |
+| `regenerate` | mocks → proto → generate → sqlc, in that order |
 | `mocks` | Regenerate the interface mocks |
 | `proto` | Regenerate the protobuf and RPC stubs |
 | `generate` | Run this component's generate step — `go generate ./...` unless `GENERATE_CMD` says otherwise |
@@ -67,7 +67,7 @@ includes:
 ```
 
 ```console
-$ task codegen:all
+$ task codegen:regenerate
 ◉ core-api · gen · mocks → proto → generate → sqlc
 ✔ core-api · gen · regenerated
 

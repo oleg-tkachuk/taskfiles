@@ -17,7 +17,7 @@ workspace — tasks then read `sec:<task>`.
 
 | Task | What it does |
 |---|---|
-| `all` | Run every scan: vulnerabilities, lint, secrets, SAST, filesystem |
+| `scan` | Run every scan: vulnerabilities, lint, secrets, SAST, filesystem |
 | `lint` | golangci-lint across every Go module, limited to issues new since main |
 | `gosec` | gosec — insecure patterns the compiler is happy with; part of `all` |
 | `dockerfile` | hadolint over the Dockerfiles this repository ships |
@@ -64,7 +64,7 @@ includes:
 ```
 
 ```console
-$ task security:all           # vuln · lint · secrets · gosec · trivy
+$ task security:scan          # vuln · lint · secrets · gosec · trivy
 $ task security:secrets       # gitleaks over the whole history
 $ task security:proto:breaking
 ```
