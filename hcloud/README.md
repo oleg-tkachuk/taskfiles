@@ -83,6 +83,23 @@ Restarting a server is a question about what is still answering:
 `shutdown` asks the guest, `poweroff` pulls the plug. Prefer the guest's own
 shutdown whenever it answers, and reach for these when it does not.
 
+## When one server refuses
+
+A task that acts on the whole selector runs every server before it fails.
+A `hcloud` command that refuses on the third of five does not stop the other
+two from being tried; the task then exits non-zero naming the ones that did not
+take:
+
+```
+◉ api · hcloud · poweron · api-0 api-1 api-2
+
+✖ api · hcloud · poweron did not take on: api-1
+```
+
+The line above the actions is the expanded selector. Since the selector is the
+safety boundary, seeing the names it came out as — before anything lands — is
+the one check that is still available to a person.
+
 ## What is deliberately not here
 
 `hcloud server` alone also has rebuild, change-type, rescue mode, ISO

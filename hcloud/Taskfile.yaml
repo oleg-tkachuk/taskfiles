@@ -88,6 +88,36 @@ vars:
       exit 1
     fi
 
+  # Fan-out, and the reason every mutating task below goes through `hc_each`
+  # rather than writing its own loop. A bare `for … do hcloud … done` under
+  # `set -e` stops at the first server that refuses: with five matched, a
+  # failure on the third leaves two untouched, the task's success line never
+  # runs, and nothing says which half of the fleet took the command. This runs
+  # every server, then fails at the end naming the ones that did not.
+  #
+  # It also prints what it is about to act on. The selector is the safety
+  # boundary, so seeing the names it expanded to — before the actions land —
+  # is the one check an operator can still make.
+  _HC_FAN_OUT: |
+    hc_each() {
+      _verb="$1"
+      shift
+      printf '%s\n' "{{._HC_RUN}} {{._HC_SVC}} · hcloud · $_verb ·$(printf ' %s' $servers)"
+
+      _failed=""
+      for server in $servers; do
+        if ! hcloud server "$_verb" "$server" "$@"; then
+          _failed="$_failed $server"
+        fi
+      done
+
+      if [ -n "$_failed" ]; then
+        printf '\n'
+        printf '%s\n' "{{._HC_ERR}} {{._HC_SVC}} · hcloud · $_verb did not take on:$_failed" >&2
+        return 1
+      fi
+    }
+
 tasks:
 
   servers:
@@ -115,10 +145,9 @@ tasks:
           set -euo pipefail
           {{._HC_TOKEN}}
           {{._HC_EACH_SERVER}}
+          {{._HC_FAN_OUT}}
 
-          for server in $servers; do
-            hcloud server poweron "$server"
-          done
+          hc_each poweron
 
           printf '\n'
           printf '%s\n' "{{._HC_OK}} {{._HC_SVC}} · hcloud · powered on — the guests need a moment"
@@ -137,10 +166,9 @@ tasks:
           set -euo pipefail
           {{._HC_TOKEN}}
           {{._HC_EACH_SERVER}}
+          {{._HC_FAN_OUT}}
 
-          for server in $servers; do
-            hcloud server shutdown "$server"
-          done
+          hc_each shutdown
 
           printf '\n'
           printf '%s\n' "{{._HC_OK}} {{._HC_SVC}} · hcloud · shutdown sent — back up with hcloud:poweron"
@@ -161,10 +189,9 @@ tasks:
           set -euo pipefail
           {{._HC_TOKEN}}
           {{._HC_EACH_SERVER}}
+          {{._HC_FAN_OUT}}
 
-          for server in $servers; do
-            hcloud server reboot "$server"
-          done
+          hc_each reboot
 
           printf '\n'
           printf '%s\n' "{{._HC_OK}} {{._HC_SVC}} · hcloud · reboot sent"
@@ -183,10 +210,9 @@ tasks:
           set -euo pipefail
           {{._HC_TOKEN}}
           {{._HC_EACH_SERVER}}
+          {{._HC_FAN_OUT}}
 
-          for server in $servers; do
-            hcloud server poweroff "$server"
-          done
+          hc_each poweroff
 
           printf '\n'
           printf '%s\n' "{{._HC_OK}} {{._HC_SVC}} · hcloud · power cut — back up with hcloud:poweron"
@@ -204,10 +230,9 @@ tasks:
           set -euo pipefail
           {{._HC_TOKEN}}
           {{._HC_EACH_SERVER}}
+          {{._HC_FAN_OUT}}
 
-          for server in $servers; do
-            hcloud server reset "$server"
-          done
+          hc_each reset
 
           printf '\n'
           printf '%s\n' "{{._HC_OK}} {{._HC_SVC}} · hcloud · reset sent"
