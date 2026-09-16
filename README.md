@@ -16,6 +16,13 @@ See [demo/](demo/README.md) for a working example — one small Go service
 taken from `go test` to a signed, running deployment using six of these
 modules, walkthrough included.
 
+For a real consumer rather than a constructed one, see
+[`oleg-tkachuk/hetzner-iac`](https://github.com/oleg-tkachuk/hetzner-iac/blob/abc50de2f21afa42c10ffa4e598bbe945a92e1b2/Taskfile.yaml) —
+a Talos/Pulumi platform on Hetzner Cloud. It includes four of these modules,
+trims three with `excludes:`, says why `k8s` is left out, and resolves the
+`hcloud` selector and token by running a program, because neither can be a
+constant. Pinned to a commit, so it cannot drift from what is said here.
+
 - [Using it](#using-it)
   - [Working on the library itself](#working-on-the-library-itself)
     - [Workflows are audited](#workflows-are-audited)
@@ -43,7 +50,7 @@ version: "3"
 silent: true
 
 vars:
-  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v5.4.0'
+  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v7.1.2'
   PROJECT_NAME: billing-api
   IMAGE_NAMESPACE: acme
   K8S_NAMESPACE: acme
@@ -385,7 +392,7 @@ you — leaves a lock in `.task/remote/`:
 Task refuses to run when the content behind that ref no longer matches it:
 
 ```
-task: Taskfile "…//go?ref=v5.4.0" not trusted by user
+task: Taskfile "…//go?ref=v7.1.2" not trusted by user
 ```
 
 That is the only thing standing between a moved tag and your build, so commit
