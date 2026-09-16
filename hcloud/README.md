@@ -84,6 +84,24 @@ never reaches for a credential and never shells out to work out a name:
 `HCLOUD_TOKEN` exported in the shell is what the CLI itself reads, so a
 session that already has one needs neither input.
 
+The two commands above are placeholders. For what they look like when they are
+real, see
+[`oleg-tkachuk/hetzner-iac`](https://github.com/oleg-tkachuk/hetzner-iac/blob/abc50de2f21afa42c10ffa4e598bbe945a92e1b2/Taskfile.yaml):
+there the selector is a cluster label read out of a committed topology file by
+the parser that writes it, and the token comes out of an encrypted Pulumi stack
+config. Neither could be a constant, which is the whole reason these inputs
+take a command.
+
+That example also shows the part worth copying deliberately: both commands are
+set once on the `includes:` entry but carry `{{.stack}}`, which arrives on the
+call — `task hcloud:servers stack=dev` and `stack=prod` select different
+clusters through the same include. Note what that costs. A selector assembled
+from a call-time value is not empty when the value is missing, it is malformed
+(`cluster=` with nothing after it), so this module's "no HCLOUD_SELECTOR" guard
+does not fire and only "no server matches" catches it. Making the argument
+mandatory is the consumer's job; hetzner-iac gives `stack` no default on
+purpose and prints a usage message naming the task that was run.
+
 ## Three rungs, and which one to reach for
 
 Restarting a server is a question about what is still answering:
