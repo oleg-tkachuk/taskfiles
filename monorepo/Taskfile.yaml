@@ -12,9 +12,12 @@ version: "3"
 # COMPONENTS is a whitespace-separated list of directories, each holding its
 # own Taskfile. The fan-out is sequential and stops at the first failure: a
 # half-shipped registry is worse than a failed command with a name attached to
-# it. Narrow the run by overriding COMPONENTS on the CLI:
+# it.
 #
-#   task monorepo:deploy COMPONENTS="backend"
+# The set is decided at the include and nowhere else: a COMPONENTS on the
+# command line does NOT narrow the run, because a declared var wins over a CLI
+# value. Run one component's own `task deploy`, or include this module a second
+# time for a second set.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   COMPONENTS       whitespace-separated component directories

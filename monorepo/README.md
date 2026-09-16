@@ -52,13 +52,28 @@ $ task monorepo:test
 
 $ task monorepo:deploy                                  # checks the registry first
 $ task monorepo:each TARGET=lint
-$ task monorepo:deploy COMPONENTS="backend/api"         # narrow the run
 ```
 
-## Narrowing replaces ONLY/SKIP
+## The set is decided at the include, and only there
 
-There is no `ONLY=` or `SKIP=`: override `COMPONENTS` instead. One knob, and it
-is the same knob that defines the set in the first place.
+A `COMPONENTS` on the command line does **not** narrow a run once the include
+above declares one — a declared var wins over a CLI value, and the fan-out
+still reaches every component in the list. Measured on two repositories; it
+produces no error and no warning, which is why it reads as if it worked.
+
+So there is no `ONLY=`, no `SKIP=`, and no CLI narrowing either. To run one
+component, run its own Taskfile: `task <component>:deploy`. To fan out over a
+*different* set — the components that publish, say, as against the ones that
+merely build — include this module a second time under a second name:
+
+```yaml
+  all:  { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: ., vars: { COMPONENTS: "…everything…" } }
+  ship: { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: ., vars: { COMPONENTS: "…publishers…" } }
+```
+
+Trim each one's surface with `excludes:` so the wrong fan-out cannot be reached
+by accident — but never exclude `each`: `test`, `lint`, `build` and `deploy`
+are all defined in terms of it.
 
 ## Why a deploy checks the registry first
 
