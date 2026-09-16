@@ -75,6 +75,27 @@ Trim each one's surface with `excludes:` so the wrong fan-out cannot be reached
 by accident — but never exclude `each`: `test`, `lint`, `build` and `deploy`
 are all defined in terms of it.
 
+## A component that is not there
+
+Both halves of "COMPONENTS is wrong" used to pass silently, so `each` refuses
+them before it dispatches anything.
+
+An **empty** list printed nothing and exited 0 — a gate that reads as every
+component passing, when the fan-out was never wired up.
+
+A **misspelt** entry was worse. Task creates a missing `dir:` rather than
+failing on it, so the typo became a new empty directory, `task <TARGET>` found
+no Taskfile in it and walked up to the repository root, and the root's `TARGET`
+is usually this very fan-out. The run recursed until it was killed — no error,
+no exit, and one junk directory per attempt.
+
+```console
+$ task test
+task: COMPONENTS names something that is not a component: workers/rag-anwsers(no such directory)
+Each entry must be a directory holding its own Taskfile, relative to
+the directory this module's include carries.
+```
+
 ## Why a deploy checks the registry first
 
 `deploy` probes the registry before the first push, so a misconfiguration costs
