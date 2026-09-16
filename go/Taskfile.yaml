@@ -175,12 +175,50 @@ tasks:
       - govulncheck {{._GO_PKG}}
 
   deps:update:
-    desc: "Bump dependencies to the latest minor/patch, tidy, then prove it still builds"
+    desc: "Bump the direct dependencies to the latest minor/patch, tidy, then prove it still builds"
     # Majors are deliberately not crossed: they need an import-path /vN edit and
     # a read of the upstream CHANGELOG.
+    #
+    # DIRECT requirements only, and that is the fix for a failure `-u ./...`
+    # produced in a consumer. That form walks indirect modules too, and an
+    # indirect module with NO releases resolves to a pseudo-version of its
+    # master every time — always ahead of the release train its siblings are
+    # pinned to.
+    #
+    # Measured: k8s.io/kube-openapi has no releases. `-u ./...` moved it to a
+    # master pseudo-version requiring sigs.k8s.io/structured-merge-diff/v7,
+    # while the newest RELEASED k8s.io/apimachinery still used /v6 — and
+    # apimachinery converts a kube-openapi schema with it. So the two majors
+    # met inside apimachinery, and the build failed there:
+    #
+    #   managedfields/internal/typeconverter.go:51:61: cannot use
+    #   typeSchema.Types (…/v7/schema.TypeDef) as …/v6/schema.TypeDef
+    #
+    # naming neither the upgrade nor the reason. The comment above was true
+    # only of modules `-u` upgrades itself: one of those may REQUIRE a new
+    # major of something else, which -u does not control.
+    #
+    # Direct requirements move here and the resolver picks the rest, so an
+    # indirect module moves when its direct requirer does — which is when the
+    # train moves.
     cmds:
-      - printf '%s\n' "{{._GO_RUN}} {{._GO_NAME}} · go · go get -u ./..."
-      - go get -u ./...
+      - printf '%s\n' "{{._GO_RUN}} {{._GO_NAME}} · go · go get -u, direct requirements"
+      - cmd: |-
+          set -euo pipefail
+
+          # awk rather than `go list -m`: this has to work on a module whose
+          # graph does not currently resolve, which is the state a failed
+          # bump leaves behind.
+          direct="$(awk '/^require \(/ {inside = 1; next}
+                         inside && /^\)/    {inside = 0}
+                         inside && $0 !~ /\/\/ indirect/ && NF >= 2 {print $1}' go.mod)"
+
+          if [ -z "${direct}" ]; then
+            printf '%s\n' "{{._GO_ERR}} {{._GO_NAME}} · go · go.mod lists no direct requirement — nothing to bump" >&2
+            exit 1
+          fi
+
+          printf '%s\n' "${direct}" | xargs go get -u
       - go mod tidy
       - go build -o /dev/null {{._GO_PKG}}
       - printf '%s\n' "{{._GO_OK}} {{._GO_NAME}} · go · deps bumped — review git diff go.mod go.sum"
