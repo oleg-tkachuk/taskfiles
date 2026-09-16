@@ -31,6 +31,36 @@ until an image build breaks.
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `PNPM_APPS` | `.` | whitespace-separated app directories, each with a `packageManager` pin |
+| `PNPM_DOCKERFILES` | *(none)* | whitespace-separated Dockerfiles pinning the same version as `ARG PNPM_VERSION=…` |
+
+## The second pin, in the image build
+
+An image build cannot read `package.json` before it has a package manager, so a
+Dockerfile that installs pnpm pins the version a second time:
+
+```dockerfile
+ARG PNPM_VERSION=12.3.4
+```
+
+corepack never sees that line and npm tooling never reads it, so it drifts on
+its own — and the image then builds a lockfile a different pnpm wrote. Name
+those files and both pins move together:
+
+```yaml
+includes:
+  pnpm:
+    taskfile: '{{printf .TASKLIB "pnpm"}}'
+    dir: .
+    vars:
+      PNPM_APPS: frontend
+      PNPM_DOCKERFILES: frontend/deploy/Dockerfile
+```
+
+`pin:check` then compares every `ARG PNPM_VERSION` against every
+`packageManager` and fails when any of them disagree; `pin:update` rewrites
+them all. The Dockerfiles are rewritten **after** the apps, so a failed
+`corepack use` leaves both pins on the old version rather than the image build
+ahead of the lockfile.
 
 ## Why `corepack use` and not `pnpm self-update`
 
@@ -63,7 +93,7 @@ the command that crosses it, rather than crossing it for you.
 
 ```
 ◉ pnpm · 11.15.1 → 11.25.0
-✔ pnpm · pinned at 11.25.0 everywhere — review the package.json and lockfile diff
+✔ pnpm · pinned at 11.25.0 everywhere — review the package.json, Dockerfile and lockfile diff
 ▲ pnpm · 12.3.4 is out and this task stays inside major 11
          cross it deliberately: task pnpm:pin:update:major -- 12
 ```
