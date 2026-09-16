@@ -145,6 +145,17 @@ tasks:
     requires:
       vars: [ARGOCD_ADMIN_PASSWORD]
     preconditions:
+      # Same reason as refresh above: `requires` only asserts the var was set,
+      # and an empty value passes it. Here that reached `argocd account bcrypt
+      # --password ''`, which asks for the password on a terminal, dies on EOF
+      # in a task, and leaves the hash empty — after which the patch below
+      # succeeded and wrote an empty admin.password, locking admin out of a
+      # server this then restarted.
+      - sh: '[ -n "{{.ARGOCD_ADMIN_PASSWORD}}" ]'
+        msg: |-
+          ARGOCD_ADMIN_PASSWORD is empty — refusing to set it.
+          An empty value does not clear the password, it writes one no login
+          can satisfy, on a server this task then rolls.
       - sh: command -v argocd >/dev/null
         msg: "the argocd CLI is not installed — https://argo-cd.readthedocs.io/en/stable/cli_installation/"
       - sh: "{{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
@@ -153,8 +164,14 @@ tasks:
       # bcrypt via the argocd CLI rather than a hash written by hand: the
       # server reads admin.password as bcrypt and rejects anything else at
       # login, long after the patch reported success.
+      #
+      # set -eu so a bcrypt that fails for any other reason stops here too: the
+      # block's exit status is the patch's, so without it a failed hash is
+      # still written.
       - cmd: |-
+          set -eu
           hash=$(argocd account bcrypt --password {{.ARGOCD_ADMIN_PASSWORD | q}})
+          [ -n "$hash" ]
           {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} patch secret argocd-secret \
             -p "{\"stringData\":{\"admin.password\":\"${hash}\",\"admin.passwordMtime\":\"$(date -u +%FT%TZ)\"}}" >/dev/null
       - task: server:restart

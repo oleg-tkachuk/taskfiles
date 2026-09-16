@@ -46,6 +46,11 @@ tasks:
       # wired up — a misspelled COMPONENTS on the include, most likely. Without
       # this the gate prints nothing and exits 0, which reads as every component
       # passing.
+      # An empty TARGET passes `requires` and then runs `task` with no
+      # argument in every component — each one's default, which is usually a
+      # task list. A fan-out that lists instead of testing, and says nothing.
+      - sh: '[ -n "{{.TARGET}}" ]'
+        msg: "TARGET is empty — name the task to run in each component."
       - sh: '[ -n "{{._MONO_COMPONENTS}}" ]'
         msg: |-
           COMPONENTS is empty — there is nothing to run TARGET in.

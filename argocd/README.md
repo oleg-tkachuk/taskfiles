@@ -74,6 +74,21 @@ namespace — the exact outcome the rule above exists to prevent.
 Every task here no-ops when kubectl cannot reach the cluster, so it is safe to
 chain after a deploy on a laptop.
 
+## An empty value is not a missing one
+
+Two tasks here take a value that is dangerous when blank, and `requires` does
+not catch it — it asserts the variable was *set*, and an empty string is set.
+
+`refresh` with an empty `APP_PREFIX` matched every application in the
+namespace, infrastructure ones included. `server:set-password` with an empty
+`ARGOCD_ADMIN_PASSWORD` was worse: `argocd account bcrypt --password ''` asks
+for the password on a terminal and dies on EOF inside a task, so the hash came
+out empty, the patch wrote it anyway, and the server was rolled onto a
+credential no login can satisfy.
+
+Both refuse explicitly now. Anywhere else you write a `requires` for a value
+that must not be blank, add the check beside it.
+
 ---
 
 Part of [taskfiles](../README.md).
