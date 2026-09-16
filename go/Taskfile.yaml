@@ -206,18 +206,29 @@ tasks:
       - cmd: |-
           set -euo pipefail
 
-          # awk rather than `go list -m`: this has to work on a module whose
-          # graph does not currently resolve, which is the state a failed
-          # bump leaves behind.
-          direct="$(awk '/^require \(/ {inside = 1; next}
-                         inside && /^\)/    {inside = 0}
-                         inside && $0 !~ /\/\/ indirect/ && NF >= 2 {print $1}' go.mod)"
+          # `go list -m` rather than parsing go.mod: it knows what a direct
+          # requirement IS. An awk over the require block missed the
+          # single-line form — `require example.com/x v1.2.3` with no
+          # parentheses is perfectly valid and this task would then find
+          # nothing to bump in a module that has plenty.
+          #
+          # Usable here, and that was checked rather than assumed: a failed
+          # bump leaves a module that COMPILES wrong, not one that resolves
+          # wrong, so the module graph still loads. `.Main` is filtered
+          # because `all` starts with the main module, and passing its own
+          # path to go get is an error.
+          direct="$(go list -m -f '{{`{{if and (not .Main) (not .Indirect)}}{{.Path}}{{end}}`}}' all | awk 'NF')"
 
           if [ -z "${direct}" ]; then
             printf '%s\n' "{{._GO_ERR}} {{._GO_NAME}} · go · go.mod lists no direct requirement — nothing to bump" >&2
             exit 1
           fi
 
+          # The guard above is not decoration: GNU xargs runs the command once
+          # with no arguments when its input is empty, and `go get -u` with no
+          # arguments acts on the current directory instead. BSD xargs runs
+          # nothing, so without the guard this task would behave differently
+          # on Linux and on macOS.
           printf '%s\n' "${direct}" | xargs go get -u
       - go mod tidy
       - go build -o /dev/null {{._GO_PKG}}
