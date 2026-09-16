@@ -286,6 +286,15 @@ Name the task the way the module itself does — `port-forward`, not
 fails silently: the task stays in the list, with no error saying why the
 exclusion did not take.
 
+Check what the task you are dropping is built on, too. `monorepo:deploy` is
+defined in terms of `each`, so excluding `each` takes `deploy` down with it —
+and the error names `each`, which is not the task anybody asked for:
+
+```console
+$ task ship:deploy
+task: Task "ship:each" does not exist
+```
+
 ### An empty value turns nothing off
 
 `{{.X | default "d"}}` yields `d` when `X`

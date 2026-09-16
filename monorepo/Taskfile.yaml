@@ -41,6 +41,37 @@ tasks:
     desc: "Run TARGET in every component (TARGET=test, TARGET=deploy, …)"
     requires:
       vars: [TARGET]
+    preconditions:
+      # An empty list is not "nothing to do", it is a fan-out that was never
+      # wired up — a misspelled COMPONENTS on the include, most likely. Without
+      # this the gate prints nothing and exits 0, which reads as every component
+      # passing.
+      - sh: '[ -n "{{._MONO_COMPONENTS}}" ]'
+        msg: |-
+          COMPONENTS is empty — there is nothing to run TARGET in.
+          Set it on this module's include (it is read when the include loads,
+          so a value passed on the command line will not do).
+      # A component that is not a directory is a typo, and Task does not treat
+      # a missing `dir:` as an error — it runs the command in the PARENT
+      # directory instead. The child `task <TARGET>` then finds the ROOT
+      # Taskfile, whose TARGET is usually this very fan-out, and the run
+      # recurses until it is killed. Silently: no error, no exit, no end.
+      - sh: '[ -z {{._MONO_BAD | q}} ]'
+        # The names go in the message, not to stderr: Task does not show a
+        # precondition's own output, so anything printed there is lost and the
+        # operator is told that something is wrong without being told what.
+        msg: |-
+          COMPONENTS names something that is not a component:{{._MONO_BAD}}
+          Each entry must be a directory holding its own Taskfile, relative to
+          the directory this module's include carries.
+    vars:
+      _MONO_BAD:
+        sh: |-
+          for c in {{._MONO_COMPONENTS}}; do
+            if [ ! -d "$c" ]; then printf ' %s(no such directory)' "$c"
+            elif ! ls "$c"/[Tt]askfile.y*ml >/dev/null 2>&1; then printf ' %s(no Taskfile)' "$c"
+            fi
+          done
     cmds:
       - for: { var: _MONO_COMPONENTS }
         task: _run
