@@ -136,7 +136,7 @@ implementation; they are not the current one.
 | [`compose/`](compose/README.md) | `compose` | local stack up/down/reset/logs |
 | [`cosign/`](cosign/README.md) | `cosign` | sign the published image and chart, attest an SBOM, verify both |
 | [`go/`](go/README.md) | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, bench, dep bumps |
-| [`hcloud/`](hcloud/README.md) | `hcloud` | power state of a project's Hetzner Cloud servers, restarts at three levels of force, a VNC console |
+| [`hcloud/`](hcloud/README.md) | `hcloud` | what a project owns in Hetzner Cloud, the power state of its servers, restarts at three levels of force, SSH and a VNC console |
 | [`helm/`](helm/README.md) | `helm` | what is installed on a cluster, and removing it |
 | [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward |
 | [`monorepo/`](monorepo/README.md) | `monorepo` | run one target across every component, registry preflight |
