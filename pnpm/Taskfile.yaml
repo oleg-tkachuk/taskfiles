@@ -12,6 +12,10 @@ version: "3"
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   PNPM_APPS    whitespace-separated app directories, each with a package.json
 #                carrying a "packageManager": "pnpm@…" pin
+#   PNPM_DOCKERFILES
+#                whitespace-separated Dockerfiles that pin the same version a
+#                second time as `ARG PNPM_VERSION=…`. Optional; empty means the
+#                repository has no such file.
 #   SPEC         which release `_pin:to` resolves — a major ("12"), an exact
 #                version, "latest", or "current-major" (the default path)
 #
@@ -30,12 +34,19 @@ version: "3"
 # resolves the pin from the CURRENT directory, so `pnpm -C <app> …` runs
 # corepack's own default rather than the app's pin and then refuses to switch.
 # Every command here cd's into the app instead.
+#
+# An image build cannot read package.json before it has a package manager, so a
+# repository that installs pnpm in its Dockerfile pins the version there too.
+# That second pin is invisible to corepack and to npm tooling alike: it drifts
+# silently, and the image then builds a lockfile a different pnpm wrote. Name
+# those files in PNPM_DOCKERFILES and both pins move together.
 # ─────────────────────────────────────────────────────────────────────────────
 
 silent: true
 
 vars:
   _PNPM_APPS: '{{.PNPM_APPS | default "."}}'
+  _PNPM_DOCKERFILES: '{{.PNPM_DOCKERFILES | default ""}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _PNPM_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -81,11 +92,21 @@ tasks:
               rc=1
             fi
           done
+          for d in {{._PNPM_DOCKERFILES}}; do
+            if [ ! -f "$d" ]; then
+              printf '%s\n' "{{._PNPM_ERR}} pnpm · $d does not exist" >&2; rc=1; continue
+            fi
+            arg=$(sed -n 's/^ARG PNPM_VERSION=//p' "$d" | head -1)
+            if [ -z "$arg" ]; then
+              printf '%s\n' "{{._PNPM_ERR}} pnpm · $d carries no ARG PNPM_VERSION" >&2; rc=1; continue
+            fi
+            pins="$pins $arg"
+          done
           if [ "$(printf '%s\n' $pins | sort -u | grep -c .)" -gt 1 ]; then
-            printf '%s\n' "{{._PNPM_ERR}} pnpm · the apps disagree on the pin:$pins" >&2
+            printf '%s\n' "{{._PNPM_ERR}} pnpm · the pins disagree:$pins" >&2
             rc=1
           fi
-          [ "$rc" = 0 ] && printf '%s\n' "{{._PNPM_OK}} pnpm · every app pinned at$(printf '%s\n' $pins | sort -u | head -1 | sed 's/^/ /')"
+          [ "$rc" = 0 ] && printf '%s\n' "{{._PNPM_OK}} pnpm · every pin at$(printf '%s\n' $pins | sort -u | head -1 | sed 's/^/ /')"
           exit "$rc"
 
   _pin:to:
@@ -105,9 +126,16 @@ tasks:
             esac
             v=${pm#pnpm@}; pins="$pins ${v%%+*}"
           done
+          for d in {{._PNPM_DOCKERFILES}}; do
+            arg=$(sed -n 's/^ARG PNPM_VERSION=//p' "$d" 2>/dev/null | head -1)
+            case "$arg" in
+              "") printf '%s\n' "{{._PNPM_ERR}} pnpm · $d carries no ARG PNPM_VERSION" >&2; exit 1 ;;
+              *) pins="$pins $arg" ;;
+            esac
+          done
           current=$(printf '%s\n' $pins | sort -u)
           if [ "$(printf '%s\n' "$current" | grep -c .)" != "1" ]; then
-            printf '%s\n' "{{._PNPM_ERR}} pnpm · the apps disagree on the pin:$pins — reconcile with pnpm:pin:check" >&2
+            printf '%s\n' "{{._PNPM_ERR}} pnpm · the pins disagree:$pins — reconcile with pnpm:pin:check" >&2
             exit 1
           fi
 
@@ -120,7 +148,7 @@ tasks:
           esac
 
           if [ "$target" = "$current" ]; then
-            printf '%s\n' "{{._PNPM_OK}} pnpm · already pinned at $current in every app"
+            printf '%s\n' "{{._PNPM_OK}} pnpm · already pinned at $current everywhere"
           else
             printf '%s\n' "{{._PNPM_RUN}} pnpm · $current → $target"
             for a in {{._PNPM_APPS}}; do
@@ -129,7 +157,17 @@ tasks:
                 exit 1
               }
             done
-            printf '%s\n' "{{._PNPM_OK}} pnpm · pinned at $target everywhere — review the package.json and lockfile diff"
+            # After the apps, so a corepack failure leaves both pins on the old
+            # version rather than the Dockerfile ahead of the lockfile.
+            for d in {{._PNPM_DOCKERFILES}}; do
+              tmp="$d.pnpm-pin.$$"
+              sed "s/^ARG PNPM_VERSION=.*/ARG PNPM_VERSION=$target/" "$d" > "$tmp" && mv "$tmp" "$d" || {
+                rm -f "$tmp"
+                printf '%s\n' "{{._PNPM_ERR}} pnpm · $d: could not rewrite ARG PNPM_VERSION" >&2
+                exit 1
+              }
+            done
+            printf '%s\n' "{{._PNPM_OK}} pnpm · pinned at $target everywhere — review the package.json, Dockerfile and lockfile diff"
           fi
 
           # A held-back major is reported, never taken silently.
