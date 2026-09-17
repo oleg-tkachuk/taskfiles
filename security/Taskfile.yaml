@@ -210,6 +210,10 @@ tasks:
               {{._SEC_PRUNE}} 2>/dev/null | sort | tr "\n" " "
           fi
     cmds:
+      # A scan that found nothing and a scan that ran on nothing print the same
+      # thing otherwise — which is the whole of its output, since every line
+      # below is per-Dockerfile.
+      - '{{if not ._SEC_DF_LIST}}printf "%s\n" "{{._SEC_SKIP}} sec · hadolint · no Dockerfile in this repository"{{end}}'
       - for: { var: _SEC_DF_LIST }
         cmd: |-
           set -eu
