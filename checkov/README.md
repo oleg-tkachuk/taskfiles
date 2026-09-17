@@ -69,6 +69,35 @@ $ task checkov:baseline
 A number that went up is reported as a warning: something new was accepted
 rather than fixed.
 
+## The baseline replaces, it does not merge
+
+`baseline` regenerates the file from the current scan, so every record the
+current scan does not reproduce is gone — and the scan reproduces only what its
+config and framework list reach *today*. A repository whose `.checkov.yaml` has
+narrowed since the baseline was written loses the rest of it here.
+
+The count was always printed. It was printed the same way either direction, so
+`177 → 5` read like `12 → 5`:
+
+```console
+◉ checkov · baselined findings: 177 → 5
+▲ checkov · the baseline LOST most of itself — 177 accepted findings became 5, 172 gone.
+         Findings the current scan cannot see are not in the new file. If the
+         config or the framework list has narrowed since it was written, those
+         records were decisions, not noise: git diff .checkov.baseline before
+         committing, and git checkout -- .checkov.baseline to put them back.
+```
+
+It takes most of the file **and** at least twenty records to fire. Either test
+alone misfires: proportional alone flags `12 → 5`, which is somebody fixing
+seven findings and is what the task is for; absolute alone flags a large
+baseline losing a fifth of itself, which is a good day's work.
+
+To add a finding without risking the rest, edit the file — it is a list of
+`{file, findings:[{resource, check_ids}]}` and appending one entry is a
+reviewable diff. Regenerate when the baseline is genuinely meant to be whatever
+the scan now says.
+
 ---
 
 Part of [taskfiles](../README.md).

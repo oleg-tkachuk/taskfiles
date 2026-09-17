@@ -198,3 +198,23 @@ tasks:
           if [ "${after}" -gt "${before}" ]; then
             printf '%s\n' "{{._CKV_WARN}} checkov · the baseline GREW — something new was accepted rather than fixed" >&2
           fi
+          # And the other direction, which used to print as ordinary news. A
+          # regenerated baseline REPLACES the file, so every record the current
+          # scan does not reproduce is gone — and the scan reproduces only what
+          # its config and frameworks reach today. A repository whose config has
+          # narrowed since the baseline was written loses the rest of it here,
+          # with "177 → 5" reading exactly like "12 → 5".
+          #
+          # Two conditions, because either alone misfires. Proportional alone
+          # flags "12 → 5", which is somebody fixing seven findings and is the
+          # whole point of the task. Absolute alone flags a big baseline losing
+          # a fifth of itself, which is a good day's work. Most of the file AND
+          # at least twenty records is the shape of a config that narrowed.
+          lost=$(( before - after ))
+          if [ "${before}" -gt 0 ] && [ "$(( after * 2 ))" -lt "${before}" ] && [ "${lost}" -ge 20 ]; then
+            printf '%s\n' "{{._CKV_WARN}} checkov · the baseline LOST most of itself — ${before} accepted findings became ${after}, ${lost} gone." >&2
+            printf '%s\n' "         Findings the current scan cannot see are not in the new file. If the" >&2
+            printf '%s\n' "         config or the framework list has narrowed since it was written, those" >&2
+            printf '%s\n' "         records were decisions, not noise: git diff {{._CKV_BASE}} before committing," >&2
+            printf '%s\n' "         and git checkout -- {{._CKV_BASE}} to put them back." >&2
+          fi
