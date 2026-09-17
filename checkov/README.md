@@ -22,6 +22,8 @@ includes:
 |---|---|---|
 | `CHECKOV_CONFIG` | `.checkov.yaml` | the config `scan` and `baseline` pass to checkov |
 | `CHECKOV_BASELINE` | `.checkov.baseline` | findings already accepted; `scan` reports only what is new. Required to exist only when the config names a baseline — a config without one scans everything |
+| `CHECKOV_VERSION` | — | the version to run, whatever is installed |
+| `CHECKOV_VERSION_CMD` | — | a command printing one, for a version that already lives somewhere |
 | `CHECKOV_FRAMEWORKS` | `github_actions dockerfile helm kubernetes` | frameworks the triage view walks |
 | `CHECKOV_TARGET` | `.` | directory the triage view walks |
 | `CHECKOV_FLAGS` | — | extra checkov flags, appended to every invocation |
@@ -70,3 +72,37 @@ rather than fixed.
 ---
 
 Part of [taskfiles](../README.md).
+
+## Pinning the version
+
+The rules a scan asserts against change between checkov releases, so a local
+run on a different version from the pipeline's is a red result nobody else can
+reproduce, or a green one that means nothing. Name a version and every task
+here runs that one:
+
+```yaml
+includes:
+  checkov:
+    taskfile: '{{printf .TASKLIB "checkov"}}'
+    dir: .
+    vars:
+      CHECKOV_VERSION: 3.3.18
+```
+
+It uses the checkov on `PATH` when that is already the right version, and
+`pipx run checkov==<version>` otherwise — checkov is a Python tool, and that
+is how one version is run without disturbing what else the machine has. It
+says which it used. With no version named, nothing changes: whatever is on
+`PATH`, and the install page when there is nothing there.
+
+`CHECKOV_VERSION_CMD` is for a version that already lives somewhere — a
+workflow's env, a `.tool-versions` — so that naming it here does not make a
+second copy to keep in step:
+
+```yaml
+      CHECKOV_VERSION_CMD: awk -F'"' '/CHECKOV_VERSION:/ {print $2}' .github/workflows/ci.yaml
+```
+
+It runs inside the task rather than at parse time, so `task --list` reads no
+files and a machine missing the source is a failure of the task that needed
+it, not of every task.
