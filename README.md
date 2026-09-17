@@ -88,25 +88,6 @@ A rename or a removal is a major bump — these modules are a public API, and
 task or an input is a minor; a fix is a patch. How a release is cut is in
 [RELEASE.md](RELEASE.md).
 
-**A consumer following a checkout has no `?ref=` to protect it**, and that is
-most of them in practice. Such a repository takes a rename the moment it lands,
-and takes it *quietly*: an include still loads, `task --list-all` still prints,
-and the forward that names the old task fails only when somebody runs it.
-
-```console
-$ task deploy:backend
-task: Task "core:cosign:all" does not exist
-```
-
-Three of those were found by calling the tasks, months after the renames —
-`cosign:all` → `cosign:sign`, `checkov:all` → `checkov:triage`,
-`helm:uninstall-all` → `helm:uninstall RELEASE=all`. So a rename is not done
-when the major is tagged. Grep the consumers in the same pass:
-
-```bash
-grep -rn 'cosign:all' --include=Taskfile.yaml ~/projects
-```
-
 ### Working on the library itself
 
 Point `TASKLIB` at a checkout beside your repository. The `%s` stays; only
@@ -125,7 +106,7 @@ base and a suffix, and the version written once.
 
 It has to work this way because an include path substitutes plain `{{.VAR}}`
 references and evaluates nothing else there: no `{{if}}`, and no variable whose
-value is itself a template. So `TASKLIB: '…//%s?ref={{.V | default "v2.2.0"}}'`
+value is itself a template. So `TASKLIB: '...//%s?ref={{.V | default "v2.2.0"}}'`
 does not resolve — it reaches git as a literal ref and fails. The version is a
 constant in the file, which is what pinning means anyway.
 
@@ -215,7 +196,7 @@ to see the full surface.
 A var declared in an included file *shadows* the
 including file's value of the same name, and all included files share one
 namespace. So no module here declares a bare knob name: every input is read
-inline as `{{.NAME | default …}}`, and every derived value carries its module's
+inline as `{{.NAME | default ...}}`, and every derived value carries its module's
 prefix — `_REL_IMAGE`, `_GO_PKG`, `_CS_KEY`, `_RT_CTX`. Consumers own the plain
 names, and two modules can never mean different things by the same one.
 
@@ -245,7 +226,7 @@ That is why every module here is scoped to one component. A repository that
 needs the same module aimed at several targets includes it once per target,
 rather than passing the target at the call.
 
-The `X: '{{.X | default "…"}}'` form in the quickstart is not decoration: a var
+The `X: '{{.X | default "..."}}'` form in the quickstart is not decoration: a var
 that reads a *different* name is fixed at whatever that name held, while one
 that reads its own sees a value given on the command line. Write inputs that
 way in a consumer and `task deploy REGISTRY=other` works.
@@ -420,7 +401,7 @@ you — leaves a lock in `.task/remote/`:
 Task refuses to run when the content behind that ref no longer matches it:
 
 ```
-task: Taskfile "…//go?ref=v7.1.2" not trusted by user
+task: Taskfile "...//go?ref=v7.1.2" not trusted by user
 ```
 
 That is the only thing standing between a moved tag and your build, so commit
