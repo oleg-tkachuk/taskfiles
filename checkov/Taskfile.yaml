@@ -16,7 +16,8 @@ version: "3"
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   CHECKOV_CONFIG      default .checkov.yaml
-#   CHECKOV_BASELINE    default .checkov.baseline
+#   CHECKOV_BASELINE    default .checkov.baseline; required to exist only
+#                       when CHECKOV_CONFIG names a baseline
 #   CHECKOV_FRAMEWORKS  frameworks the triage view walks
 #                       (default: github_actions dockerfile helm kubernetes)
 #   CHECKOV_TARGET      directory the triage view walks        (default .)
@@ -46,10 +47,19 @@ tasks:
         msg: "checkov is not installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
       - sh: test -f {{._CKV_CFG}}
         msg: "{{._CKV_CFG}} not found — set CHECKOV_CONFIG"
-      # The config names the baseline, so a missing baseline is not "no findings
-      # accepted yet" — it is checkov reading a file that is not there.
-      - sh: test -f {{._CKV_BASE}}
-        msg: "{{._CKV_BASE}} not found, and the config references it — create it with checkov:baseline"
+      # A missing baseline that the config NAMES is not "no findings accepted
+      # yet" — it is checkov reading a file that is not there. A config that
+      # names none has nothing to be missing, and this refused it anyway:
+      # `test -f` was unconditional while the comment beside it already said
+      # "the config names the baseline". A consumer whose .checkov.yaml has no
+      # `baseline:` key could not run the scan at all, and the message told it
+      # to create a file its config would ignore.
+      #
+      # One awk pass over the config, and the file test only if it named one.
+      - sh: |
+          named="$(awk '/^[ \t]*baseline:[ \t]*[^ \t]/ { print "yes"; exit }' {{._CKV_CFG | q}})"
+          [ -z "$named" ] || test -f {{._CKV_BASE | q}}
+        msg: "{{._CKV_CFG}} names a baseline and {{._CKV_BASE}} does not exist — create it with checkov:baseline, or point CHECKOV_BASELINE at the one it names"
     cmds:
       - checkov --config-file {{._CKV_CFG}} {{._CKV_FLAGS}}
       - printf '%s\n' "{{._CKV_OK}} checkov · no findings outside the baseline"
