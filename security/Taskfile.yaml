@@ -58,6 +58,12 @@ vars:
   # trivy walks the filesystem itself and has to be told separately.
   _SEC_TRIVY_SKIP: '{{.TRIVY_SKIP_DIRS | default "--skip-dirs .claude"}}'
   _SEC_TRIVY_FLAGS: '{{.TRIVY_FLAGS | default ""}}'
+  # Its own input, not a share of TRIVY_FLAGS: `trivy config` and `trivy fs`
+  # are two invocations with two flag sets, and a flag meant for one is an
+  # error on the other. It defaults to TRIVY_FLAGS all the same, because the
+  # one flag both calls need is --ignorefile, and a repository that has an
+  # ignore file wants it read by both.
+  _SEC_TRIVY_CONFIG_FLAGS: '{{.TRIVY_CONFIG_FLAGS | default .TRIVY_FLAGS | default ""}}'
   _SEC_BUF_FLAGS: '{{.BUF_BREAKING_FLAGS | default ""}}'
   # What discovery never looks inside. Vendored trees and throwaway agent
   # worktrees are not this repository's code, and scanning them turns a gate
@@ -164,7 +170,7 @@ tasks:
       - trivy {{._SEC_TRIVY_SUB}} {{._SEC_TRIVY_SCAN}} --exit-code 1 --quiet {{._SEC_TRIVY_SKIP}} {{._SEC_TRIVY_FLAGS}} {{._SEC_TRIVY_TARGET}}
       # Misconfiguration findings are informational: they are dense, noisy, and
       # blocking on them would stop every release for a Kubernetes default.
-      - trivy config --exit-code 0 --quiet {{._SEC_TRIVY_SKIP}} .
+      - trivy config --exit-code 0 --quiet {{._SEC_TRIVY_SKIP}} {{._SEC_TRIVY_CONFIG_FLAGS}} .
       - printf '%s\n' "{{._SEC_OK}} sec · trivy clean"
 
   proto:breaking:

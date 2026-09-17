@@ -41,7 +41,8 @@ workspace — tasks then read `sec:<task>`.
 | `TRIVY_SCANNERS` | `--scanners vuln,secret` | which scanners run; `--scanners misconfig` for IaC |
 | `TRIVY_TARGET` | `.` | what to scan |
 | `TRIVY_SKIP_DIRS` | `--skip-dirs .claude` | directories trivy walks past |
-| `TRIVY_FLAGS` | — | extra trivy flags |
+| `TRIVY_FLAGS` | — | extra flags for the `trivy fs` call |
+| `TRIVY_CONFIG_FLAGS` | `TRIVY_FLAGS` | extra flags for the `trivy config` call |
 | `BUF_BREAKING_FLAGS` | — | extra buf breaking flags |
 | `GITLEAKS_BASELINE` | — | findings accepted as known, so the gate reports only new ones |
 | `GOSEC_FLAGS` | — | extra gosec flags |
@@ -128,6 +129,19 @@ misconfiguration reports.
 Infrastructure policy scanning lives in [`checkov`](../checkov/README.md): it
 asks a different question of a different tree, and a repository usually has one
 or the other.
+
+## Two trivy calls, two flag sets
+
+`trivy` is invoked twice here — `fs` for dependencies and secrets, `config` for
+IaC misconfiguration — and a flag that belongs to one is an error on the other.
+So `config` reads `TRIVY_CONFIG_FLAGS`, falling back to `TRIVY_FLAGS`.
+
+It did not read anything at all before, which is worth saying because of how it
+failed: a repository that set `TRIVY_FLAGS: --ignorefile .trivyignore.yaml` and
+then wrote `misconfigurations:` entries into that file got no error and no
+effect. The entries sat there looking like a decision that had been taken, and
+the same findings kept being reported.
+
 
 ---
 
