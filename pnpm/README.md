@@ -31,20 +31,26 @@ until an image build breaks.
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `PNPM_APPS` | `.` | whitespace-separated app directories, each with a `packageManager` pin |
-| `PNPM_DOCKERFILES` | *(none)* | whitespace-separated Dockerfiles pinning the same version as `ARG PNPM_VERSION=…` |
+| `PNPM_PIN_FILES` | *(none)* | whitespace-separated files writing the same version a second time |
 
-## The second pin, in the image build
+## The second pin, wherever it is written
 
 An image build cannot read `package.json` before it has a package manager, so a
-Dockerfile that installs pnpm pins the version a second time:
+Dockerfile that installs pnpm writes the version itself. corepack never sees
+that line and npm tooling never reads it, so it drifts alone - and the image
+then builds a lockfile a different pnpm wrote.
 
-```dockerfile
-ARG PNPM_VERSION=12.3.4
-```
+The spelling of that pin is not one thing, so this matches the **version**
+rather than the line around it, and takes every occurrence in a file rather
+than the first:
 
-corepack never sees that line and npm tooling never reads it, so it drifts on
-its own — and the image then builds a lockfile a different pnpm wrote. Name
-those files and both pins move together:
+| Recognised | Example |
+| --- | --- |
+| `pnpm@X.Y.Z` | `RUN corepack prepare pnpm@12.4.2 --activate` |
+| `PNPM_VERSION=X.Y.Z` | `ARG PNPM_VERSION=12.4.2`, or the same as an `ENV` |
+
+`pnpm@${PNPM_VERSION}` is deliberately left alone: it is derived from the ARG
+this already rewrites.
 
 ```yaml
 includes:
@@ -53,14 +59,24 @@ includes:
     dir: .
     vars:
       PNPM_APPS: frontend
-      PNPM_DOCKERFILES: frontend/deploy/Dockerfile
+      PNPM_PIN_FILES: frontend/deploy/Dockerfile
 ```
 
-`pin:check` then compares every `ARG PNPM_VERSION` against every
-`packageManager` and fails when any of them disagree; `pin:update` rewrites
-them all. The Dockerfiles are rewritten **after** the apps, so a failed
-`corepack use` leaves both pins on the old version rather than the image build
-ahead of the lockfile.
+`pin:check` compares every version it finds against every `packageManager` and
+fails when any disagree; `pin:update` rewrites them all, then **reads them back**
+- a pattern that matches nothing rewrites nothing and exits 0, and saying
+"pinned everywhere" on the strength of that is how this was wrong once already.
+
+The pin files are rewritten **after** the apps, so a failed `corepack use`
+leaves everything on the old version rather than the image build ahead of the
+lockfile.
+
+Do not list a `package.json` here. corepack owns that pin, integrity hash and
+all, and a plain version rewrite would leave the hash of the release it
+replaced.
+
+Two repositories in one workspace wrote this pin two different ways, and the
+one nothing could read had fallen a whole major behind its `package.json`.
 
 ## Why `corepack use` and not `pnpm self-update`
 

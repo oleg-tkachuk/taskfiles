@@ -11,11 +11,13 @@ version: "3"
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
 #   PNPM_APPS    whitespace-separated app directories, each with a package.json
-#                carrying a "packageManager": "pnpm@…" pin
-#   PNPM_DOCKERFILES
-#                whitespace-separated Dockerfiles that pin the same version a
-#                second time as `ARG PNPM_VERSION=…`. Optional; empty means the
-#                repository has no such file.
+#                carrying a "packageManager": "pnpm@..." pin
+#   PNPM_PIN_FILES
+#                whitespace-separated files that write the same version a second
+#                time, in any spelling this recognises: `pnpm@X.Y.Z` (corepack
+#                prepare, an install line) or `PNPM_VERSION=X.Y.Z` (an ARG or an
+#                ENV). Optional. Never list a package.json here - corepack owns
+#                that pin, hash and all.
 #   SPEC         which release `_pin:to` resolves — a major ("12"), an exact
 #                version, "latest", or "current-major" (the default path)
 #
@@ -31,22 +33,43 @@ version: "3"
 # by the new pnpm rather than the previous major's.
 #
 # One thing that is not obvious and cost a real debugging session: corepack
-# resolves the pin from the CURRENT directory, so `pnpm -C <app> …` runs
+# resolves the pin from the CURRENT directory, so `pnpm -C <app> ...` runs
 # corepack's own default rather than the app's pin and then refuses to switch.
 # Every command here cd's into the app instead.
 #
 # An image build cannot read package.json before it has a package manager, so a
 # repository that installs pnpm in its Dockerfile pins the version there too.
 # That second pin is invisible to corepack and to npm tooling alike: it drifts
-# silently, and the image then builds a lockfile a different pnpm wrote. Name
-# those files in PNPM_DOCKERFILES and both pins move together.
+# silently, and the image then builds a lockfile a different pnpm wrote.
+#
+# The spelling of that pin is not one thing. Two repositories in the same
+# workspace wrote it two ways - `ARG PNPM_VERSION=12.3.4` in one, `corepack
+# prepare pnpm@11.8.0` in the other - so this matches the version rather than
+# the line around it, and takes every occurrence in a file rather than the
+# first. The second of those had drifted a whole major behind its package.json
+# and nothing had noticed.
 # ─────────────────────────────────────────────────────────────────────────────
 
 silent: true
 
 vars:
   _PNPM_APPS: '{{.PNPM_APPS | default "."}}'
-  _PNPM_DOCKERFILES: '{{.PNPM_DOCKERFILES | default ""}}'
+  _PNPM_PIN_FILES: '{{.PNPM_PIN_FILES | default ""}}'
+  # Both spellings of a literal pin, applied to every occurrence in a line.
+  # `pnpm@${PNPM_VERSION}` is deliberately not matched: it is derived from the
+  # ARG this already rewrites, so touching it would be touching the same pin
+  # twice.
+  _PNPM_READ_PINS: |-
+    {
+      for (i = 1; i <= 2; i++) {
+        pat = (i == 1) ? "pnpm@" : "PNPM_VERSION="
+        rest = $0
+        while (match(rest, pat "[0-9]+\\.[0-9]+\\.[0-9]+")) {
+          print substr(rest, RSTART + length(pat), RLENGTH - length(pat))
+          rest = substr(rest, RSTART + RLENGTH)
+        }
+      }
+    }
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _PNPM_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -92,15 +115,16 @@ tasks:
               rc=1
             fi
           done
-          for d in {{._PNPM_DOCKERFILES}}; do
-            if [ ! -f "$d" ]; then
-              printf '%s\n' "{{._PNPM_ERR}} pnpm · $d does not exist" >&2; rc=1; continue
+          for f in {{._PNPM_PIN_FILES}}; do
+            if [ ! -f "$f" ]; then
+              printf '%s\n' "{{._PNPM_ERR}} pnpm · $f does not exist" >&2; rc=1; continue
             fi
-            arg=$(sed -n 's/^ARG PNPM_VERSION=//p' "$d" | head -1)
-            if [ -z "$arg" ]; then
-              printf '%s\n' "{{._PNPM_ERR}} pnpm · $d carries no ARG PNPM_VERSION" >&2; rc=1; continue
+            found=$(awk {{._PNPM_READ_PINS | q}} "$f" | sort -u)
+            if [ -z "$found" ]; then
+              printf '%s\n' "{{._PNPM_ERR}} pnpm · $f writes no pnpm version this recognises (pnpm@X.Y.Z or PNPM_VERSION=X.Y.Z)" >&2
+              rc=1; continue
             fi
-            pins="$pins $arg"
+            pins="$pins $found"
           done
           if [ "$(printf '%s\n' $pins | sort -u | grep -c .)" -gt 1 ]; then
             printf '%s\n' "{{._PNPM_ERR}} pnpm · the pins disagree:$pins" >&2
@@ -126,11 +150,11 @@ tasks:
             esac
             v=${pm#pnpm@}; pins="$pins ${v%%+*}"
           done
-          for d in {{._PNPM_DOCKERFILES}}; do
-            arg=$(sed -n 's/^ARG PNPM_VERSION=//p' "$d" 2>/dev/null | head -1)
-            case "$arg" in
-              "") printf '%s\n' "{{._PNPM_ERR}} pnpm · $d carries no ARG PNPM_VERSION" >&2; exit 1 ;;
-              *) pins="$pins $arg" ;;
+          for f in {{._PNPM_PIN_FILES}}; do
+            found=$(awk {{._PNPM_READ_PINS | q}} "$f" 2>/dev/null | sort -u)
+            case "$found" in
+              "") printf '%s\n' "{{._PNPM_ERR}} pnpm · $f writes no pnpm version this recognises" >&2; exit 1 ;;
+              *) pins="$pins $found" ;;
             esac
           done
           current=$(printf '%s\n' $pins | sort -u)
@@ -158,16 +182,31 @@ tasks:
               }
             done
             # After the apps, so a corepack failure leaves both pins on the old
-            # version rather than the Dockerfile ahead of the lockfile.
-            for d in {{._PNPM_DOCKERFILES}}; do
-              tmp="$d.pnpm-pin.$$"
-              sed "s/^ARG PNPM_VERSION=.*/ARG PNPM_VERSION=$target/" "$d" > "$tmp" && mv "$tmp" "$d" || {
+            # version rather than the image build ahead of the lockfile.
+            for f in {{._PNPM_PIN_FILES}}; do
+              tmp="$f.pnpm-pin.$$"
+              awk -v t="$target" '
+                {
+                  gsub(/pnpm@[0-9]+\.[0-9]+\.[0-9]+/, "pnpm@" t)
+                  gsub(/PNPM_VERSION=[0-9]+\.[0-9]+\.[0-9]+/, "PNPM_VERSION=" t)
+                }
+                1
+              ' "$f" > "$tmp" && mv "$tmp" "$f" || {
                 rm -f "$tmp"
-                printf '%s\n' "{{._PNPM_ERR}} pnpm · $d: could not rewrite ARG PNPM_VERSION" >&2
+                printf '%s\n' "{{._PNPM_ERR}} pnpm · $f: could not rewrite the pin" >&2
                 exit 1
               }
+              # Read it back rather than trusting the rewrite. A pattern that
+              # matches nothing rewrites nothing and exits 0, and the line below
+              # then reports a version the file does not carry - which is
+              # exactly what a wrong escape in the gsub above once did.
+              left=$(awk {{._PNPM_READ_PINS | q}} "$f" | sort -u | grep -vx "$target" || true)
+              if [ -n "$left" ]; then
+                printf '%s\n' "{{._PNPM_ERR}} pnpm · $f still pins $(printf '%s' $left) after the rewrite" >&2
+                exit 1
+              fi
             done
-            printf '%s\n' "{{._PNPM_OK}} pnpm · pinned at $target everywhere — review the package.json, Dockerfile and lockfile diff"
+            printf '%s\n' "{{._PNPM_OK}} pnpm · pinned at $target everywhere — review the package.json, pin-file and lockfile diff"
           fi
 
           # A held-back major is reported, never taken silently.
