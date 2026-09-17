@@ -88,6 +88,25 @@ A rename or a removal is a major bump — these modules are a public API, and
 task or an input is a minor; a fix is a patch. How a release is cut is in
 [RELEASE.md](RELEASE.md).
 
+**A consumer following a checkout has no `?ref=` to protect it**, and that is
+most of them in practice. Such a repository takes a rename the moment it lands,
+and takes it *quietly*: an include still loads, `task --list-all` still prints,
+and the forward that names the old task fails only when somebody runs it.
+
+```console
+$ task deploy:backend
+task: Task "core:cosign:all" does not exist
+```
+
+Three of those were found by calling the tasks, months after the renames —
+`cosign:all` → `cosign:sign`, `checkov:all` → `checkov:triage`,
+`helm:uninstall-all` → `helm:uninstall RELEASE=all`. So a rename is not done
+when the major is tagged. Grep the consumers in the same pass:
+
+```bash
+grep -rn 'cosign:all' --include=Taskfile.yaml ~/projects
+```
+
 ### Working on the library itself
 
 Point `TASKLIB` at a checkout beside your repository. The `%s` stays; only
