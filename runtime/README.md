@@ -51,7 +51,7 @@ The same vars `release` reads — `PROJECT_NAME`, `REGISTRY`, `IMAGE_NAMESPACE`,
 
 | Var | Default | Meaning |
 |---|---|---|
-| `K8S_CONTEXT` | the runtime's usual name | `orbstack`, `minikube`, `kind-kind`, … |
+| `K8S_CONTEXT` | the runtime's usual name | `orbstack`, `minikube`, `kind-kind`, ... |
 | `VALUES` | — | a values file for `install` |
 | `HELM_UPGRADE_FLAGS` | — | extra flags for `install` |
 | `KIND_CLUSTER` / `K3D_CLUSTER` | — | when the cluster is not the default one |
@@ -77,11 +77,11 @@ tasks:
 
 ```console
 $ task deploy:local
-◉ core-api · image · build registry.example.com/acme/core-api:0.1.0-dev.…
+◉ core-api · image · build registry.example.com/acme/core-api:0.1.0-dev....
 ✔ core-api · local · minikube running
-◉ core-api · local · minikube image load registry.example.com/acme/core-api:0.1.0-dev.…
+◉ core-api · local · minikube image load registry.example.com/acme/core-api:0.1.0-dev....
 ◉ core-api · local · helm upgrade --install into minikube/acme
-✔ core-api · local · 0.1.0-dev.… installed into minikube
+✔ core-api · local · 0.1.0-dev.... installed into minikube
 ```
 
 ## Why one directory per runtime rather than one module with a switch

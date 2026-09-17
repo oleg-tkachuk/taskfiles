@@ -56,7 +56,7 @@ version: "3"
 #
 # Nothing here is defined as a bare knob name: a var declared in an included
 # file SHADOWS the including file's value of the same name, so every input is
-# read through `{{.NAME | default …}}` and every derived value is prefixed `_`.
+# read through `{{.NAME | default ...}}` and every derived value is prefixed `_`.
 # ─────────────────────────────────────────────────────────────────────────────
 
 silent: true
@@ -203,7 +203,7 @@ tasks:
             bad "no git history — every build would publish the same version"
           else
             say '{{._REL_OK}}' "version {{._REL_VERSION}}"
-            # `cond && say …` would end the script here under Task's errexit
+            # `cond && say ...` would end the script here under Task's errexit
             # shell whenever cond is false, silently truncating the report.
             if [ -n '{{._REL_DIRTY}}' ]; then
               say '{{._REL_WARN}}' "tree is dirty — this version is not reproducible"
@@ -466,7 +466,7 @@ tasks:
       # whenever both are asked for in the same run.
       - cmd: |-
           set -eu
-          # A directory, not `mktemp -t …​.yaml`: BSD mktemp appends its
+          # A directory, not `mktemp -t ...​.yaml`: BSD mktemp appends its
           # randomness AFTER the template, so the file ends up without a .yaml
           # extension and kubeconform skips it — reporting 0 resources checked
           # and exiting 0. A gate that passes by validating nothing.

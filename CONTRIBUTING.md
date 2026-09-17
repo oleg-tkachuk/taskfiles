@@ -61,7 +61,7 @@ whatever the PR was titled.
 
 `semantic-release` (see [RELEASE.md](RELEASE.md)) reads these to decide the
 next version automatically once a PR merges, so a commit that renames or
-removes a task needs `!` after the type (`feat(k8s)!: …`) or a `BREAKING
+removes a task needs `!` after the type (`feat(k8s)!: ...`) or a `BREAKING
 CHANGE:` footer — Conventional Commits has no type of its own for that case,
 and without the marker it reads as an ordinary `feat`.
 

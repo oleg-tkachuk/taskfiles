@@ -87,7 +87,7 @@ tasks:
     # every consumer's, and two modules declaring `_IMAGE:` differently would
     # each mean something else by it.
     #
-    # So: read inputs inline as `{{`{{`}}.NAME | default "…"{{`}}`}}`, and give
+    # So: read inputs inline as `{{`{{`}}.NAME | default "..."{{`}}`}}`, and give
     # every declared var this module's own prefix — `_REL_`, `_GO_`, `_CS_`.
     # A cross-module read (runtime and cosign read `_REL_VERSION`) is a read:
     # the module must not declare it.
@@ -124,7 +124,7 @@ tasks:
     # A var in a module's top-level `vars:` block is evaluated in that file's
     # own scope. It sees what the CONSUMER set at include time — and nothing a
     # caller passes on the call itself (`task: argocd:refresh` with
-    # `vars: {APP_PREFIX: …}`). So a module var written to pre-chew such an
+    # `vars: {APP_PREFIX: ...}`). So a module var written to pre-chew such an
     # input resolves to empty while the task it feeds sees the real value.
     #
     # This is silent in the worst way. argocd/refresh filtered applications

@@ -46,7 +46,7 @@ application needs — roles, a tenant, a scope — is one variable:
 
 ```yaml
 vars:
-  JWT_CLAIMS: '{"roles":["platform.admin"],"tenant":"3a823fd4-…"}'
+  JWT_CLAIMS: '{"roles":["platform.admin"],"tenant":"3a823fd4-..."}'
 ```
 
 Overriding it replaces the whole set rather than merging into it, so a caller

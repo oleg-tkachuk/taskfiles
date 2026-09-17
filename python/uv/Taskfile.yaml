@@ -26,7 +26,7 @@ version: "3"
 #   FORMAT_CMD      default "ruff format"
 #   TYPECHECK_CMD   default mypy
 #   TYPECHECK_MODULE  what typecheck probes for before running (default mypy)
-#                   an extras-based project passes "--extra dev --extra …")
+#                   an extras-based project passes "--extra dev --extra ...")
 #
 # uv resolves and installs from the lockfile by default, which is the
 # reproducible path — `uv sync` on an unchanged lock is a no-op measured in

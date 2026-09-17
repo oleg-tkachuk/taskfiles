@@ -40,7 +40,7 @@ vars:
   # APP_PREFIX is deliberately NOT resolved here. A var in this block is
   # evaluated in the included file's own scope, which does not yet carry the
   # vars a caller passes on the task call (`task: argocd:refresh` with
-  # `vars: {APP_PREFIX: …}`) — it resolved to "" there while the task itself
+  # `vars: {APP_PREFIX: ...}`) — it resolved to "" there while the task itself
   # saw the real value, and `grep -E '^'` then matched every application in
   # the namespace. The tasks below read .APP_PREFIX directly, which works for
   # a value passed at include time and at call time alike.
