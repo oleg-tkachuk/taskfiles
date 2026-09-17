@@ -18,7 +18,7 @@ workspace — tasks then read `dev:<task>`.
 |---|---|
 | `build` | Rebuild the images the stack is composed of, then start it |
 | `down` | Stop the stack. Volumes are preserved. |
-| `logs` | Tail the stack's logs (SERVICE=… for one of them) |
+| `logs` | Tail the stack's logs (SERVICE=... for one of them) |
 | `ps` | Show what is running |
 | `reset` | Stop the stack and DELETE its volumes — local data is lost |
 | `up` | Start the stack and wait until every service is healthy |

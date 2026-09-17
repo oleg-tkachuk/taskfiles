@@ -192,7 +192,7 @@ tasks:
     # met inside apimachinery, and the build failed there:
     #
     #   managedfields/internal/typeconverter.go:51:61: cannot use
-    #   typeSchema.Types (…/v7/schema.TypeDef) as …/v6/schema.TypeDef
+    #   typeSchema.Types (.../v7/schema.TypeDef) as .../v6/schema.TypeDef
     #
     # naming neither the upgrade nor the reason. The comment above was true
     # only of modules `-u` upgrades itself: one of those may REQUIRE a new

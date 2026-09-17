@@ -247,7 +247,7 @@ tasks:
           # The template is spelled out rather than passed to `-t`, which BSD
           # reads as a filename prefix and GNU as a directory hint. And the
           # path that is trapped is the path that is written: the earlier
-          # `$(mktemp …).json` form cleaned up a different file than syft wrote.
+          # `$(mktemp ...).json` form cleaned up a different file than syft wrote.
           d="$(mktemp -d "${TMPDIR:-/tmp}/sbom-XXXXXX")"
           trap 'rm -rf "$d"' EXIT
           sb="$d/sbom.json"

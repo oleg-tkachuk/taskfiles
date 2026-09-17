@@ -38,7 +38,7 @@ vars:
 tasks:
 
   each:
-    desc: "Run TARGET in every component (TARGET=test, TARGET=deploy, …)"
+    desc: "Run TARGET in every component (TARGET=test, TARGET=deploy, ...)"
     requires:
       vars: [TARGET]
     preconditions:
@@ -126,6 +126,6 @@ tasks:
         msg: |-
           {{._MONO_REG}} is not answering on :443.
           Bring the OCI registry up, or point the run somewhere else with
-          GLOBAL_REGISTRY=<host> task …
+          GLOBAL_REGISTRY=<host> task ...
     cmds:
       - printf '%s\n' "{{._MONO_OK}} registry {{._MONO_REG}} reachable"

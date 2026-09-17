@@ -19,7 +19,7 @@ workspace — tasks then read `all:<task>`.
 |---|---|
 | `build` | Run `task build` in every component |
 | `deploy` | Run `task deploy` in every component, after checking the registry answers |
-| `each` | Run TARGET in every component (TARGET=test, TARGET=deploy, …) |
+| `each` | Run TARGET in every component (TARGET=test, TARGET=deploy, ...) |
 | `lint` | Run `task lint` in every component |
 | `test` | Run `task test` in every component |
 | `registry:check` | Fail fast when localhost:5000 is not reachable |
@@ -67,8 +67,8 @@ component, run its own Taskfile: `task <component>:deploy`. To fan out over a
 merely build — include this module a second time under a second name:
 
 ```yaml
-  all:  { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: ., vars: { COMPONENTS: "…everything…" } }
-  ship: { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: ., vars: { COMPONENTS: "…publishers…" } }
+  all:  { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: ., vars: { COMPONENTS: "...everything..." } }
+  ship: { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: ., vars: { COMPONENTS: "...publishers..." } }
 ```
 
 Trim each one's surface with `excludes:` so the wrong fan-out cannot be reached
