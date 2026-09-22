@@ -54,10 +54,13 @@ package-lock.json linguist-generated=true
 
 # ─── Documentation: the worked example ───────────────────────────────────
 # demo/ is a consumer of this library kept runnable so the README's claims
-# stay honest: a Go binary, a Dockerfile, two Helm charts and a kind config.
-# Linguist already keeps it off the bar — it reported no Go at all for this
-# repository, though demo/ holds 3,177 bytes of it. Stating that here makes it
-# a decision rather than a coincidence, and keeps the rule at the top of this
-# file from pulling demo/deploy's 5,488 bytes of chart YAML onto the bar
-# alongside the Taskfiles.
+# stay honest: a Go binary, a Dockerfile, two Helm charts, a kind config, and
+# a Taskfile of its own that drives them. Linguist already keeps it off the
+# bar — it reported no Go at all for this repository, though demo/ holds 3,177
+# bytes of it. Stating that here makes it a decision rather than a
+# coincidence, and holds back the 13,736 bytes of YAML the rule at the top of
+# this file would otherwise count as if they were modules: demo/Taskfile.yaml
+# at 8,248 and demo/deploy's charts at 5,488. That subtraction is the whole
+# difference between the 244,352 bytes of *.yaml tracked here and the 230,616
+# GitHub reports.
 demo/** linguist-documentation=true
