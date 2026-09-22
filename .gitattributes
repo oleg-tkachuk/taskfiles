@@ -1,7 +1,63 @@
-# GitHub's language bar counts only `programming`/`markup` languages by
-# default — YAML is classified `data` and is excluded, so this repository's
-# ~230KB of Taskfile YAML counted for nothing next to the one small
-# release.config.cjs, and the bar showed 100% JavaScript. Forcing YAML in
-# overrides that default without touching what release.config.cjs itself is.
-*.yaml linguist-language=YAML
-*.yml linguist-language=YAML
+# What this file is for: the language GitHub reports for this repository, and
+# the diffs it shows.
+#
+# Measured, before any of the rules below (tracked bytes):
+#
+#   package-lock.json    186,504
+#   Taskfile YAML        238,864   in 25 module Taskfiles
+#   Markdown             171,194   of which 48,641 a frozen CHANGELOG
+#   CI and hook YAML      43,526   .github/ and lefthook
+#   demo/                 27,395   a worked example, of which 3,177 Go
+#   release.config.cjs     1,373
+#
+# What GitHub actually reported, with the previous version of this file in
+# place:
+#
+#   {"JavaScript": 1373}
+#
+# One semantic-release config and nothing else — the language bar read 100%
+# JavaScript off 1.4 KB, against 239 KB of the Taskfiles this repository
+# exists to publish. The rule meant to fix that,
+#
+#   *.yaml linguist-language=YAML
+#
+# could not, and had not. linguist-language overrides the language a file is
+# counted AS; it does not make that language countable. The bar counts only
+# languages Linguist types `programming` or `markup`, YAML is typed `data`,
+# and renaming YAML to YAML leaves the type alone. linguist-detectable is the
+# attribute that overrides it.
+
+# ─── Counted: the Taskfiles ──────────────────────────────────────────────
+# The 239 KB this repository is. linguist-detectable is what puts a `data`
+# language on the bar; see above for why linguist-language could not.
+*.yaml linguist-detectable=true
+
+# ─── Not counted: CI and hook configuration ──────────────────────────────
+# .github/workflows, the issue templates, dependabot and lefthook: 43,526
+# bytes describing how this repository is built, not what it is. Every one of
+# them is *.yml, nothing here makes *.yml detectable, and so they stay off the
+# bar without a rule. Written down because the split is load-bearing — a later
+# `*.yml linguist-detectable=true` would undo it, and would look like tidying.
+
+# ─── Generated ───────────────────────────────────────────────────────────
+# Solver output for a single devDependency, 186 KB of it. Reviewed as "the
+# lock moved", not line by line.
+package-lock.json linguist-generated=true
+
+# CHANGELOG.md gets no rule, though its 48,641 bytes look the part. It is not
+# output: RELEASE.md calls it a frozen historical record through 5.4.0, the
+# last version cut by hand, and it has not moved since the automation landed.
+# Release notes are built from merged pull requests now — see
+# .github/release.yml. So there is no diff to collapse, and Markdown is prose,
+# which the bar leaves out regardless. Marking it generated would only be a
+# claim about the file that is not true.
+
+# ─── Documentation: the worked example ───────────────────────────────────
+# demo/ is a consumer of this library kept runnable so the README's claims
+# stay honest: a Go binary, a Dockerfile, two Helm charts and a kind config.
+# Linguist already keeps it off the bar — it reported no Go at all for this
+# repository, though demo/ holds 3,177 bytes of it. Stating that here makes it
+# a decision rather than a coincidence, and keeps the rule at the top of this
+# file from pulling demo/deploy's 5,488 bytes of chart YAML onto the bar
+# alongside the Taskfiles.
+demo/** linguist-documentation=true
