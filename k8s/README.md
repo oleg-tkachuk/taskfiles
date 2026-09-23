@@ -20,6 +20,7 @@ workspace — tasks then read `k8s:<task>`.
 
 | Task | What it does |
 |---|---|
+| `doctor` | Check that the context, namespace and deployment this component declares resolve |
 | `logs` | Tail the deployment's logs (Ctrl-C to stop) |
 | `port-forward` | Port-forward the deployment (PORT local, TARGET_PORT in the pod) |
 | `restart` | Roll the deployment (no-op when the namespace or deployment is absent) |
@@ -67,6 +68,26 @@ $ task k8s:port-forward PORT=8080
 $ task k8s:port-forward PORT=8081 TARGET_PORT=80    # container listens on :80
 $ task k8s:logs TAIL=500
 ```
+
+## doctor — what this component points at
+
+`task k8s:doctor` prints the cluster, namespace and deployment this component
+resolved, so a `restart` or an `uninstall` is not the thing that discovers
+them:
+
+```
+✔ billing-api · doctor · context prod-eu (pinned)
+✔ billing-api · doctor · chart ./deploy/chart
+✔ billing-api · doctor · namespace acme
+✔ billing-api · doctor · deployment billing-api
+✔ billing-api · doctor · ready
+```
+
+An unpinned context is a warning rather than a pass: without `K8S_CONTEXT`
+every task here follows whatever `kubectl config use-context` last set, which
+can be a different cluster tomorrow. An unreachable cluster is a warning too —
+that is the normal state on a laptop, and a doctor that fails there is one
+nobody runs.
 
 ## Your chart's Deployment must be named after the release
 
