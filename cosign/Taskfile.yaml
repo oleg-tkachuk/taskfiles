@@ -20,6 +20,10 @@ version: "3"
 #         - task: cosign:sign
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   PROJECT_NAME       image and chart name, as in the release module
 #   REGISTRY           OCI host                        (default localhost:5000)
 #   IMAGE_NAMESPACE    path between host and name

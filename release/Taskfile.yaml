@@ -22,7 +22,10 @@ version: "3"
 # directory, so CHART_DIR / DOCKERFILE / INFO_ENV_FILE stay relative to it.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
-# Set these in the including Taskfile's `vars:`. Only PROJECT_NAME is required.
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+# Only PROJECT_NAME is required.
 #
 #   PROJECT_NAME         image + chart name, and the label in every log line
 #   CHART_NAME           chart name when it differs from PROJECT_NAME

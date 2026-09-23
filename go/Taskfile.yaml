@@ -7,6 +7,10 @@ version: "3"
 #     go: { taskfile: '{{printf .TASKLIB "go"}}', dir: . }
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   PROJECT_NAME     label in log lines
 #   GO_PKG           package pattern to test/lint       (default ./...)
 #   GO_MAIN          package(s) that produce binaries   (default ./cmd/...)

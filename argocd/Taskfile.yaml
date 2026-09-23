@@ -18,6 +18,10 @@ version: "3"
 # is safe to chain after a deploy on a laptop.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   APP_PREFIX     required by refresh; which applications to touch
 #   ARGOCD_NS      default "argocd"
 #   ARGOCD_SERVER  the server deployment    (default "argocd-server"; a Helm

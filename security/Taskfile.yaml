@@ -14,6 +14,10 @@ version: "3"
 # scan that can be silently skipped is a scan that does not exist.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   GO_MODULES   whitespace-separated module directories for the Go scans
 #   DOCKERFILES  Dockerfiles to lint                       (default: discovered)
 #   SCAN_EXCLUDE find(1) predicates discovery skips — vendored and throwaway trees

@@ -69,6 +69,9 @@ tasks:
 `dir: .` is required on every include — it pins the module's commands to the
 including component's directory.
 
+In a monorepo, module inputs belong in the include's own `vars:` rather than at
+the top level shown here — see [Variable scoping](#variable-scoping).
+
 The three names above `includes:` are inputs, not decoration. A module never
 declares a bare input name — a var declared inside an included file *shadows*
 the including file's value of the same name — so it reads
@@ -204,6 +207,38 @@ Two derived values cross a module boundary on purpose: `runtime/*` and `cosign`
 read `_REL_VERSION` and `_REL_IMAGE` from `release`, because they act on what a
 release published. They read them — they must never declare them, or they would
 shadow the very values they are supposed to act on.
+
+That namespace is the **repository's**, not the component's. A monorepo whose
+root Taskfile includes several component Taskfiles puts all of their top-level
+`vars:` into one pool: a name one component declares is what every other
+component's includes read, and a module's own `default` never applies there.
+
+```
+a (declares DOCKERFILE: ./deploy/Dockerfile)  -> ./deploy/Dockerfile
+b (declares nothing)                          -> ./deploy/Dockerfile  (not ./Dockerfile)
+c (includes a different module entirely)      -> ./deploy/Dockerfile
+```
+
+Measured on Task 3.53.1. Worse, with two components declaring different values
+and a third declaring none, which one wins is not stable: twelve runs of one
+unchanged task returned two different answers.
+
+So in a monorepo a module input goes in the `vars:` of the include that reads
+it, where it is scoped to that component:
+
+```yaml
+includes:
+  release:
+    taskfile: '{{printf .TASKLIB "release"}}'
+    dir: .
+    vars:
+      DOCKERFILE: ./deploy/Dockerfile
+```
+
+The quickstart above puts inputs at the top level because it shows one
+repository with one component — a pool of one, which cannot collide. A name
+*every* component declares is safe there too, because the pool then holds one
+value per component. A name only some declare is the shape that bites.
 
 ### When a module's values are decided
 

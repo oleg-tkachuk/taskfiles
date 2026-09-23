@@ -22,6 +22,10 @@ version: "3"
 # library's own demo/ chart does, and skip the fullname helper.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   PROJECT_NAME         the label in every log line
 #   K8S_NAMESPACE        default "default"
 #   K8S_DEPLOYMENT_NAME  default PROJECT_NAME
