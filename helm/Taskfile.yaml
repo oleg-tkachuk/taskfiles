@@ -50,7 +50,7 @@ tasks:
     # laptop with no cluster running would otherwise still demand helm be
     # installed just to decide there was nothing to list.
     status:
-      - "! kubectl{{._HELM_CTX}} version --request-timeout=3s >/dev/null 2>&1"
+      - "! kubectl{{._HELM_KCTX}} version --request-timeout=3s >/dev/null 2>&1"
     cmds:
       - task: _list
 
