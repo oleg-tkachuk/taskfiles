@@ -164,10 +164,17 @@ tasks:
   deps:update:
     desc: "Bump dependencies to the latest minor/patch (no majors), then reinstall"
     cmds:
-      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · npm-check-updates --target minor"
+      # Both lines name the RESOLVED tool rather than spelling one in prose.
+      # PM is an input, so which manager runs here is the consumer's answer,
+      # not this file's — and when a stray `npm` reached a pnpm tree, npm died
+      # inside its own tree builder with a message naming neither the manager
+      # nor the component that chose it. The log said `npm-check-updates` and
+      # nothing else. Now it says who ran it.
+      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_EXEC}} npm-check-updates --target minor"
       # `dlx` is pnpm's; npm spells the same thing `npx`. Hardcoding one of
       # them made this task fail with "Unknown command: dlx" on every npm repo.
       - "{{._NODE_EXEC}} npm-check-updates --target minor --upgrade"
+      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_PM}} install"
       - "{{._NODE_PM}} install"
       - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · deps bumped — review the lockfile diff, then verify"
 
