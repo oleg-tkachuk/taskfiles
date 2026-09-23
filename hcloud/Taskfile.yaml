@@ -45,6 +45,10 @@ version: "3"
 # matches, not only the servers.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   PROJECT_NAME          the label in every log line
 #   HCLOUD_SELECTOR       label selector naming the servers          (required)
 #   HCLOUD_SELECTOR_CMD   a command printing one, when it has to be looked up

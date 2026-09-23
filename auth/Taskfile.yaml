@@ -10,6 +10,10 @@ version: "3"
 #       vars: { JWT_ISS: acme-dev, JWT_AUD: billing-api }
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   JWT_SECRET        signing key         (default: an obvious dev placeholder)
 #   JWT_ALG           default HS256
 #   JWT_ISS/AUD/SUB   claims

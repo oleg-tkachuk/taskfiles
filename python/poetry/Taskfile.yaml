@@ -7,6 +7,10 @@ version: "3"
 #     python: { taskfile: '{{printf .TASKLIB "python/poetry"}}', dir: . }
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   PROJECT_NAME           label in log lines
 #   PY                     interpreter to build the venv on (default python3)
 #   PY_SRC                 source directory for lint/format  (default src)

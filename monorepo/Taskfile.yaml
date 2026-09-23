@@ -20,6 +20,10 @@ version: "3"
 # time for a second set.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   COMPONENTS       whitespace-separated component directories
 #   TARGET           required by `each`: the task to run in each of them
 #   REGISTRY         what `registry:check` probes    (default localhost:5000)

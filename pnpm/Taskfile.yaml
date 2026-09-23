@@ -10,6 +10,10 @@ version: "3"
 #       vars: { PNPM_APPS: "frontend/admin-app frontend/clinic-app" }
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   PNPM_APPS    whitespace-separated app directories, each with a package.json
 #                carrying a "packageManager": "pnpm@..." pin
 #   PNPM_PIN_FILES

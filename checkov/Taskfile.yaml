@@ -15,6 +15,10 @@ version: "3"
 # against.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   CHECKOV_CONFIG      default .checkov.yaml
 #   CHECKOV_BASELINE    default .checkov.baseline; required to exist only
 #                       when CHECKOV_CONFIG names a baseline

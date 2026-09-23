@@ -15,6 +15,10 @@ version: "3"
 # component's chart lives in `k8s:upgrade`. This module is the cluster view.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   K8S_CONTEXT   pin a cluster                            (default: current)
 #   HELM_NS       limit to one namespace          (default: every namespace)
 # ─────────────────────────────────────────────────────────────────────────────

@@ -14,6 +14,10 @@ version: "3"
 # no-op, and `down` on an absent one is the desired end state, not an error.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
 #   COMPOSE_FILE   default docker-compose.yaml
 #   PROJECT_NAME   the label in every log line
 #   SERVICE        narrow `logs` to one service
