@@ -54,8 +54,56 @@ vars:
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _PY_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
   _PY_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
+  _PY_WARN: '{{if .NO_COLOR}}▲{{else}}{{"\x1b[33m▲\x1b[0m"}}{{end}}'
+  _PY_ERR: '{{if .NO_COLOR}}✖{{else}}{{"\x1b[31m✖\x1b[0m"}}{{end}}'
 
 tasks:
+
+  doctor:
+    desc: "Check that the interpreter, lock and project this component declares resolve"
+    # A report rather than a gate chain, the shape release:doctor uses.
+    #
+    # PY is the line that earned it. It names the interpreter the deployed
+    # image runs, it is an input, and in a monorepo a sibling component's
+    # top-level `vars:` can supply it (see README.md#variable-scoping) — so
+    # the version a venv is built on is not always the one this component
+    # wrote down. Nothing else prints it.
+    cmds:
+      - cmd: |-
+          set -u
+          fail=0
+
+          say() { printf '%s %s · doctor · %s\n' "$1" '{{._PY_NAME}}' "$2"; }
+          bad() { say '{{._PY_ERR}}' "$1" >&2; fail=1; }
+
+          command -v poetry >/dev/null 2>&1 \
+            && say '{{._PY_OK}}' "poetry $(poetry --version 2>/dev/null | sed 's/[^0-9.]*//;s/).*//')" \
+            || bad "poetry is not installed — https://python-poetry.org/docs/#installation"
+
+          # The interpreter by the name this module will hand poetry, not by
+          # whatever `python3` happens to be: those differ exactly when PY is
+          # wrong, which is the case worth catching.
+          if command -v '{{._PY_BIN}}' >/dev/null 2>&1; then
+            say '{{._PY_OK}}' "interpreter {{._PY_BIN}} ($('{{._PY_BIN}}' -V 2>&1))"
+          else
+            bad "interpreter {{._PY_BIN}} is not on PATH — PY names it, and nothing else here checks"
+          fi
+
+          if [ ! -f pyproject.toml ]; then
+            bad "no pyproject.toml here — is the include missing dir: . ?"
+          else
+            say '{{._PY_OK}}' "pyproject.toml is here"
+            [ -f poetry.lock ] \
+              && say '{{._PY_OK}}' "poetry.lock is here" \
+              || say '{{._PY_WARN}}' "no poetry.lock yet — run lock before install"
+            [ -d '{{._PY_SRC}}' ] \
+              || say '{{._PY_WARN}}' "PY_SRC {{._PY_SRC}} is not a directory — lint and format would find nothing"
+          fi
+
+          say '{{._PY_OK}}' "install flags {{._PY_INSTALL_FLAGS}}"
+
+          [ "$fail" = 0 ] && say '{{._PY_OK}}' "ready"
+          exit "$fail"
 
   install:
     desc: "poetry install (skipped when pyproject and the lockfile are unchanged)"

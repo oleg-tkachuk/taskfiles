@@ -26,6 +26,7 @@ drift apart, so the swap keeps working.
 
 | Task | poetry | uv |
 |---|---|---|
+| `doctor` | interpreter, `poetry.lock`, pyproject | interpreter, `uv.lock`, pyproject |
 | `install` | `poetry install` | `uv sync` |
 | `test` | pytest | pytest |
 | `lint` | ruff check | ruff check |
@@ -106,6 +107,30 @@ vars:
 includes:
   python: { taskfile: '{{printf .TASKLIB "python/uv"}}', dir: . }
 ```
+
+## doctor — which interpreter this component resolved
+
+`task python:doctor` prints the tool, the interpreter, the lock and the flags
+this component resolved:
+
+```
+✔ billing-api · doctor · poetry 2.5.1
+✔ billing-api · doctor · interpreter python3.13 (Python 3.13.15)
+✔ billing-api · doctor · pyproject.toml is here
+✔ billing-api · doctor · poetry.lock is here
+✔ billing-api · doctor · install flags --no-interaction
+✔ billing-api · doctor · ready
+```
+
+`PY` is the line worth having. It names the interpreter the deployed image
+runs, it is an input, and in a monorepo a sibling component's top-level
+`vars:` can supply it (see the library
+[README](../README.md#variable-scoping)) — so the version a venv is built on
+is not always the one this component wrote down. Nothing else prints it.
+
+Under uv an unset `PY` is a supported answer, not a gap: uv reads
+`.python-version` or the pyproject constraint, and the doctor says which of
+the two happened.
 
 ## Pin the interpreter under Poetry
 
