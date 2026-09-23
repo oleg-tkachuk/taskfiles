@@ -57,8 +57,58 @@ vars:
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _UV_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
   _UV_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
+  _UV_WARN: '{{if .NO_COLOR}}▲{{else}}{{"\x1b[33m▲\x1b[0m"}}{{end}}'
+  _UV_ERR: '{{if .NO_COLOR}}✖{{else}}{{"\x1b[31m✖\x1b[0m"}}{{end}}'
 
 tasks:
+
+  doctor:
+    desc: "Check that the interpreter, lock and project this component declares resolve"
+    # A report rather than a gate chain, the shape release:doctor uses.
+    #
+    # PY is the line that earned it. It pins the interpreter uv builds the
+    # venv on, it is an input, and in a monorepo a sibling component's
+    # top-level `vars:` can supply it (see README.md#variable-scoping) — so
+    # the version a venv is built on is not always the one this component
+    # wrote down. Nothing else prints it.
+    cmds:
+      - cmd: |-
+          set -u
+          fail=0
+
+          say() { printf '%s %s · doctor · %s\n' "$1" '{{._UV_NAME}}' "$2"; }
+          bad() { say '{{._UV_ERR}}' "$1" >&2; fail=1; }
+
+          command -v uv >/dev/null 2>&1 \
+            && say '{{._UV_OK}}' "$(uv --version 2>/dev/null)" \
+            || bad "uv is not installed — https://docs.astral.sh/uv/getting-started/installation/"
+
+          # Unpinned is a supported answer here, unlike poetry's: uv reads
+          # .python-version or the pyproject constraint when PY says nothing.
+          # Printing which of the two happened is the whole point.
+          if [ -z '{{.PY}}' ]; then
+            say '{{._UV_OK}}' "interpreter: uv's choice (PY unset)"
+          elif command -v '{{.PY}}' >/dev/null 2>&1; then
+            say '{{._UV_OK}}' "interpreter {{.PY}} ($('{{.PY}}' -V 2>&1))"
+          else
+            say '{{._UV_WARN}}' "interpreter {{.PY}} is not on PATH — uv will try to fetch it"
+          fi
+
+          if [ ! -f pyproject.toml ]; then
+            bad "no pyproject.toml here — is the include missing dir: . ?"
+          else
+            say '{{._UV_OK}}' "pyproject.toml is here"
+            [ -f uv.lock ] \
+              && say '{{._UV_OK}}' "uv.lock is here" \
+              || say '{{._UV_WARN}}' "no uv.lock yet — run lock before install"
+            [ -d '{{._UV_SRC}}' ] \
+              || say '{{._UV_WARN}}' "PY_SRC {{._UV_SRC}} is not a directory — lint and format would find nothing"
+          fi
+
+          say '{{._UV_OK}}' "sync flags {{._UV_SYNC}}"
+
+          [ "$fail" = 0 ] && say '{{._UV_OK}}' "ready"
+          exit "$fail"
 
   install:
     desc: "uv sync (skipped when the manifests are unchanged)"
