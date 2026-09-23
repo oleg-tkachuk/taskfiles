@@ -18,6 +18,7 @@ workspace — tasks then read `node:<task>`.
 |---|---|
 | `build` | Build the production bundle |
 | `dev` | Start the dev server |
+| `doctor` | Check that the package manager, lockfile and scripts this component declares agree |
 | `generate` | Run the codegen script |
 | `install` | Install dependencies from the lockfile (skipped when the manifests are unchanged) |
 | `lint` | Run the lint script (read-only) |
@@ -67,6 +68,35 @@ An npm project:
 vars:
   PM: npm       # install becomes `npm ci`
 ```
+
+## doctor — which package manager actually runs here
+
+`task node:doctor` prints what this component resolved, before a task spends
+time proving it: the manager and its one-off runner, whether the lockfile on
+disk is the one that manager writes, and whether `package.json` declares the
+scripts the tasks wrap.
+
+```
+✔ billing-api · doctor · package manager pnpm (pnpm dlx for one-off tools)
+✔ billing-api · doctor · lockfile pnpm-lock.yaml matches pnpm
+✔ billing-api · doctor · scripts build, lint, test are declared
+✔ billing-api · doctor · ready
+```
+
+The lockfile line is why the task exists. `PM` is an input, so the manager is
+the consumer's answer — and in a monorepo a sibling component's top-level
+`vars:` can supply it (see the library
+[README](../README.md#variable-scoping)). An `npm install` over a pnpm tree
+does not announce itself: npm walks the symlink farm and dies inside its own
+tree builder with `Cannot read properties of null (reading 'matches')`, naming
+neither the manager nor where it came from.
+
+```
+✖ billing-api · doctor · pnpm would install here, but the lockfile is package-lock.json — one of the two is wrong
+```
+
+A missing script is a warning, not a fault: every task here wraps one, and a
+component is free to use some and not others.
 
 ## The install is the reproducible one
 
