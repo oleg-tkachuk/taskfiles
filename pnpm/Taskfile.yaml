@@ -104,6 +104,20 @@ tasks:
       - cmd: |-
           set -u
           rc=0; pins=""
+          # Which binary answers to `pnpm`, not which version it reports. A
+          # standalone pnpm 10 or later ahead of the shim switches itself to
+          # the pin, so the version check below passes - and it still breaks
+          # anything run under corepack, where it refuses to switch. corepack
+          # installs its shims as links into its own dist/, beside corepack
+          # itself, so a pnpm that resolves anywhere else is not the shim.
+          found=$(command -v pnpm || true)
+          if [ -z "$found" ]; then
+            printf '%s\n' "{{._PNPM_ERR}} pnpm · no pnpm on PATH — run \`corepack enable\`" >&2
+            rc=1
+          elif [ "$(dirname "$(realpath "$found")")" != "$(dirname "$(realpath "$(command -v corepack)")")" ]; then
+            printf '%s\n' "{{._PNPM_ERR}} pnpm · $found is first on PATH and is not corepack's shim — remove it, or put the shim ahead of it" >&2
+            rc=1
+          fi
           for a in {{._PNPM_APPS}}; do
             pm=$(cd "$a" && node -p "require('./package.json').packageManager || ''" 2>/dev/null)
             case "$pm" in
