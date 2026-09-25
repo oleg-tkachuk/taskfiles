@@ -85,6 +85,16 @@ supported path, and it does both halves of a pin bump: it rewrites
 `"packageManager"` with the release's integrity hash, and re-runs the install so
 the lockfile is written by the new pnpm rather than the previous major's.
 
+That install runs with lifecycle scripts off; a `pnpm install --force` in each
+app runs them afterwards, once every pin agrees. A postinstall that calls
+`pnpm` inside `corepack use` reaches whatever `pnpm` is first on `PATH`. Where
+that is a standalone pnpm rather than the corepack shim, it notices it is
+running under corepack, refuses to switch to the new pin, and fails with
+`ERR_PNPM_BAD_PM_VERSION` - after corepack has already rewritten
+`"packageManager"`. The same pnpm outside corepack switches by itself. The
+second install needs `--force`: a plain one finds the lockfile current and
+skips the project's own scripts without a word.
+
 ## The trap this module exists to avoid
 
 corepack resolves the pin from the **current directory**. So this:
