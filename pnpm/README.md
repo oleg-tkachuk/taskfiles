@@ -109,6 +109,20 @@ wrong. Every command here `cd`s into the app instead. The same applies to
 anything you write yourself that reaches into an app from elsewhere in the
 tree.
 
+## A pnpm ahead of the shim
+
+`pin:check` fails when the `pnpm` first on `PATH` is not corepack's shim - a
+standalone install, `npm install -g pnpm`, a `pnpm self-update`. Comparing
+versions cannot see this: pnpm 10 and later switch themselves to the
+`packageManager` pin, so the shadowing binary reports the right version. It
+still breaks anything run under corepack, where it refuses to switch - a
+postinstall that calls `pnpm` during `corepack use` fails with
+`ERR_PNPM_BAD_PM_VERSION`.
+
+The check resolves both `pnpm` and `corepack` through their links and requires
+them to sit in the same directory: corepack installs its shims as links into
+its own `dist/`.
+
 ## A held-back major is reported, not taken
 
 `pin:update` stays inside the current major on purpose — a pnpm major changes
