@@ -134,10 +134,29 @@ tasks:
       # One block, so the resolution above and the run it defines are the same
       # shell. `set -e` because a merged block would otherwise print the OK
       # line after a failing scan.
+      #
+      # The output is captured rather than streamed, because a zero exit is not
+      # enough to believe here. checkov reports a directory it cannot open as
+      # "Directory X does not exist; skipping it" on stderr AND THEN EXITS 0 —
+      # so this task printed "no findings outside the baseline" over a scan of
+      # no files at all. The directory comes from the config's own `directory:`
+      # key, which nothing else validates, so the marker checkov prints is the
+      # honest detector; a precondition here would have to parse that YAML.
+      #
+      # A gate that cannot fail is worse than no gate: the first one is trusted.
       - cmd: |
           set -eu
           {{._CKV_RESOLVE}}
-          run_checkov --config-file {{._CKV_CFG | q}} {{._CKV_FLAGS}}
+          out="$(mktemp)"
+          trap 'rm -f "$out"' EXIT
+          status=0
+          run_checkov --config-file {{._CKV_CFG | q}} {{._CKV_FLAGS}} >"$out" 2>&1 || status=$?
+          cat "$out"
+          [ "$status" -eq 0 ] || exit "$status"
+          if grep -q 'does not exist; skipping it' "$out"; then
+            printf '%s\n' "{{._CKV_ERR}} checkov · a directory in {{._CKV_CFG}} does not exist, so part of the tree went unscanned — the line above names it" >&2
+            exit 1
+          fi
           printf '%s\n' "{{._CKV_OK}} checkov · no findings outside the baseline"
 
   # Named for what it is, and it used to be called `all`.
