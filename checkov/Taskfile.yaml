@@ -157,6 +157,20 @@ tasks:
       # Either is enough — see _CKV_RESOLVE.
       - sh: command -v checkov >/dev/null || command -v pipx >/dev/null
         msg: "neither checkov nor pipx is installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
+      # checkov reports a directory it cannot open on stderr — "Directory X
+      # does not exist; skipping it" — and then exits 0. A target that is
+      # wrong is therefore a scan of NOTHING wearing a green exit code, which
+      # is the one result a triage view must never produce: the consumer reads
+      # an empty finding list as a clean tree.
+      #
+      # Observed in a consumer that passed three paths while this took one:
+      # they arrived as a single path, checkov skipped it, and the task
+      # returned 0 having examined no file at all.
+      - sh: |
+          for d in {{._CKV_TARGET}}; do
+            [ -d "$d" ] || exit 1
+          done
+        msg: "CHECKOV_TARGET names a directory that does not exist ({{._CKV_TARGET}}) — checkov would skip it and still exit 0"
     # Deliberately ignores the baseline and the config: this is the view for
     # deciding what to fix next, not a pass/fail check.
     cmds:
