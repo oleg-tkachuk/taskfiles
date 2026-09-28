@@ -25,7 +25,7 @@ includes:
 | `CHECKOV_VERSION` | — | the version to run, whatever is installed |
 | `CHECKOV_VERSION_CMD` | — | a command printing one, for a version that already lives somewhere |
 | `CHECKOV_FRAMEWORKS` | `github_actions dockerfile helm kubernetes` | frameworks the triage view walks |
-| `CHECKOV_TARGET` | `.` | directory the triage view walks |
+| `CHECKOV_TARGET` | `.` | directories the triage view walks, space-separated |
 | `CHECKOV_FLAGS` | — | extra checkov flags, appended to every invocation |
 
 ## Examples
