@@ -24,7 +24,8 @@ version: "3"
 #                       when CHECKOV_CONFIG names a baseline
 #   CHECKOV_FRAMEWORKS  frameworks the triage view walks
 #                       (default: github_actions dockerfile helm kubernetes)
-#   CHECKOV_TARGET      directory the triage view walks        (default .)
+#   CHECKOV_TARGET      directories the triage view walks, space-separated
+#                       (default .)
 #   CHECKOV_FLAGS       extra checkov flags, appended to every invocation
 #   CHECKOV_VERSION     the version to run, whatever is installed
 #   CHECKOV_VERSION_CMD a command printing one, when it already lives
@@ -162,7 +163,8 @@ tasks:
       - cmd: |
           set -eu
           {{._CKV_RESOLVE}}
-          run_checkov -d {{._CKV_TARGET | q}} --compact {{._CKV_FLAGS}} \
+          run_checkov --compact {{._CKV_FLAGS}} \
+            {{range $d := splitList " " ._CKV_TARGET}}-d {{$d | q}} {{end}}\
             {{range $f := splitList " " ._CKV_FW}}--framework {{$f}} {{end}}
 
   baseline:
