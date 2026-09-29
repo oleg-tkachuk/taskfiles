@@ -32,12 +32,12 @@ component's directory.
 | `PROJECT_NAME` | `codegen` | label in log lines |
 | `MOCKERY_CONFIG` | `.mockery.yaml` | mockery's config; its absence stops `mocks` with a message |
 | `MOCKERY_MODULE` | `github.com/vektra/mockery/v3` | resolved through go.mod by `go run` |
-| `BUF_TEMPLATE` | `buf.gen.yaml` | one or more templates, as a YAML list or a space-separated string — buf runs once per template |
+| `BUF_TEMPLATE` | `["buf.gen.yaml"]` | list of templates — buf runs once per template |
 | `BUF_INPUT` | — | buf's input, when it is not the working directory |
 | `PROTO_FORBID` | — | paths that must not exist when the stubs are generated |
 | `PROTO_PLUGINS` | — | protoc plugins to install from this module before buf |
 | `CODEGEN_BIN_DIR` | `./bin` | where those plugins land |
-| `GENERATED_DIRS` | — | directories to normalise with goimports |
+| `GENERATED_DIRS` | — | list of directories to normalise with goimports |
 | `PROTO_PATH` | — | directories prepended to `PATH` before buf runs; evaluated by the shell, so `$(pnpm -C ../web bin)` works |
 | `GENERATE_CMD` | `go generate ./...` | what `generate` runs |
 | `BUF_FLAGS` | — | verbatim extra flags for every `buf generate` |
@@ -60,7 +60,7 @@ includes:
       PROTO_PLUGINS: >-
         google.golang.org/protobuf/cmd/protoc-gen-go
         connectrpc.com/connect/cmd/protoc-gen-connect-go
-      GENERATED_DIRS: internal/domain/mocks api/
+      GENERATED_DIRS: ["internal/domain/mocks", "api/"]
       MOCKS_PATHSPEC: ':(glob)internal/**/mocks/**'
       SQLC_MODULE: github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
       SQLC_DIR: internal/repo/db
