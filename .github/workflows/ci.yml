@@ -395,6 +395,63 @@ jobs:
           grep -q 'const Generated = true' generated.go
           echo "✔ codegen:generate wrote the file its directive asks for"
 
+      - name: 'Verify: proto:check derives what it watches, and refuses when it cannot'
+        if: needs.changes.outputs.smoke_skippable != 'true'
+        # No buf here, for the reason the step above gives. A no-op shim stands
+        # in for the generator, which is exactly the clean case — it ran and
+        # changed nothing — and lets the four behaviours that are this gate's own
+        # be exercised: the derivation, drift, an unparseable template, and a
+        # target with nothing committed under it.
+        run: |
+          set -euo pipefail
+          W="$RUNNER_TEMP/protogate"
+          mkdir -p "$W/shims" "$W/gen/go"
+          printf '#!/bin/sh\nexit 0\n' > "$W/shims/buf"
+          chmod +x "$W/shims/buf"
+          cd "$W"
+          git init -q . && git config user.email ci@example.com && git config user.name CI
+          printf 'version: v2\nplugins:\n  - local: protoc-gen-go\n    out: gen/go\n' > buf.gen.yaml
+          printf 'package greetv1\n' > gen/go/greet.pb.go
+          cat > Taskfile.yaml <<YAML
+          version: "3"
+          includes:
+            cg:
+              taskfile: '$GITHUB_WORKSPACE/taskfiles/codegen'
+              dir: .
+              vars: { PROJECT_NAME: gate, BUF_TEMPLATE: ["buf.gen.yaml"] }
+          tasks: {}
+          YAML
+          git add -A && git commit -qm "seed"
+          export PATH="$W/shims:$PATH"
+
+          task cg:proto:check | grep -q 'stubs match their sources'
+          echo "✔ proto:check passes on a tree whose stubs are committed"
+
+          printf 'package greetv1\n// drifted\n' > gen/go/greet.pb.go
+          if task cg:proto:check 2> drift.err; then
+            echo "✖ proto:check passed on a stale stub" >&2; exit 1
+          fi
+          grep -q 'stubs are stale' drift.err
+          echo "✔ proto:check fails when a committed stub no longer matches"
+          git checkout -q -- gen/go
+
+          # `out:` inside a flow mapping: valid YAML, accepted by buf, invisible
+          # to a line parser. The gate must refuse, not report a clean tree.
+          printf 'version: v2\nplugins: [{local: protoc-gen-go, out: gen/go}]\n' > buf.gen.yaml
+          if task cg:proto:check 2> flow.err; then
+            echo "✖ proto:check passed on a template it could not parse" >&2; exit 1
+          fi
+          grep -q 'no out: path in' flow.err
+          echo "✔ proto:check refuses a template whose out: it cannot read"
+
+          # Every target untracked is a gate that checks nothing, which must be
+          # an error rather than a pass.
+          if task cg:proto:check PROTO_PATHSPEC=gen/nothing 2> empty.err; then
+            echo "✖ proto:check passed with nothing tracked to check" >&2; exit 1
+          fi
+          grep -q 'checks nothing' empty.err
+          echo "✔ proto:check refuses when no watched directory holds a tracked file"
+
       - name: 'Verify: pnpm:pin:update survives a postinstall that calls pnpm'
         if: needs.changes.outputs.smoke_skippable != 'true'
         # The machine this broke on had a standalone pnpm ahead of the corepack
@@ -659,7 +716,7 @@ jobs:
           echo placeholder > README.md
           git add -A && git commit -qm "chore: seed"
 
-          cat > Taskfile.yaml <<'YAML'
+          cat > Taskfile.yaml <<YAML
           version: "3"
           silent: true
           vars:

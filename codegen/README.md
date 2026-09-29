@@ -21,8 +21,9 @@ component's directory.
 | `proto` | Regenerate the protobuf and RPC stubs |
 | `generate` | Run this component's generate step — `go generate ./...` unless `GENERATE_CMD` says otherwise |
 | `sqlc` | Regenerate the sqlc bindings |
-| `check` | Both drift gates |
+| `check` | All three drift gates |
 | `mocks:check` | Fail when the committed mocks are stale |
+| `proto:check` | Fail when the committed protobuf stubs are stale |
 | `sqlc:check` | Fail when the committed sqlc output is stale |
 
 ## Inputs
@@ -45,6 +46,7 @@ component's directory.
 | `GOIMPORTS_FLAGS` | — | verbatim extra goimports flags |
 | `SQLC_MODULE` | — | run sqlc through `go run` at a pinned version instead of from PATH |
 | `MOCKS_PATHSPEC` | `internal` | git pathspec the mock gate watches |
+| `PROTO_PATHSPEC` | derived from the templates' `out:` | git pathspec the proto gate watches |
 | `SQLC_DIR` | — | directory the sqlc gate watches; required by `sqlc:check` |
 | `GOWORK` | `off` | set to `""` to generate through a go.work workspace |
 
@@ -104,12 +106,30 @@ the drift gate reports files stale on a tree that was just generated — the gat
 failing against its own generator. Normalising here is what makes generation
 idempotent.
 
-## Why the two gates differ
+## Why the gates differ
 
 `mocks:check` reads `git status`, not `git diff`: a newly added interface
 produces a **new** file, and an uncommitted new mock is drift that a diff-only
-check calls clean. `sqlc:check` reads `git diff`, because sqlc rewrites files
-that already exist.
+check calls clean. `proto:check` reads it for the same reason — a new message or
+service is a new file. `sqlc:check` reads `git diff`, because sqlc rewrites
+files that already exist.
+
+`proto:check` is the only one that is not told what to watch. The directories
+come from the `out:` paths in the templates it was already given, so the gate
+cannot end up watching a path the generator stopped writing to: a template that
+gains a plugin or relocates its output moves the gate with it. Two consequences
+are worth knowing:
+
+- A template shape the line parser does not understand — `out:` inside a flow
+  mapping, say — yields no paths, and the gate **refuses** rather than reporting
+  a tree it never looked at. `PROTO_PATHSPEC` overrides the derivation for a
+  layout the templates cannot express.
+- A target with nothing committed under it cannot show drift. That is reported
+  as unchecked (`○`) rather than counted as clean, and when every target is
+  untracked the gate refuses. Where generated output is gitignored but one file
+  was committed before the rule, only modifications to that file are visible —
+  additions are not, in which case name a committed directory through
+  `PROTO_PATHSPEC`.
 
 ---
 
