@@ -10,7 +10,7 @@ includes:
   pnpm:
     taskfile: '{{printf .TASKLIB "pnpm"}}'
     dir: .
-    vars: { PNPM_APPS: "frontend/admin-app frontend/clinic-app" }
+    vars: { PNPM_APPS: ["frontend/admin-app", "frontend/clinic-app"] }
 ```
 
 Repo-scoped, unlike [`node`](../node/README.md), which is included once per app.
@@ -30,8 +30,8 @@ until an image build breaks.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `PNPM_APPS` | `.` | whitespace-separated app directories, each with a `packageManager` pin |
-| `PNPM_PIN_FILES` | *(none)* | whitespace-separated files writing the same version a second time |
+| `PNPM_APPS` | `["."]` | list of app directories, each with a `packageManager` pin |
+| `PNPM_PIN_FILES` | *(none)* | list of files writing the same version a second time |
 
 ## The second pin, wherever it is written
 
@@ -58,8 +58,8 @@ includes:
     taskfile: '{{printf .TASKLIB "pnpm"}}'
     dir: .
     vars:
-      PNPM_APPS: frontend
-      PNPM_PIN_FILES: frontend/deploy/Dockerfile
+      PNPM_APPS: ["frontend"]
+      PNPM_PIN_FILES: ["frontend/deploy/Dockerfile"]
 ```
 
 `pin:check` compares every version it finds against every `packageManager` and

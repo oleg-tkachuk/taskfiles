@@ -28,7 +28,7 @@ workspace — tasks then read `all:<task>`.
 
 | Var | Default | Meaning |
 |---|---|---|
-| `COMPONENTS` | — | whitespace-separated component directories |
+| `COMPONENTS` | — | list of component directories |
 | `TARGET` | — | required by `each`: the task to run in each |
 | `REGISTRY` / `GLOBAL_REGISTRY` | `localhost:5000` | what `registry:check` probes |
 
@@ -40,7 +40,7 @@ includes:
     taskfile: '{{printf .TASKLIB "monorepo"}}'
     dir: .
     vars:
-      COMPONENTS: "backend/api backend/worker frontend/console"
+      COMPONENTS: ["backend/api", "backend/worker", "frontend/console"]
       GLOBAL_REGISTRY: "{{.GLOBAL_REGISTRY}}"
 ```
 
@@ -67,8 +67,8 @@ component, run its own Taskfile: `task <component>:deploy`. To fan out over a
 merely build — include this module a second time under a second name:
 
 ```yaml
-  all:  { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: ., vars: { COMPONENTS: "...everything..." } }
-  ship: { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: ., vars: { COMPONENTS: "...publishers..." } }
+  all:  { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: ., vars: { COMPONENTS: [...everything...] } }
+  ship: { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: ., vars: { COMPONENTS: [...publishers...] } }
 ```
 
 Trim each one's surface with `excludes:` so the wrong fan-out cannot be reached
