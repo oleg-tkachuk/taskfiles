@@ -130,6 +130,24 @@ Infrastructure policy scanning lives in [`checkov`](../checkov/README.md): it
 asks a different question of a different tree, and a repository usually has one
 or the other.
 
+## The secrets gate says where, with the values redacted
+
+`gitleaks` is called with both `--redact` and `-v`, and the pair is deliberate.
+`--redact` keeps the secret out of the log — the `Secret` and `Finding` fields
+print as `REDACTED`, so a CI log is not a second copy of the credential. `-v` is
+what makes a finding actionable: the rule, the file, the line and the commit.
+
+Without `-v` the tool reports a count and nothing else:
+
+```
+WRN leaks found: 2
+```
+
+That is a gate that fails without saying on what. It cost a manual re-run
+against a consumer to learn that the two findings were a `jwt` and a
+`generic-api-key` in two overlay files, committed months earlier — information
+the gate already had and threw away.
+
 ## Two trivy calls, two flag sets
 
 `trivy` is invoked twice here — `fs` for dependencies and secrets, `config` for
