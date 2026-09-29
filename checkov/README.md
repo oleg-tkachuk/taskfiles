@@ -24,7 +24,7 @@ includes:
 | `CHECKOV_BASELINE` | `.checkov.baseline` | findings already accepted; `scan` reports only what is new. Required to exist only when the config names a baseline — a config without one scans everything |
 | `CHECKOV_VERSION` | — | the version to run, whatever is installed |
 | `CHECKOV_VERSION_CMD` | — | a command printing one, for a version that already lives somewhere |
-| `CHECKOV_FRAMEWORKS` | `github_actions dockerfile helm kubernetes` | frameworks the triage view walks |
+| `CHECKOV_FRAMEWORKS` | `["github_actions", "dockerfile", "helm", "kubernetes"]` | list of frameworks the triage view walks |
 | `CHECKOV_TARGET` | `["."]` | list of directories the triage view walks |
 | `CHECKOV_FLAGS` | — | extra checkov flags, appended to every invocation |
 
@@ -36,7 +36,7 @@ includes:
     taskfile: '{{printf .TASKLIB "checkov"}}'
     dir: .
     vars:
-      CHECKOV_FRAMEWORKS: terraform kubernetes helm
+      CHECKOV_FRAMEWORKS: ["terraform", "kubernetes", "helm"]
 ```
 
 ```console

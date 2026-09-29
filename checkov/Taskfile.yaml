@@ -22,8 +22,9 @@ version: "3"
 #   CHECKOV_CONFIG      default .checkov.yaml
 #   CHECKOV_BASELINE    default .checkov.baseline; required to exist only
 #                       when CHECKOV_CONFIG names a baseline
-#   CHECKOV_FRAMEWORKS  frameworks the triage view walks
-#                       (default: github_actions dockerfile helm kubernetes)
+#   CHECKOV_FRAMEWORKS  list of frameworks the triage view walks
+#                       (default: ["github_actions", "dockerfile", "helm",
+#                       "kubernetes"])
 #   CHECKOV_TARGET      list of directories the triage view walks
 #                       (default ["."])
 #   CHECKOV_FLAGS       extra checkov flags, appended to every invocation
@@ -37,7 +38,8 @@ silent: true
 vars:
   _CKV_CFG: '{{.CHECKOV_CONFIG | default ".checkov.yaml"}}'
   _CKV_BASE: '{{.CHECKOV_BASELINE | default ".checkov.baseline"}}'
-  _CKV_FW: '{{.CHECKOV_FRAMEWORKS | default "github_actions dockerfile helm kubernetes"}}'
+  _CKV_FW:
+    ref: 'default (list "github_actions" "dockerfile" "helm" "kubernetes") .CHECKOV_FRAMEWORKS'
   # A real list, not a string this module splits. `ref:` is what keeps it one
   # — interpolating it into a template flattens it to "[a b]", which is then
   # a directory name with a bracket in it.
@@ -202,7 +204,7 @@ tasks:
           {{._CKV_RESOLVE}}
           run_checkov --compact {{._CKV_FLAGS}} \
             {{range $d := ._CKV_TARGET}}-d {{$d | q}} {{end}}\
-            {{range $f := splitList " " ._CKV_FW}}--framework {{$f}} {{end}}
+            {{range $f := ._CKV_FW}}--framework {{$f}} {{end}}
 
   baseline:
     desc: "Regenerate the checkov baseline — only after deliberately fixing findings"
