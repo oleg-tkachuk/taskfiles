@@ -368,7 +368,7 @@ jobs:
           cat > Taskfile.yaml <<YAML
           version: "3"
           includes:
-            pnpm: { taskfile: '$GITHUB_WORKSPACE/taskfiles/pnpm', dir: ., vars: { PNPM_APPS: app } }
+            pnpm: { taskfile: '$GITHUB_WORKSPACE/taskfiles/pnpm', dir: ., vars: { PNPM_APPS: ["app"] } }
           YAML
           printf '{ "name": "shadow", "private": true, "packageManager": "pnpm@%s" }\n' "$PIN" > app/package.json
 
@@ -429,7 +429,7 @@ jobs:
           cat > Taskfile.yaml <<YAML
           version: "3"
           includes:
-            pnpm: { taskfile: '$GITHUB_WORKSPACE/taskfiles/pnpm', dir: ., vars: { PNPM_APPS: app } }
+            pnpm: { taskfile: '$GITHUB_WORKSPACE/taskfiles/pnpm', dir: ., vars: { PNPM_APPS: ["app"] } }
           YAML
           cat > app/package.json <<JSON
           { "name": "smoke", "private": true, "packageManager": "pnpm@$PIN_FROM",
