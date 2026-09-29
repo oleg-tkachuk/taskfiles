@@ -30,8 +30,8 @@ workspace — tasks then read `sec:<task>`.
 
 | Var | Default | Meaning |
 |---|---|---|
-| `GO_MODULES` | `.` | whitespace-separated module directories for the Go scans; one without a `go.mod` is skipped, not failed |
-| `DOCKERFILES` | discovered | Dockerfiles to lint; set to skip the `find` and lint exactly these |
+| `GO_MODULES` | `["."]` | list of module directories for the Go scans; one without a `go.mod` is skipped, not failed |
+| `DOCKERFILES` | discovered | list of Dockerfiles to lint; set to skip the `find` and lint exactly these |
 | `SCAN_EXCLUDE` | vendored + throwaway trees | `find(1)` predicates the Dockerfile discovery skips |
 | `HADOLINT_FLAGS` | `--failure-threshold error` | hadolint flags |
 | `GOVULNCHECK_FLAGS` | — | extra govulncheck flags |
@@ -61,7 +61,7 @@ includes:
     taskfile: '{{printf .TASKLIB "security"}}'
     dir: .
     vars:
-      GO_MODULES: "backend/api backend/worker"
+      GO_MODULES: ["backend/api", "backend/worker"]
       BASE: develop
 ```
 
