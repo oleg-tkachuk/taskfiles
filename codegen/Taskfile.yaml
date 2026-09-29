@@ -255,7 +255,7 @@ tasks:
                  if (v == "") { next }
                  if (index(v, "\"") == 1 || index(v, q) == 1) { v = substr(v, 2, length(v) - 2) }
                  if (v != "") { print v }
-               }' {{range $f := ._CG_BUF_TPL}}{{$f | q}} {{end}} | sort -u | tr '\n' ' '
+               }' {{range $f := ._CG_BUF_TPL}}{{$f | q}} {{end}} 2>/dev/null | sort -u | tr '\n' ' '
     cmds:
       - task: proto
       - cmd: |-
