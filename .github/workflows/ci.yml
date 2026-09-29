@@ -462,6 +462,34 @@ jobs:
           grep -q 'checks nothing' empty.err
           echo "✔ proto:check refuses when no watched directory holds a tracked file"
 
+      - name: 'Verify: the secrets gate asks gitleaks to say where, with values redacted'
+        if: needs.changes.outputs.smoke_skippable != 'true'
+        # gitleaks is not installed here, for the reason the codegen steps give. A
+        # shim that records its argv is enough, because what matters is the pair of
+        # flags: -v so a finding names its rule, file, line and commit, --redact so
+        # neither the secret nor the surrounding match reaches the log. Dropping
+        # either one is the regression this guards.
+        run: |
+          set -euo pipefail
+          W="$RUNNER_TEMP/secretsgate"
+          mkdir -p "$W/shims"
+          printf '#!/bin/sh\nprintf "%%s\\n" "$@" > "%s/argv"\nexit 0\n' "$W" > "$W/shims/gitleaks"
+          chmod +x "$W/shims/gitleaks"
+          cd "$W"
+          git init -q . && git config user.email ci@example.com && git config user.name CI
+          cat > Taskfile.yaml <<YAML
+          version: "3"
+          includes:
+            sec: { taskfile: '$GITHUB_WORKSPACE/taskfiles/security', dir: . }
+          tasks: {}
+          YAML
+          git add -A && git commit -qm seed
+          PATH="$W/shims:$PATH" task sec:secrets
+
+          grep -qx -- '--redact' argv || { echo "✖ gitleaks was not asked to redact" >&2; cat argv >&2; exit 1; }
+          grep -qx -- '-v' argv       || { echo "✖ gitleaks was not asked to report where" >&2; cat argv >&2; exit 1; }
+          echo "✔ the secrets gate passes both --redact and -v"
+
       - name: 'Verify: pnpm:pin:update survives a postinstall that calls pnpm'
         if: needs.changes.outputs.smoke_skippable != 'true'
         # The machine this broke on had a standalone pnpm ahead of the corepack
