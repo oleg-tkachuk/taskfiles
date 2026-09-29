@@ -444,6 +444,16 @@ jobs:
           grep -q 'no out: path in' flow.err
           echo "✔ proto:check refuses a template whose out: it cannot read"
 
+          # `out: .` is legitimate — a plugin carrying the subdirectory in
+          # `module=` writes from the component root — and watching the root
+          # would report every unrelated change as a stale stub.
+          printf 'version: v2\nplugins:\n  - local: protoc-gen-go\n    out: .\n' > buf.gen.yaml
+          if task cg:proto:check 2> root.err; then
+            echo "✖ proto:check watched the component root" >&2; exit 1
+          fi
+          grep -q 'writes to the component root' root.err
+          echo "✔ proto:check refuses a template that writes to the component root"
+
           # Every target untracked is a gate that checks nothing, which must be
           # an error rather than a pass.
           if task cg:proto:check PROTO_PATHSPEC=gen/nothing 2> empty.err; then

@@ -124,6 +124,9 @@ are worth knowing:
   mapping, say — yields no paths, and the gate **refuses** rather than reporting
   a tree it never looked at. `PROTO_PATHSPEC` overrides the derivation for a
   layout the templates cannot express.
+- A template that writes to the component root (`out: .`, which a plugin carrying
+  its subdirectory in `module=` legitimately uses) is refused for the same reason
+  in reverse: watching the root would call every unrelated change a stale stub.
 - A target with nothing committed under it cannot show drift. That is reported
   as unchecked (`○`) rather than counted as clean, and when every target is
   untracked the gate refuses. Where generated output is gitignored but one file
