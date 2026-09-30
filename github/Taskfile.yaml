@@ -29,9 +29,13 @@ version: "3"
 # CONTRIBUTING.md said "there is no direct push, for anyone", and the gap was
 # found only because a direct push succeeded that should not have.
 #
-# `force-push` therefore restores the flag in a trap that fires on success, on
-# failure and on Ctrl-C alike. The window is one command wide and the reason is
-# recorded in the flag's own audit log on GitHub.
+# `force-push` therefore restores the flag from an EXIT trap, which covers a
+# successful push and a failed one alike. It does NOT cover a hard interrupt:
+# the shell Task runs commands in accepts `trap … EXIT` and rejects every other
+# signal — measured, `trap: INT: invalid signal specification` — so Ctrl-C
+# between the two API calls can leave protection down. The task therefore
+# prints the one-line restore command BEFORE it lifts anything, so the way back
+# is already in the scrollback when it is needed.
 # ─────────────────────────────────────────────────────────────────────────────
 
 silent: true
@@ -73,12 +77,18 @@ tasks:
             exit 1
           fi
 
+          # Printed BEFORE the flag comes down, not after. EXIT is the only
+          # trap this shell accepts, so a hard interrupt in the next few
+          # seconds is the one path that leaves protection off — and then this
+          # line is already on screen.
+          echo "   if this dies, restore protection with:  gh api -X POST $api"
+
           restore() {
             gh api -X POST "$api" >/dev/null 2>&1 \
               && echo "✔ enforce_admins restored on $repo@$branch" \
-              || echo "✖ COULD NOT RESTORE enforce_admins on $repo@$branch — re-enable it by hand NOW"
+              || echo "✖ COULD NOT RESTORE enforce_admins on $repo@$branch — run the line above NOW"
           }
-          trap restore EXIT INT TERM
+          trap restore EXIT
 
           echo "▲ lifting enforce_admins on $repo@$branch — {{.REASON}}"
           gh api -X DELETE "$api" >/dev/null

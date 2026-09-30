@@ -15,9 +15,15 @@ hypothetical: `enforce_admins` sat at `false` in this repository while
 reported the gap; it surfaced only when a direct push succeeded that should
 have been refused.
 
-`force-push` closes the window itself. The flag is restored from a trap that
-fires on success, on failure and on Ctrl-C alike, so the door cannot be left
-open by a command that died halfway.
+`force-push` closes the window itself. The flag is restored from an `EXIT`
+trap, which covers a push that succeeds and one that fails.
+
+It does **not** cover a hard interrupt. The shell Task runs commands in accepts
+`trap … EXIT` and rejects everything else — `trap: INT: invalid signal
+specification`, measured rather than assumed — so Ctrl-C in the second or two
+between the two API calls can leave protection down. The task prints the
+one-line restore command *before* it lifts anything, so the way back is already
+in the scrollback if that happens.
 
 ```yaml
 includes:
