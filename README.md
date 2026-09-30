@@ -141,6 +141,7 @@ implementation; they are not the current one.
 |---|---|---|
 | [`argocd/`](argocd/README.md) | `argocd` | hard-refresh the apps a deploy republished, and operate the Argo server |
 | [`auth/`](auth/README.md) | `auth` | mint a local-dev JWT |
+| [`github/`](github/README.md) | `github` | force-push a protected branch without leaving protection off |
 | [`checkov/`](checkov/README.md) | `checkov` | policy-scan manifests, charts, Dockerfiles and workflows |
 | [`codegen/`](codegen/README.md) | `codegen` | mocks, protobuf stubs, `go generate`, sqlc — and the drift gates for them |
 | [`compose/`](compose/README.md) | `compose` | local stack up/down/reset/logs |

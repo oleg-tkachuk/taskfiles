@@ -1,0 +1,85 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# github — repository administration that has to be done deliberately.
+#
+#   includes:
+#     github:
+#       taskfile: '{{printf .TASKLIB "github"}}'
+#       dir: .
+#       vars: { GH_REPO: owner/name }
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:` — see README.md#variable-scoping.
+#
+#   GH_REPO      owner/name           (default: the origin remote)
+#   GH_BRANCH    protected branch     (default: main)
+#
+# ── Why this module exists ───────────────────────────────────────────────────
+# A protected `main` with `enforce_admins` on refuses EVERY direct ref update,
+# force or not — measured, not assumed: a push and a `--force` push were both
+# declined with "5 of 5 required status checks are expected". GitHub has no
+# "admins follow the rules except for force-push" setting, and a ruleset bypass
+# is whole-ruleset, so it would hand back every rule at once.
+#
+# So the escape hatch is a toggle, and a toggle is exactly the thing a human
+# does correctly on the way in and forgets on the way out. That forgetting is
+# not hypothetical: `enforce_admins` sat at false in this repository while
+# CONTRIBUTING.md said "there is no direct push, for anyone", and the gap was
+# found only because a direct push succeeded that should not have.
+#
+# `force-push` therefore restores the flag in a trap that fires on success, on
+# failure and on Ctrl-C alike. The window is one command wide and the reason is
+# recorded in the flag's own audit log on GitHub.
+# ─────────────────────────────────────────────────────────────────────────────
+
+silent: true
+
+tasks:
+
+  force-push:
+    desc: "Force-push a protected branch: drop enforce_admins, push, restore it"
+    summary: |
+      REASON is required and is not decoration — it is what the next reader
+      sees when they ask why protection was off for ninety seconds.
+
+        task github:force-push REASON="drop the secret from 3 published commits"
+
+      REF defaults to HEAD. The flag is restored even when the push fails.
+    vars:
+      REPO:
+        sh: '{{if .GH_REPO}}echo {{.GH_REPO | q}}{{else}}gh repo view --json nameWithOwner -q .nameWithOwner{{end}}'
+      BRANCH: '{{.GH_BRANCH | default "main"}}'
+      REF: '{{.REF | default "HEAD"}}'
+    preconditions:
+      - sh: command -v gh >/dev/null
+        msg: "gh is not installed — https://cli.github.com"
+      - sh: '{{if .REASON}}true{{else}}false{{end}}'
+        msg: "REASON is required: task github:force-push REASON=\"…\""
+    cmds:
+      - cmd: |-
+          set -eu
+          repo={{.REPO | q}}; branch={{.BRANCH | q}}
+          api="repos/$repo/branches/$branch/protection/enforce_admins"
+
+          # Only restore what was actually on. Turning it ON afterwards when it
+          # had been OFF would be this task inventing policy rather than
+          # borrowing it for one command.
+          was_on=$(gh api "$api" --jq .enabled 2>/dev/null || echo "unknown")
+          if [ "$was_on" != "true" ]; then
+            echo "enforce_admins is already '$was_on' on $repo@$branch — nothing to lift."
+            echo "Refusing: this task exists to reopen a CLOSED door, and this one is open."
+            exit 1
+          fi
+
+          restore() {
+            gh api -X POST "$api" >/dev/null 2>&1 \
+              && echo "✔ enforce_admins restored on $repo@$branch" \
+              || echo "✖ COULD NOT RESTORE enforce_admins on $repo@$branch — re-enable it by hand NOW"
+          }
+          trap restore EXIT INT TERM
+
+          echo "▲ lifting enforce_admins on $repo@$branch — {{.REASON}}"
+          gh api -X DELETE "$api" >/dev/null
+          git push --force-with-lease origin {{.REF}}:"$branch"
