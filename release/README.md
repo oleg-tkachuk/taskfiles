@@ -135,13 +135,21 @@ the context. A component whose image needs the repo root sets the context to
 ```
 exact tag, clean tree  →  X.Y.Z
 otherwise, clean tree  →  <base>-dev.<committer-ts>.g<sha>
-dirty tree             →  <base>-dev.<committer-ts>.g<sha>.dirty.<now>
+dirty tree             →  <base>-dev.<committer-ts>.dirty.<now>.g<sha>
 ```
 
 The **committer** timestamp, not the wall clock: a clean tree then produces the
 same version on every run, which is what makes `deploy` idempotent. A dirty tree
 is not reproducible by definition, so it takes a wall-clock suffix and always
 rebuilds.
+
+The dirty marker sits BEFORE the sha because SemVer ranks a larger set of
+pre-release fields above a smaller one when the prefix matches. Appended, it made
+a dirty build outrank the clean build of the same commit permanently — the clean
+version is pinned by the committer timestamp and cannot grow fields to catch up,
+so committing and rebuilding could not displace an image already pushed from a
+dirty tree. In front, `dirty` compares below `g<sha>` and the clean build always
+wins, while a dirty build still outranks anything built from an older commit.
 
 Timestamp before sha, because SemVer compares pre-release identifiers left to
 right: the leading numeric timestamp orders builds chronologically, and ArgoCD's

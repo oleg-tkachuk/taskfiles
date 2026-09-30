@@ -393,7 +393,7 @@ One scheme, in [`release/`](release/README.md):
 ```
 exact tag, clean tree  →  X.Y.Z
 otherwise, clean tree  →  <base>-dev.<committer-ts>.g<sha>
-dirty tree             →  <base>-dev.<committer-ts>.g<sha>.dirty.<now>
+dirty tree             →  <base>-dev.<committer-ts>.dirty.<now>.g<sha>
 ```
 
 Committer timestamp rather than wall clock, so a clean tree produces the same
