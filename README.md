@@ -22,6 +22,8 @@ a Talos/Pulumi platform on Hetzner Cloud. It includes four of these modules,
 trims three with `excludes:`, says why `k8s` is left out, and resolves the
 `hcloud` selector and token by running a program, because neither can be a
 constant. Pinned to a commit, so it cannot drift from what is said here.
+[`oleg-tkachuk/paladin`](https://github.com/oleg-tkachuk/paladin/blob/7ccd9db77e0991f01492fe35b68ce738d69a4376/Taskfile.yaml)
+is another, split into three entry points by who runs the command.
 
 - [Using it](#using-it)
   - [Working on the library itself](#working-on-the-library-itself)
