@@ -50,7 +50,7 @@ env:
   # since. (It is also Alpine with neither git nor Node, so it cannot serve as
   # a job `container:` — actions/checkout needs both.) Revisit if upstream
   # starts publishing again.
-  TASK_VERSION: 3.53.1
+  TASK_VERSION: 3.54.0
   # What every checkout below resolves: the dispatched tag when there is one,
   # otherwise whatever triggered this run. workflow_dispatch's own
   # `github.ref` stays the branch picked in the "Run workflow" UI even when
