@@ -2,7 +2,7 @@
 
 Mocks, protobuf stubs, a generate step and sqlc bindings, regenerated in
 the one order that works — plus the drift gates that refuse a tree where the
-committed output no longer matches the source it came from.
+generated output no longer matches the source it came from.
 
 ```yaml
 includes:
@@ -22,9 +22,9 @@ component's directory.
 | `generate` | Run this component's generate step — `go generate ./...` unless `GENERATE_CMD` says otherwise |
 | `sqlc` | Regenerate the sqlc bindings |
 | `check` | All three drift gates |
-| `mocks:check` | Fail when the committed mocks are stale |
-| `proto:check` | Fail when the committed protobuf stubs are stale |
-| `sqlc:check` | Fail when the committed sqlc output is stale |
+| `mocks:check` | Fail when the mocks are stale against the working tree |
+| `proto:check` | Fail when the protobuf stubs are stale against the working tree |
+| `sqlc:check` | Fail when the sqlc output is stale against the working tree |
 
 ## Inputs
 
@@ -106,13 +106,16 @@ the drift gate reports files stale on a tree that was just generated — the gat
 failing against its own generator. Normalising here is what makes generation
 idempotent.
 
-## Why the gates differ
+## What the gates compare
 
-`mocks:check` reads `git status`, not `git diff`: a newly added interface
-produces a **new** file, and an uncommitted new mock is drift that a diff-only
-check calls clean. `proto:check` reads it for the same reason — a new message or
-service is a new file. `sqlc:check` reads `git diff`, because sqlc rewrites
-files that already exist.
+Each gate records the working tree's state of what it watches — every tracked
+or new, unignored file with its content hash — then regenerates, and fails,
+naming the files, if regenerating changed anything. The question is whether
+the output matches its source as the tree stands, not whether it is
+committed: comparing with HEAD failed every change until it was committed,
+which made the gate unusable before a commit, the one time it is asked. A new
+file counts, because a new interface or message generates one. In CI, where
+the tree is HEAD, the answer is the same as before.
 
 `proto:check` is the only one that is not told what to watch. The directories
 come from the `out:` paths in the templates it was already given, so the gate
