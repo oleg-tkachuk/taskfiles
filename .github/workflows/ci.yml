@@ -397,21 +397,25 @@ jobs:
 
       - name: 'Verify: proto:check derives what it watches, and refuses when it cannot'
         if: needs.changes.outputs.smoke_skippable != 'true'
-        # No buf here, for the reason the step above gives. A no-op shim stands
-        # in for the generator, which is exactly the clean case — it ran and
-        # changed nothing — and lets the four behaviours that are this gate's own
-        # be exercised: the derivation, drift, an unparseable template, and a
-        # target with nothing committed under it.
+        # No buf here, for the reason the step above gives. A shim stands in for
+        # the generator and writes a fixed "generated" file, which lets this
+        # gate's own behaviours be exercised: the derivation, drift, a
+        # regenerated change that is not committed yet, an unparseable
+        # template, and a target with nothing committed under it.
         run: |
           set -euo pipefail
           W="$RUNNER_TEMP/protogate"
           mkdir -p "$W/shims" "$W/gen/go"
-          printf '#!/bin/sh\nexit 0\n' > "$W/shims/buf"
+          # The shim stands in for buf: it writes what generation would, which
+          # is whatever canonical.go holds — the stub's "source" here. The
+          # gate regenerates and checks whether that changed the tree.
+          printf '#!/bin/sh\ncp "%s/canonical.go" "%s/gen/go/greet.pb.go"\n' "$W" "$W" > "$W/shims/buf"
           chmod +x "$W/shims/buf"
           cd "$W"
           git init -q . && git config user.email ci@example.com && git config user.name CI
           printf 'version: v2\nplugins:\n  - local: protoc-gen-go\n    out: gen/go\n' > buf.gen.yaml
-          printf 'package greetv1\n' > gen/go/greet.pb.go
+          printf 'package greetv1\n' > canonical.go
+          cp canonical.go gen/go/greet.pb.go
           cat > Taskfile.yaml <<YAML
           version: "3"
           includes:
@@ -432,7 +436,24 @@ jobs:
             echo "✖ proto:check passed on a stale stub" >&2; exit 1
           fi
           grep -q 'stubs are stale' drift.err
-          echo "✔ proto:check fails when a committed stub no longer matches"
+          echo "✔ proto:check fails when a stub no longer matches what generation writes"
+          git checkout -q -- gen/go
+
+          # A source change regenerated but not yet committed is a fresh tree:
+          # the gate runs before a commit, so it must pass here.
+          printf 'package greetv1\n// v2\n' > canonical.go
+          task cg:proto >/dev/null
+          task cg:proto:check | grep -q 'stubs match their sources'
+          echo "✔ proto:check passes a regenerated, uncommitted change"
+
+          # The same source change without regenerating is stale.
+          printf 'package greetv1\n// v3\n' > canonical.go
+          if task cg:proto:check 2> source.err; then
+            echo "✖ proto:check passed a source change it was not regenerated for" >&2; exit 1
+          fi
+          grep -q 'stubs are stale' source.err
+          echo "✔ proto:check fails a source change that was not regenerated"
+          printf 'package greetv1\n' > canonical.go
           git checkout -q -- gen/go
 
           # `out:` inside a flow mapping: valid YAML, accepted by buf, invisible
