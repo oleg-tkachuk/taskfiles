@@ -2,15 +2,19 @@
 
 [![release](https://img.shields.io/github/v/release/oleg-tkachuk/taskfiles?sort=semver&label=release)](https://github.com/oleg-tkachuk/taskfiles/releases/latest)
 [![ci](https://github.com/oleg-tkachuk/taskfiles/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/oleg-tkachuk/taskfiles/actions/workflows/ci.yml)
-[![Task 3.53+](https://img.shields.io/badge/Task-3.53%2B-29BEB0?logo=task&logoColor=white)](https://taskfile.dev/docs/installation)
+[![Task 3.54+](https://img.shields.io/badge/Task-3.54%2B-29BEB0?logo=task&logoColor=white)](https://taskfile.dev/docs/installation)
 [![license: MIT](https://img.shields.io/github/license/oleg-tkachuk/taskfiles?label=license)](LICENSE)
 
 Shared [Task](https://taskfile.dev) modules — one implementation of the release
 chain, the language gates and the Kubernetes conveniences, included over git
 instead of copied into every repository.
 
-Requires [Task](https://taskfile.dev/docs/installation) **3.53+** — remote
-Taskfiles are stable from that version, with no experiment flag to set.
+Requires [Task](https://taskfile.dev/docs/installation) **3.54+**. Remote
+Taskfiles are stable from 3.53, with no experiment flag to set; 3.54 is the
+floor because earlier versions clone git includes into a shared temporary
+directory, where another local user can plant a Taskfile that runs in place of
+a module (GHSA-679p-658w-m3wr, fixed in
+[3.54.0](https://github.com/go-task/task/releases/tag/v3.54.0)).
 
 See [demo/](demo/README.md) for a working example — one small Go service
 taken from `go test` to a signed, running deployment using six of these
@@ -222,9 +226,9 @@ b (declares nothing)                          -> ./deploy/Dockerfile  (not ./Doc
 c (includes a different module entirely)      -> ./deploy/Dockerfile
 ```
 
-Measured on Task 3.53.1. Worse, with two components declaring different values
-and a third declaring none, which one wins is not stable: twelve runs of one
-unchanged task returned two different answers.
+Measured on Task 3.53.1 and again on 3.54.0. Worse, with two components
+declaring different values and a third declaring none, which one wins is not
+stable: repeated runs of one unchanged task return both answers.
 
 So in a monorepo a module input goes in the `vars:` of the include that reads
 it, where it is scoped to that component:

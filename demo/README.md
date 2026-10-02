@@ -15,7 +15,7 @@ names the task it runs.
 
 | Tool | Used for |
 |---|---|
-| [Task](https://taskfile.dev/docs/installation) 3.53+ | everything |
+| [Task](https://taskfile.dev/docs/installation) 3.54+ | everything |
 | Go 1.27+ | `go:*` |
 | Docker (or OrbStack/Podman) | `docker build`, `kind`'s nodes |
 | [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) | the local cluster |
