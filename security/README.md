@@ -95,6 +95,15 @@ install hint rather than passing quietly. The skip is printed rather than done
 with `status:`, which is silent — a typo in `GO_MODULES` has to be visible, or
 the scan it disables is one nobody notices is gone.
 
+## gosec runs the module's own, when it has one
+
+Pin gosec in each Go module with `go get -tool github.com/securego/gosec/v2/cmd/gosec`.
+gosec reads compiled export data through `golang.org/x/tools`, and a release
+binary or an `@latest` install carries the x/tools gosec itself requires — which
+can be too old for the Go the module targets, and then every package fails to
+type-check. Built from the module's `tool` directive it gets the module's
+x/tools instead. A module without one falls back to a gosec on `PATH`.
+
 ## Python and Node dependencies are trivy's job
 
 There is no separate scan for them, and adding one made coverage worse rather
