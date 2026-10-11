@@ -1,6 +1,6 @@
 image:
   repository: registry
-  tag: "2"
+  tag: "3"
 
 # The port both the container and the Service listen on.
 port: 5000
