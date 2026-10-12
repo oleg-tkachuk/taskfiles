@@ -32,6 +32,7 @@ version: "3"
 #   CHECKOV_VERSION_CMD a command printing one, when it already lives
 #                       somewhere — a workflow's env, a .tool-versions
 # ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _CKV_RESOLVE _CKV_FLAGS CHECKOV_FLAGS CHECKOV_VERSION_CMD
 
 silent: true
 
@@ -86,7 +87,7 @@ vars:
     {{if .CHECKOV_VERSION_CMD -}}
     checkov_version="$({{.CHECKOV_VERSION_CMD}})"
     {{- else -}}
-    checkov_version="{{.CHECKOV_VERSION | default ""}}"
+    checkov_version={{.CHECKOV_VERSION | default "" | q}}
     {{- end}}
 
     checkov_installed=""
@@ -121,7 +122,7 @@ tasks:
       # decided by _CKV_RESOLVE, whose messages name the exact case.
       - sh: command -v checkov >/dev/null || command -v pipx >/dev/null
         msg: "neither checkov nor pipx is installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
-      - sh: test -f {{._CKV_CFG}}
+      - sh: test -f {{._CKV_CFG | q}}
         msg: "{{._CKV_CFG}} not found — set CHECKOV_CONFIG"
       # A missing baseline that the config NAMES is not "no findings accepted
       # yet" — it is checkov reading a file that is not there. A config that
@@ -160,7 +161,7 @@ tasks:
           cat "$out"
           [ "$status" -eq 0 ] || exit "$status"
           if grep -q 'does not exist; skipping it' "$out"; then
-            printf '%s\n' "{{._CKV_ERR}} checkov · a directory in {{._CKV_CFG}} does not exist, so part of the tree went unscanned — the line above names it" >&2
+            printf '%s checkov · a directory in %s does not exist, so part of the tree went unscanned — the line above names it\n' "{{._CKV_ERR}}" {{._CKV_CFG | q}} >&2
             exit 1
           fi
           printf '%s\n' "{{._CKV_OK}} checkov · no findings outside the baseline"
@@ -260,6 +261,6 @@ tasks:
             printf '%s\n' "{{._CKV_WARN}} checkov · the baseline LOST most of itself — ${before} accepted findings became ${after}, ${lost} gone." >&2
             printf '%s\n' "         Findings the current scan cannot see are not in the new file. If the" >&2
             printf '%s\n' "         config or the framework list has narrowed since it was written, those" >&2
-            printf '%s\n' "         records were decisions, not noise: git diff {{._CKV_BASE}} before committing," >&2
-            printf '%s\n' "         and git checkout -- {{._CKV_BASE}} to put them back." >&2
+            printf '         records were decisions, not noise: git diff %s before committing,\n' {{._CKV_BASE | q}} >&2
+            printf '         and git checkout -- %s to put them back.\n' {{._CKV_BASE | q}} >&2
           fi
