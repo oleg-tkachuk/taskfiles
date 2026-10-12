@@ -61,7 +61,7 @@ tasks:
       - task --list-all
 
   lint:
-    desc: "Run every gate: modules parse, vars are scoped, output is quiet, README matches"
+    desc: "Run every gate: modules parse, vars are scoped, output is quiet, README matches, tasks behave"
     cmds:
       - task: check:parse
       - task: check:vars
@@ -71,6 +71,7 @@ tasks:
       - task: check:surface
       - task: check:runtime-install
       - task: check:quoting
+      - task: check:behaviour
 
   # ─── gates ──────────────────────────────────────────────────────────────────
 
@@ -217,6 +218,21 @@ tasks:
           done
           bash scripts/check-quoting.sh $held
           printf '%s\n' "{{._LIB_OK}} taskfiles · every value reaches the shell quoted"
+
+  check:behaviour:
+    desc: "Run each module's behaviour tests against shimmed tools"
+    # Loading a module proves it parses. These run its tasks, with the tools it
+    # calls replaced by shims that record their argv, and assert on what the
+    # task did with its inputs: which context a destructive call went to,
+    # whether a failure reached the exit code. One file per module, under
+    # tests/, discovered so a new one cannot be left out.
+    cmds:
+      - for: { var: _BEHAVIOUR_TESTS }
+        cmd: bash {{.ITEM | q}} >/dev/null
+      - printf '%s\n' "{{._LIB_OK}} taskfiles · every module behaves as its tests say"
+    vars:
+      _BEHAVIOUR_TESTS:
+        sh: ls tests/*.test.sh 2>/dev/null | sort | tr '\n' ' '
 
   check:readme:
     desc: "Refuse a module with no README, or one the top-level README does not link"

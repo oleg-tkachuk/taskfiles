@@ -23,7 +23,7 @@ version: "3"
 #   HELM_NS       limit to one namespace          (default: every namespace)
 #   HELM_UNINSTALL_FLAGS  verbatim extra flags for `helm uninstall`
 # ─────────────────────────────────────────────────────────────────────────────
-# shell-verbatim: _HELM_CTX _HELM_KCTX _HELM_SCOPE _HELM_UNINSTALL_FLAGS HELM_UNINSTALL_FLAGS
+# shell-verbatim: _HELM_CTX _HELM_KCTX _HELM_SCOPE _HELM_EVERY_STATE _HELM_UNINSTALL_FLAGS HELM_UNINSTALL_FLAGS
 
 silent: true
 
@@ -37,6 +37,10 @@ vars:
   _HELM_KCTX: '{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT | q}}{{end}}'
   _HELM_SCOPE: '{{if .HELM_NS}}--namespace {{.HELM_NS | q}}{{else}}--all-namespaces{{end}}'
   _HELM_UNINSTALL_FLAGS: '{{.HELM_UNINSTALL_FLAGS | default ""}}'
+  # Without it helm list shows deployed and failed releases only, so one stuck
+  # pending-install or uninstalling is neither listed before the prompt nor
+  # removed after it.
+  _HELM_EVERY_STATE: '-a'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _HELM_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -82,25 +86,33 @@ tasks:
     # not meaning it; it does nothing about meaning it on the wrong cluster,
     # which is the mistake that actually happens — kubectl's current context is
     # ambient state nobody re-reads before typing a command.
+    #
+    # The context being emptied is K8S_CONTEXT when one is pinned, and only
+    # otherwise the current one. `kubectl --context X config current-context`
+    # does not answer that: it prints the kubeconfig's current context whatever
+    # --context says, so comparing against it let CONFIRM=dev through while
+    # every helm call below went to the pinned prod.
     requires:
       vars: [CONFIRM, RELEASE]
     preconditions:
       - sh: command -v helm >/dev/null
         msg: "helm is not installed — https://helm.sh/docs/intro/install/"
       - sh: >-
-          ctx="$(kubectl{{._HELM_KCTX}} config current-context 2>/dev/null)";
-          test -n "$ctx" && test {{.CONFIRM | q}} = "$ctx"
+          ctx={{if .K8S_CONTEXT}}{{.K8S_CONTEXT | q}}{{else}}"$(kubectl config current-context 2>/dev/null)"{{end}};
+          test -n "$ctx"
+          && kubectl config get-contexts -o name 2>/dev/null | grep -qxF -- "$ctx"
+          && test {{.CONFIRM | q}} = "$ctx"
         msg: |-
           CONFIRM does not name the context this would empty.
           Re-run with CONFIRM=<the context you mean>, after checking
-          which one that is:  kubectl config current-context
+          which one that is:  {{if .K8S_CONTEXT}}K8S_CONTEXT={{.K8S_CONTEXT}}{{else}}kubectl config current-context{{end}}
     prompt: "Uninstall {{if eq .RELEASE \"all\"}}EVERY Helm release{{else}}the Helm release {{.RELEASE}}{{end}} {{if .HELM_NS}}in {{.HELM_NS}}{{else}}in every namespace{{end}} on {{.CONFIRM}}. This cannot be undone. Continue?"
     cmds:
       # Listed before removing, so the prompt above is answered with the list in
       # view rather than from memory.
       - printf '%s\n' "{{._HELM_RUN}} helm · about to uninstall:"
       - cmd: |-
-          helm list{{._HELM_CTX}} {{._HELM_SCOPE}} -q \
+          helm list{{._HELM_CTX}} {{._HELM_SCOPE}} {{._HELM_EVERY_STATE}} -q \
             | awk -v want={{.RELEASE | q}} 'want == "all" || $1 == want' \
             | sed 's/^/    /'
       # awk over helm's table rather than a JSON parse: a release name is a DNS
@@ -114,7 +126,7 @@ tasks:
           # rather than silently emptying the cluster instead of removing one
           # release: a helm release name is a DNS label, so `all` is legal.
           if [ {{.RELEASE | q}} = all ] \
-             && helm list{{._HELM_CTX}} {{._HELM_SCOPE}} -q | grep -qx all; then
+             && helm list{{._HELM_CTX}} {{._HELM_SCOPE}} {{._HELM_EVERY_STATE}} -q | grep -qx all; then
             printf '%s\n' "{{._HELM_ERR}} helm · a release is named 'all', and RELEASE=all means EVERY release." >&2
             printf '%s\n' "         Refusing rather than guessing. Scope it with HELM_NS=<namespace>, or rename it." >&2
             exit 1
@@ -124,7 +136,7 @@ tasks:
           # operator asked for something to be gone and it never was. Saying so
           # is the difference between "done" and "you removed nothing".
           if [ {{.RELEASE | q}} != all ] \
-             && ! helm list{{._HELM_CTX}} {{._HELM_SCOPE}} -q | grep -qx {{.RELEASE | q}}; then
+             && ! helm list{{._HELM_CTX}} {{._HELM_SCOPE}} {{._HELM_EVERY_STATE}} -q | grep -qx {{.RELEASE | q}}; then
             printf '%s helm · no release named %s in scope\n' "{{._HELM_ERR}}" {{.RELEASE | q}} >&2
             exit 1
           fi
@@ -135,12 +147,25 @@ tasks:
           # The earlier version piped through python3 — an interpreter this
           # module has no reason to require, and whose absence would surface
           # only after the prompt had been answered.
-          helm list{{._HELM_CTX}} {{._HELM_SCOPE}} \
+          #
+          # Every release that fails to go is named, and the task fails after
+          # trying the rest: a `cmd && say` per release dropped the failure on
+          # the floor, and the step after it reported nothing left in scope.
+          set -o pipefail
+          helm list{{._HELM_CTX}} {{._HELM_SCOPE}} {{._HELM_EVERY_STATE}} \
             | awk -v want={{.RELEASE | q}} 'NR > 1 && (want == "all" || $1 == want) { print $1, $2 }' \
-            | while read -r name ns; do
-                helm uninstall{{._HELM_CTX}} {{._HELM_UNINSTALL_FLAGS}} "$name" --namespace "$ns" >/dev/null \
-                  && printf '%s\n' "{{._HELM_OK}} helm · uninstalled $ns/$name"
-              done
+            | {
+                failed=0
+                while read -r name ns; do
+                  if helm uninstall{{._HELM_CTX}} {{._HELM_UNINSTALL_FLAGS}} "$name" --namespace "$ns" >/dev/null; then
+                    printf '%s\n' "{{._HELM_OK}} helm · uninstalled $ns/$name"
+                  else
+                    printf '%s\n' "{{._HELM_ERR}} helm · could not uninstall $ns/$name" >&2
+                    failed=1
+                  fi
+                done
+                exit "$failed"
+              }
       - cmd: |-
           if [ {{.RELEASE | q}} = all ]; then
             printf '%s\n' "{{._HELM_OK}} helm · nothing left in scope"
