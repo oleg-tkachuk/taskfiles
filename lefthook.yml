@@ -62,6 +62,7 @@ pre-commit:
     - name: zizmor
       tags: [ci, security]
       glob: ".github/workflows/*.yml"
+      # renovate: datasource=pypi depName=zizmor
       run: pipx run zizmor==1.30.0 --persona=auditor --format=plain .github/workflows/
 
     # 4) The library's own gates: every module parses through Task, declares no
@@ -69,7 +70,7 @@ pre-commit:
     #    README table. See Taskfile.yaml for what each one is guarding against.
     - name: lint
       tags: [task, lint]
-      glob: "{*/*.yaml,*/*/*.yaml,Taskfile.yaml,README.md,tests/*,scripts/*,.github/workflows/*,.github/scripts/*}"
+      glob: "{*/*.yaml,*/*/*.yaml,Taskfile.yaml,README.md,tests/*,scripts/*,.github/workflows/*,.github/scripts/*,.github/renovate.json,.github/release.yml,lefthook.yml}"
       run: task lint
 
 # Last gate before the change leaves the machine.
