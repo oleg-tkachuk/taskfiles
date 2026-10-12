@@ -47,6 +47,12 @@ tasks:
     cmds:
       - printf "%s\n" "{{._LIB_OK}} done"'
 
+expect clean glyph-constant-with-a-digit-in-its-prefix 'version: "3"
+tasks:
+  t:
+    cmds:
+      - printf "%s\n" "{{._K8S_OK}} done"'
+
 expect clean control-actions 'version: "3"
 tasks:
   t:
