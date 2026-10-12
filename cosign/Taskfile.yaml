@@ -36,7 +36,7 @@ version: "3"
 #   COSIGN_SIGN        set to "0" to make every task here a no-op
 #   COSIGN_SIGN_FLAGS  extra flags for sign/attest
 #   COSIGN_VERIFY_FLAGS  extra flags for verify   (default --insecure-ignore-tlog=true)
-#   SBOM_FORMAT        syft output format             (default spdx-json)
+#   SBOM_FORMAT        spdx-json or cyclonedx-json    (default spdx-json)
 #   SYFT_FLAGS         verbatim extra syft flags
 #   SBOM_INSECURE      "1" when the registry serves a certificate syft rejects
 #
@@ -44,8 +44,9 @@ version: "3"
 # log, because that is what a private registry can actually verify against.
 # `task cosign:keygen` writes both the keys and a signing config that has no
 # Rekor, Fulcio, TSA or OIDC in it. Publishing to a public registry instead?
-# Drop COSIGN_KEY, pass keyless flags through COSIGN_SIGN_FLAGS, and take
-# `--insecure-ignore-tlog=true` back out of COSIGN_VERIFY_FLAGS.
+# Point COSIGN_SIGNING_CONFIG at a config that names the public services, and
+# take `--insecure-ignore-tlog=true` back out of COSIGN_VERIFY_FLAGS. Signing
+# is always with COSIGN_KEY: keyless signing is not something this module does.
 #
 # Missing key or missing syft is an ERROR, not a skip. An artifact that is
 # quietly unsigned is the whole failure mode this module exists to prevent; if
@@ -72,6 +73,11 @@ vars:
   _CS_SIGN_FLAGS: '{{.COSIGN_SIGN_FLAGS | default ""}}'
   _CS_VERIFY_FLAGS: '{{.COSIGN_VERIFY_FLAGS | default "--insecure-ignore-tlog=true"}}'
   _CS_SBOM_FORMAT: '{{.SBOM_FORMAT | default "spdx-json"}}'
+  # The predicate type cosign records for the SBOM syft wrote, keyed by the
+  # format without its @version. It was always spdxjson, so a CycloneDX SBOM
+  # was attested as SPDX and a verifier asking for CycloneDX found nothing.
+  # Empty for a format cosign has no type for; _attest refuses that.
+  _CS_SBOM_TYPE: '{{get (dict "spdx-json" "spdxjson" "cyclonedx-json" "cyclonedx") (regexReplaceAll "@.*$" ._CS_SBOM_FORMAT "")}}'
 
   # Every included file shares one var namespace, so the release module's
   # derived version is readable here directly. Do NOT shell out to
@@ -218,10 +224,14 @@ tasks:
         msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/ (or set COSIGN_SIGN=0)"
       - sh: test -f {{._CS_KEY}}
         msg: "{{._CS_KEY}} not found — run `task cosign:keygen`, or set COSIGN_SIGN=0 to publish unsigned"
+      # Always passed, so always required: it is what keeps signing off the
+      # public transparency log. Missing, cosign failed on its own message.
+      - sh: test -f {{._CS_CONFIG | q}}
+        msg: "{{._CS_CONFIG}} not found — run `task cosign:keygen`, or set COSIGN_SIGNING_CONFIG"
     cmds:
       - >-
         COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign sign --yes
-        {{if ._CS_CONFIG}}--signing-config {{._CS_CONFIG}} {{end}}--key {{._CS_KEY}}
+        --signing-config {{._CS_CONFIG | q}} --key {{._CS_KEY}}
         {{._CS_SIGN_FLAGS}} '{{.REF}}' >/dev/null
       - printf '%s\n' "{{._CS_OK}} {{._CS_NAME}} · cosign · signed {{.REF}}"
 
@@ -238,6 +248,10 @@ tasks:
         msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/ (or set COSIGN_SIGN=0)"
       - sh: test -f {{._CS_KEY}}
         msg: "{{._CS_KEY}} not found — run `task cosign:keygen`, or set COSIGN_SIGN=0"
+      - sh: test -f {{._CS_CONFIG | q}}
+        msg: "{{._CS_CONFIG}} not found — run `task cosign:keygen`, or set COSIGN_SIGNING_CONFIG"
+      - sh: test -n {{._CS_SBOM_TYPE | q}}
+        msg: "SBOM_FORMAT {{._CS_SBOM_FORMAT}} has no cosign predicate type — use spdx-json or cyclonedx-json"
     cmds:
       # The SBOM is a build artifact of this task, not of the repository: it is
       # written to a temp file, attached to the image, and dropped.
@@ -257,6 +271,6 @@ tasks:
           sb="$d/sbom.json"
           {{if eq (.SBOM_INSECURE | default "0") "1"}}SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY=true {{end}}syft {{._CS_SYFT_FLAGS}} '{{.REF}}' -q -o {{._CS_SBOM_FORMAT}}="$sb"
           COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign attest --yes \
-            {{if ._CS_CONFIG}}--signing-config {{._CS_CONFIG}} {{end}}--key {{._CS_KEY}} \
-            --predicate "$sb" --type spdxjson {{._CS_SIGN_FLAGS}} '{{.REF}}' >/dev/null
+            --signing-config {{._CS_CONFIG | q}} --key {{._CS_KEY}} \
+            --predicate "$sb" --type {{._CS_SBOM_TYPE | q}} {{._CS_SIGN_FLAGS}} '{{.REF}}' >/dev/null
       - printf '%s\n' "{{._CS_OK}} {{._CS_NAME}} · cosign · SBOM attested to {{.REF}}"
