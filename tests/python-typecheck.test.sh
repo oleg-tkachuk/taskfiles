@@ -14,6 +14,7 @@ case "$*" in
       broken) echo "error: no virtual environment" >&2; exit 2 ;;
       *) exit 0 ;;
     esac ;;
+  *"run mypy"*) exit "${FAKE_MYPY_STATUS:-0}" ;;
 esac
 exit 0'
 shim uv "$runner"
@@ -41,7 +42,12 @@ for variant in uv poetry; do
   run_task python:typecheck
   expect_status ok "$variant: typecheck runs when mypy is a dependency"
   expect_call "run mypy src" "$variant: mypy runs over the source"
-  unset FAKE_ENV
+
+  export FAKE_MYPY_STATUS=1
+  run_task python:typecheck
+  expect_status fail "$variant: a type error fails typecheck"
+  refute_output "types clean" "$variant: a type error is not reported clean"
+  unset FAKE_ENV FAKE_MYPY_STATUS
 done
 
 finish
