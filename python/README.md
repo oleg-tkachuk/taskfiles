@@ -52,7 +52,7 @@ Shared by both:
 | Var | Default | Meaning |
 |---|---|---|
 | `PROJECT_NAME` | `python` | the label in every log line |
-| `PY_SRC` | `src` | what lint and format target |
+| `PY_SRC` | `src` | what lint, format and typecheck target — one or more directories, space-separated |
 | `PY_TEST_FLAGS` | `-q` | flags for the test run |
 | `TEST_CMD` | `pytest` | which runner each task invokes |
 | `LINT_CMD` | `ruff check` | what `lint` runs |

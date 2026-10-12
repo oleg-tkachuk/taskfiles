@@ -16,7 +16,7 @@ version: "3"
 #
 #   PROJECT_NAME    the label in every log line
 #   PY              interpreter to build the venv on (default: uv's choice)
-#   PY_SRC          source directory for lint/format   (default src)
+#   PY_SRC          source directories, space-separated   (default src)
 #   PY_TEST_FLAGS   default "-q"
 #   UV_SYNC_FLAGS   which dependency sets to install   (default "--group dev";
 #
@@ -36,13 +36,17 @@ version: "3"
 # reproducible path — `uv sync` on an unchanged lock is a no-op measured in
 # milliseconds, so it is cheap to depend on.
 # ─────────────────────────────────────────────────────────────────────────────
-# shell-verbatim: _UV_TEST_CMD TEST_CMD _UV_LINT_CMD LINT_CMD _UV_FMT_CMD FORMAT_CMD _UV_TC_CMD TYPECHECK_CMD _UV_TEST_FLAGS PY_TEST_FLAGS _UV_LOCK_FLAGS UV_LOCK_FLAGS _UV_SYNC UV_SYNC_FLAGS _UV_PY
+# shell-verbatim: _UV_TEST_CMD TEST_CMD _UV_LINT_CMD LINT_CMD _UV_FMT_CMD FORMAT_CMD _UV_TC_CMD TYPECHECK_CMD _UV_TEST_FLAGS PY_TEST_FLAGS _UV_LOCK_FLAGS UV_LOCK_FLAGS _UV_SYNC UV_SYNC_FLAGS _UV_PY _UV_SRC_ARGS
 
 silent: true
 
 vars:
   _UV_NAME: '{{.PROJECT_NAME | default "python"}}'
   _UV_SRC: '{{.PY_SRC | default "src"}}'
+  # PY_SRC is a list of directories, space-separated (`src tests examples`).
+  # Each goes to the tool as its own quoted argument: quoted whole, the list
+  # reached ruff and mypy as one path that does not exist.
+  _UV_SRC_ARGS: '{{range (splitList " " ._UV_SRC | compact)}}{{q .}} {{end}}'
   _UV_TEST_CMD: '{{.TEST_CMD | default "pytest"}}'
   _UV_LINT_CMD: '{{.LINT_CMD | default "ruff check"}}'
   _UV_FMT_CMD: '{{.FORMAT_CMD | default "ruff format"}}'
@@ -80,7 +84,6 @@ tasks:
 
           name={{._UV_NAME | q}}
           py={{.PY | default "" | q}}
-          src={{._UV_SRC | q}}
           say() { printf '%s %s · doctor · %s\n' "$1" "$name" "$2"; }
           bad() { say '{{._UV_ERR}}' "$1" >&2; fail=1; }
 
@@ -106,8 +109,10 @@ tasks:
             [ -f uv.lock ] \
               && say '{{._UV_OK}}' "uv.lock is here" \
               || say '{{._UV_WARN}}' "no uv.lock yet — run lock before install"
-            [ -d "$src" ] \
-              || say '{{._UV_WARN}}' "PY_SRC $src is not a directory — lint and format would find nothing"
+            for src in {{._UV_SRC_ARGS}}; do
+              [ -d "$src" ] \
+                || say '{{._UV_WARN}}' "PY_SRC $src is not a directory — lint and format would find nothing"
+            done
           fi
 
           say '{{._UV_OK}}' "sync flags {{._UV_SYNC}}"
@@ -141,7 +146,7 @@ tasks:
     deps: [install]
     cmds:
       - printf '%s %s · uv · %s\n' "{{._UV_RUN}}" {{._UV_NAME | q}} {{._UV_LINT_CMD | q}}
-      - uv run {{._UV_LINT_CMD}} {{._UV_SRC | q}}
+      - uv run {{._UV_LINT_CMD}} {{._UV_SRC_ARGS}}
       - printf '%s %s · uv · lint clean\n' "{{._UV_OK}}" {{._UV_NAME | q}}
 
   fmt:
@@ -151,7 +156,7 @@ tasks:
     aliases: [format]
     deps: [install]
     cmds:
-      - uv run {{._UV_FMT_CMD}} {{._UV_SRC | q}}
+      - uv run {{._UV_FMT_CMD}} {{._UV_SRC_ARGS}}
       - printf '%s %s · uv · formatted\n' "{{._UV_OK}}" {{._UV_NAME | q}}
 
   typecheck:
@@ -181,7 +186,7 @@ tasks:
             exit 1
           fi
           printf '%s %s · uv · %s\n' "{{._UV_RUN}}" {{._UV_NAME | q}} {{._UV_TC_CMD | q}}
-          uv run {{._UV_TC_CMD}} {{._UV_SRC | q}}
+          uv run {{._UV_TC_CMD}} {{._UV_SRC_ARGS}}
           printf '%s %s · uv · types clean\n' "{{._UV_OK}}" {{._UV_NAME | q}}
 
   lock:
