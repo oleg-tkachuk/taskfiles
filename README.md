@@ -5,13 +5,9 @@
 [![Task 3.54+](https://img.shields.io/badge/Task-3.54%2B-29BEB0?logo=task&logoColor=white)](https://taskfile.dev/docs/installation)
 [![license: MIT](https://img.shields.io/github/license/oleg-tkachuk/taskfiles?label=license)](LICENSE)
 
-Shared [Task](https://taskfile.dev) modules — one implementation of the release
-chain, the language gates and the Kubernetes conveniences, included over git
-instead of copied into every repository.
-
-Reusable Task modules that repositories include over git, pinned to a tag: one
-toolkit to build, test, run CI and release, instead of per-repo Makefiles and
-scripts.
+Reusable [Task](https://taskfile.dev) modules that repositories include over
+git, pinned to a tag: one toolkit to build, test, run CI and release, instead
+of per-repo Makefiles and scripts.
 
 - **One release chain:** git-derived SemVer, idempotent image and Helm chart
   publishing, cosign signing with SBOM.
@@ -66,10 +62,10 @@ version: "3"
 silent: true
 
 vars:
-  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v7.4.0'
-  PROJECT_NAME: billing-api
-  IMAGE_NAMESPACE: acme
-  K8S_NAMESPACE: acme
+  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v11.2.1'
+  PROJECT_NAME: '{{.PROJECT_NAME | default "billing-api"}}'
+  IMAGE_NAMESPACE: '{{.IMAGE_NAMESPACE | default "acme"}}'
+  K8S_NAMESPACE: '{{.K8S_NAMESPACE | default "acme"}}'
 
 includes:
   release: { taskfile: '{{printf .TASKLIB "release"}}', dir: . }
@@ -465,7 +461,7 @@ you — leaves a lock in `.task/remote/`:
 Task refuses to run when the content behind that ref no longer matches it:
 
 ```
-task: Taskfile "...//go?ref=v7.4.0" not trusted by user
+task: Taskfile "...//go?ref=v11.2.1" not trusted by user
 ```
 
 That is the only thing standing between a moved tag and your build, so commit
