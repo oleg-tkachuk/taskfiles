@@ -18,7 +18,7 @@ set -euo pipefail
 command -v yq >/dev/null || { printf '%s\n' "yq is not installed — https://github.com/mikefarah/yq#install" >&2; exit 2; }
 
 # Glyph constants: status markers built from NO_COLOR, never from input.
-readonly glyph='^\._[A-Z]+_(OK|ERR|RUN|SKIP|WARN|INFO)$'
+readonly glyph='^\._[A-Z0-9]+_(OK|ERR|RUN|SKIP|WARN|INFO)$'
 
 # Every string a module hands to a shell: commands, preconditions, status
 # checks, and dynamic (sh:) variables, at task and module level.
