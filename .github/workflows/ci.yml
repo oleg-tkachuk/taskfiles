@@ -452,6 +452,16 @@ jobs:
           grep -q "gen/it's holds no tracked file" quote.out || { cat quote.out >&2; exit 1; }
           echo "✔ proto:check reads a quote in its pathspec as data"
 
+          # An `out:` path is read from a file, so it is data too: a command
+          # substitution in it must never run.
+          PROBE="$W/substituted"
+          # shellcheck disable=SC2016 # the $(...) is the payload, written literally
+          printf 'version: v2\nplugins:\n  - local: protoc-gen-go\n    out: gen/$(touch %s)\n' "$PROBE" > buf.gen.yaml
+          task cg:proto:check > subst.out 2>&1 || true
+          test ! -e "$PROBE" || { echo "✖ proto:check ran a command substitution from an out: path" >&2; exit 1; }
+          git checkout -q -- buf.gen.yaml
+          echo "✔ proto:check never runs a command substitution from an out: path"
+
           printf 'package greetv1\n// drifted\n' > gen/go/greet.pb.go
           if task cg:proto:check 2> drift.err; then
             echo "✖ proto:check passed on a stale stub" >&2; exit 1
