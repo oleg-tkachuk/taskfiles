@@ -9,6 +9,16 @@ Shared [Task](https://taskfile.dev) modules — one implementation of the releas
 chain, the language gates and the Kubernetes conveniences, included over git
 instead of copied into every repository.
 
+Reusable Task modules that repositories include over git, pinned to a tag: one
+toolkit to build, test, run CI and release, instead of per-repo Makefiles and
+scripts.
+
+- **One release chain:** git-derived SemVer, idempotent image and Helm chart
+  publishing, cosign signing with SBOM.
+- **Safe by construction:** quoted shell inputs, lint gates for scoping and
+  parity, behaviour tests.
+- **Public API:** modules released automatically under strict SemVer.
+
 Requires [Task](https://taskfile.dev/docs/installation) **3.54+**. Remote
 Taskfiles are stable from 3.53, with no experiment flag to set; 3.54 is the
 floor because earlier versions clone git includes into a shared temporary
