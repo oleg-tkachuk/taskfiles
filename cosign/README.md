@@ -30,11 +30,11 @@ workspace — tasks then read `sign:<task>`.
 | `COSIGN_DIR` | `deploy/sigstore` | where the key pair lives |
 | `COSIGN_KEY` | `<dir>/cosign.key` | private key; never commit it |
 | `COSIGN_PUB` | `<dir>/cosign.pub` | public key; commit this one |
-| `COSIGN_SIGNING_CONFIG` | `<dir>/signing-config.json` | written by `keygen`; keeps signing off the public infrastructure |
+| `COSIGN_SIGNING_CONFIG` | `<dir>/signing-config.json` | written by `keygen`; keeps signing off the public infrastructure. Required by `sign` and `sbom` |
 | `COSIGN_SIGN` | `1` | `0` makes every task here a no-op |
 | `COSIGN_SIGN_FLAGS` | — | extra flags for sign and attest |
 | `COSIGN_VERIFY_FLAGS` | `--insecure-ignore-tlog=true` | the default matches signing without a transparency log |
-| `SBOM_FORMAT` | `spdx-json` | syft output format |
+| `SBOM_FORMAT` | `spdx-json` | syft output format, `spdx-json` or `cyclonedx-json`; the attestation's predicate type follows it |
 | `SYFT_FLAGS` | — | verbatim extra syft flags |
 | `SBOM_INSECURE` | `0` | `1` when the registry's certificate is one syft rejects |
 
@@ -85,9 +85,10 @@ turning signing off is something you say out loud, with `COSIGN_SIGN=0`.
 
 `keygen` writes a signing config with no Rekor, Fulcio, TSA or OIDC, because a
 private registry cannot verify against the public log anyway. Publishing to a
-public registry instead? Drop `COSIGN_KEY`, pass keyless flags through
-`COSIGN_SIGN_FLAGS`, and take `--insecure-ignore-tlog=true` back out of
-`COSIGN_VERIFY_FLAGS`.
+public registry instead? Point `COSIGN_SIGNING_CONFIG` at a signing config that
+names the public services, and take `--insecure-ignore-tlog=true` back out of
+`COSIGN_VERIFY_FLAGS`. Signing always uses `COSIGN_KEY`; keyless signing is not
+something this module does.
 
 ## keygen refuses to overwrite
 
