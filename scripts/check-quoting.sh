@@ -9,6 +9,8 @@
 #
 # A module declares its shell-by-contract inputs on one comment line:
 #   # shell-verbatim: _ARGO_KUBECTL _CMP_CMD
+# A declared variable that the module defines as a script fragment is itself
+# checked: being code does not excuse the data interpolated into it.
 #
 # Usage: check-quoting.sh <Taskfile>...   (exit 1 when anything is reported)
 set -euo pipefail
@@ -34,7 +36,9 @@ readonly shell_texts='
 found=0
 for file in "$@"; do
   verbatim=$(awk -F': ' '/^# shell-verbatim: /{print $2}' "$file" | tr '\n' ' ')
-  yq -r "$shell_texts" "$file" | awk -v file="$file" -v glyph="$glyph" -v verbatim="$verbatim" '
+  # The bodies of declared variables the module defines as plain strings.
+  bodies=$(VERBATIM="$verbatim" yq -r '.vars // {} | to_entries[] | select(.value | type == "!!str") | select(.key as $k | strenv(VERBATIM) | split(" ") | any_c(. == $k)) | .value' "$file")
+  { yq -r "$shell_texts" "$file"; printf '%s\n' "$bodies"; } | awk -v file="$file" -v glyph="$glyph" -v verbatim="$verbatim" '
     BEGIN { n = split(verbatim, v, " "); for (i = 1; i <= n; i++) allowed["." v[i]] = 1 }
     {
       line = $0

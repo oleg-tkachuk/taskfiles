@@ -111,4 +111,24 @@ tasks:
     cmds:
       - echo ok'
 
+expect reported data-inside-a-verbatim-fragment '# shell-verbatim: _RESOLVE
+version: "3"
+vars:
+  _RESOLVE: |
+    version="{{.VERSION}}"
+tasks:
+  t:
+    cmds:
+      - "{{._RESOLVE}}"'
+
+expect clean quoted-inside-a-verbatim-fragment '# shell-verbatim: _RESOLVE
+version: "3"
+vars:
+  _RESOLVE: |
+    version={{.VERSION | q}}
+tasks:
+  t:
+    cmds:
+      - "{{._RESOLVE}}"'
+
 [ "$failures" = 0 ] || exit 1
