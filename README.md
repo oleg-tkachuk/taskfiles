@@ -142,7 +142,7 @@ own primitives rather than shelling out to a helper.
 
 `zizmor` runs over `.github/workflows/` in CI and in
 the pre-commit hook, in its `auditor` persona. Actions are pinned to commit
-SHAs with the version in a trailing comment, and Dependabot moves the pins —
+SHAs with the version in a trailing comment, and Renovate moves the pins —
 a tag is mutable, and a pin nobody updates is its own problem.
 
 A step longer than one command runs a script from `.github/scripts/` rather

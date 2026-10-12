@@ -142,19 +142,6 @@ jobs:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 'Notice: a newer Task exists'
-        # Dependabot watches `uses:` pins and cannot see TASK_VERSION, so this
-        # is the only thing that would ever mention a new Task. A notice rather
-        # than a gate: the pin is deliberate — a silent upgrade is how a green
-        # check stops meaning what it meant — so this reports and moves on.
-        #
-        # continue-on-error keeps a rate-limited API call from failing the job.
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PINNED: ${{ env.TASK_VERSION }}
-        run: bash .github/scripts/lint-task-version-notice.sh
-
       - name: 'Guard: every module lints'
         run: task lint
 

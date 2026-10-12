@@ -33,7 +33,7 @@
 *.yaml linguist-detectable=true
 
 # ─── Not counted: CI and hook configuration ──────────────────────────────
-# .github/workflows, the issue templates, dependabot and lefthook: 43,526
+# .github/workflows, the issue templates and lefthook: 43,526
 # bytes describing how this repository is built, not what it is. Every one of
 # them is *.yml, nothing here makes *.yml detectable, and so they stay off the
 # bar without a rule. Written down because the split is load-bearing — a later
