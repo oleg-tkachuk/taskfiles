@@ -209,6 +209,9 @@ tasks:
 
   baseline:
     desc: "Regenerate the checkov baseline — only after deliberately fixing findings"
+    vars:
+      # Lines of checkov's output shown when a run did not write the baseline.
+      _CKV_LOG_TAIL: '20'
     preconditions:
       # Either is enough — see _CKV_RESOLVE.
       - sh: command -v checkov >/dev/null || command -v pipx >/dev/null
@@ -238,7 +241,19 @@ tasks:
           }
           {{._CKV_RESOLVE}}
           before=$(count {{._CKV_BASE | q}})
-          run_checkov --config-file {{._CKV_CFG | q}} {{._CKV_FLAGS}} --create-baseline >/dev/null 2>&1 || true
+          # checkov exits 1 when it finds anything, which a baseline run always
+          # may, so its status cannot tell a scan from a crash. Whether it wrote
+          # the baseline can: a run that crashed left the old file in place,
+          # and discarding its status and output reported that as "N → N".
+          stamp=$(mktemp); log=$(mktemp)
+          trap 'rm -f "$stamp" "$log"' EXIT
+          status=0
+          run_checkov --config-file {{._CKV_CFG | q}} {{._CKV_FLAGS}} --create-baseline >"$log" 2>&1 || status=$?
+          if ! [ {{._CKV_BASE | q}} -nt "$stamp" ]; then
+            printf '%s\n' "{{._CKV_ERR}} checkov · the baseline was not written (checkov exited ${status}); the last of its output:" >&2
+            tail -n {{._CKV_LOG_TAIL | q}} "$log" | sed 's/^/    /' >&2
+            exit 1
+          fi
           after=$(count {{._CKV_BASE | q}})
           printf '%s\n' "{{._CKV_RUN}} checkov · baselined findings: ${before} → ${after}"
           if [ "${after}" -gt "${before}" ]; then
