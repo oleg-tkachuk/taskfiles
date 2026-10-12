@@ -69,6 +69,10 @@ $ task checkov:baseline
 A number that went up is reported as a warning: something new was accepted
 rather than fixed.
 
+A run that did not write the baseline fails, with the end of checkov's output.
+checkov exits 1 whenever it finds anything, so its exit status cannot tell a
+scan from a crash; whether the file was rewritten can.
+
 ## The baseline replaces, it does not merge
 
 `baseline` regenerates the file from the current scan, so every record the
