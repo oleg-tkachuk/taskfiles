@@ -37,10 +37,6 @@ vars:
   # runtime, python — the directories that hold variants rather than a module.
   FAMILIES:
     sh: ls -d */*/Taskfile.yaml 2>/dev/null | grep -v '^demo/' | cut -d/ -f1 | sort -u | tr '\n' ' '
-  # Modules not yet held to check:quoting. Each comes off this list in the
-  # change that quotes it; the gate covers every other module, and any new
-  # one, from the start.
-  QUOTING_PENDING:
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _LIB_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
@@ -202,14 +198,7 @@ tasks:
       - bash scripts/check-quoting.test.sh >/dev/null
       - cmd: |-
           set -eu
-          held=''
-          for f in {{.MODULE_FILES}}; do
-            case " {{range .QUOTING_PENDING}}{{.}} {{end}}" in
-              *" $f "*) ;;
-              *) held="$held $f" ;;
-            esac
-          done
-          bash scripts/check-quoting.sh $held
+          bash scripts/check-quoting.sh {{.MODULE_FILES}}
           printf '%s\n' "{{._LIB_OK}} taskfiles · every value reaches the shell quoted"
 
   check:behaviour:
