@@ -637,6 +637,31 @@ jobs:
           done
           echo "✔ runtime install passes every value as one argument"
 
+      - name: 'Verify: compose splits the engine and keeps the file whole'
+        if: needs.changes.outputs.smoke_skippable != 'true'
+        # COMPOSE_ENGINE is shell by contract — "podman compose" is a command
+        # and its first argument — while COMPOSE_FILE is data and must arrive
+        # as one argument even with a space in it. A shim stands in for podman.
+        run: |
+          set -euo pipefail
+          W="$RUNNER_TEMP/composegate"
+          mkdir -p "$W/shims"
+          # shellcheck disable=SC2016 # the shim's own $@, written literally
+          printf '#!/bin/sh\nprintf "%%s\\n" "$@" > "%s/argv"\n' "$W" > "$W/shims/podman"
+          chmod +x "$W/shims/podman"
+          cd "$W"
+          touch 'my compose.yaml'
+          cat > Taskfile.yaml <<YAML
+          version: "3"
+          includes:
+            cmp: { taskfile: '$GITHUB_WORKSPACE/taskfiles/compose', dir: ., vars: { COMPOSE_ENGINE: 'podman compose', COMPOSE_FILE: 'my compose.yaml' } }
+          tasks: {}
+          YAML
+          PATH="$W/shims:$PATH" task cmp:logs SERVICE=web
+          [ "$(head -3 argv | tr '\n' '|')" = 'compose|-f|my compose.yaml|' ] || { echo "✖ the engine or the file did not arrive as meant" >&2; cat argv >&2; exit 1; }
+          grep -qx web argv || { echo "✖ SERVICE did not arrive" >&2; cat argv >&2; exit 1; }
+          echo "✔ compose splits the engine and keeps the file whole"
+
       - name: 'Verify: auth passes its flags through and refuses a TTL that is not a number'
         if: needs.changes.outputs.smoke_skippable != 'true'
         # step is not installed here; a shim records its argv. STEP_FLAGS is
