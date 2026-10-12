@@ -41,16 +41,19 @@ workspace — tasks then read `go:<task>`.
 | Var | Default | Meaning |
 |---|---|---|
 | `PROJECT_NAME` | `go` | the label in every log line |
-| `GO_PKG` | `./...` | package pattern to test and lint |
-| `GO_MAIN` | `./cmd/...` | packages that produce binaries |
+| `GO_PKG` | `./...` | package patterns to test and lint, space-separated; each is passed as one argument |
+| `GO_MAIN` | `./cmd/...` | packages that produce binaries, space-separated like `GO_PKG` |
 | `GO_BIN_DIR` | `./bin` | where `build` writes its binaries |
 | `GO_TEST_FLAGS` | `-race -short` | flags for the unit run |
 | `GO_BUILD_FLAGS` | — | extra `go build` flags, e.g. `-ldflags` |
 | `GOLANGCI_FLAGS` | — | extra golangci-lint flags |
-| `GO_BENCH_PKG` | `GO_PKG` | packages to benchmark |
+| `GO_BENCH_PKG` | `GO_PKG` | packages to benchmark, space-separated like `GO_PKG` |
 | `GO_BENCH_FLAGS` | `-benchtime=1x` | flags for the benchmark run |
 | `GO_TEST_TAGS` | `integration` | for the tagged suites |
 | `GOWORK` | `off` | set to `""` to build through the workspace |
+
+The `*_FLAGS` inputs are shell: they are word-split and parsed as written.
+Every other value reaches the tool as data.
 
 ## Examples
 
