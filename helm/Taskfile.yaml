@@ -21,7 +21,9 @@ version: "3"
 #
 #   K8S_CONTEXT   pin a cluster                            (default: current)
 #   HELM_NS       limit to one namespace          (default: every namespace)
+#   HELM_UNINSTALL_FLAGS  verbatim extra flags for `helm uninstall`
 # ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _HELM_CTX _HELM_KCTX _HELM_SCOPE _HELM_UNINSTALL_FLAGS HELM_UNINSTALL_FLAGS
 
 silent: true
 
@@ -29,9 +31,11 @@ vars:
   # helm spells it --kube-context, kubectl spells it --context. Mixing them up
   # does not error loudly: kubectl rejects the flag, the substitution captures
   # nothing, and a guard comparing against that empty string passes.
-  _HELM_CTX: '{{if .K8S_CONTEXT}} --kube-context {{.K8S_CONTEXT}}{{end}}'
-  _HELM_KCTX: '{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT}}{{end}}'
-  _HELM_SCOPE: '{{if .HELM_NS}}--namespace {{.HELM_NS}}{{else}}--all-namespaces{{end}}'
+  # Flag fragments, spliced into commands as shell: the values inside them are
+  # quoted here, where they are built.
+  _HELM_CTX: '{{if .K8S_CONTEXT}} --kube-context {{.K8S_CONTEXT | q}}{{end}}'
+  _HELM_KCTX: '{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT | q}}{{end}}'
+  _HELM_SCOPE: '{{if .HELM_NS}}--namespace {{.HELM_NS | q}}{{else}}--all-namespaces{{end}}'
   _HELM_UNINSTALL_FLAGS: '{{.HELM_UNINSTALL_FLAGS | default ""}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
@@ -121,7 +125,7 @@ tasks:
           # is the difference between "done" and "you removed nothing".
           if [ {{.RELEASE | q}} != all ] \
              && ! helm list{{._HELM_CTX}} {{._HELM_SCOPE}} -q | grep -qx {{.RELEASE | q}}; then
-            printf '%s\n' "{{._HELM_ERR}} helm · no release named {{.RELEASE}} in scope" >&2
+            printf '%s helm · no release named %s in scope\n' "{{._HELM_ERR}}" {{.RELEASE | q}} >&2
             exit 1
           fi
 

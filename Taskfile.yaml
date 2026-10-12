@@ -47,7 +47,6 @@ vars:
     - cosign/Taskfile.yaml
     - go/Taskfile.yaml
     - hcloud/Taskfile.yaml
-    - helm/Taskfile.yaml
     - k8s/Taskfile.yaml
     - node/Taskfile.yaml
     - python/poetry/Taskfile.yaml
