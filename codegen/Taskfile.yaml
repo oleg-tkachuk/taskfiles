@@ -268,11 +268,15 @@ tasks:
       - task: proto
       - cmd: |-
           set -eu
+          # Both come from files the gate reads, so they enter the shell once,
+          # quoted, and are only ever expanded as variables after that.
+          out={{._CG_PROTO_OUT | q}}
+          templates={{._CG_BUF_TPL | join ", " | q}}
           # Nothing parsed means the templates are a shape this does not
           # understand. A gate that cannot name what it watches must refuse:
           # passing here would report a clean tree it never looked at.
-          if [ -z "{{._CG_PROTO_OUT}}" ]; then
-            printf '%s\n' "{{._CG_ERR}} {{._CG_NAME}} · gen · no out: path in {{._CG_BUF_TPL | join ", "}} — set PROTO_PATHSPEC" >&2
+          if [ -z "$out" ]; then
+            printf '%s\n' "{{._CG_ERR}} {{._CG_NAME}} · gen · no out: path in $templates — set PROTO_PATHSPEC" >&2
             exit 1
           fi
           watched=''
@@ -284,7 +288,7 @@ tasks:
             # to be told which directory holds the output.
             case "$d" in
               . | ./)
-                printf '%s\n' "{{._CG_ERR}} {{._CG_NAME}} · gen · {{._CG_BUF_TPL | join ", "}} writes to the component root — set PROTO_PATHSPEC to the directory that holds the stubs" >&2
+                printf '%s\n' "{{._CG_ERR}} {{._CG_NAME}} · gen · $templates writes to the component root — set PROTO_PATHSPEC to the directory that holds the stubs" >&2
                 exit 1
                 ;;
             esac
