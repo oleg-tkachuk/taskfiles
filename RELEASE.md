@@ -14,7 +14,7 @@ from merged PRs, and a PR with no label falls into "Other Changes".
 ## Cutting one
 
 Fully automatic — there is no command to run. Once a PR merges to `main` and
-every check passes, `ci.yml`'s `release` job dispatches
+every check passes, `ci.yml`'s `dispatch-release` job dispatches
 [`release.yml`](.github/workflows/release.yml), which runs `semantic-release`
 (config in [`release.config.cjs`](release.config.cjs)) against the commits
 since the last tag. If any of them are release-worthy — see
@@ -22,8 +22,9 @@ since the last tag. If any of them are release-worthy — see
 computes the next version, creates the tag and pushes it. If none are,
 nothing happens: no tag, no error, just a run that says so.
 
-The pushed tag re-triggers `ci.yml`, whose `gate`, `consumable` and `publish`
-jobs pick it up from there.
+`release.yml` then runs `ci.yml` for that tag with `-f tag=`, and its
+`gate`, `consumable` and `publish` jobs pick it up from there. The tag push
+cannot do that itself: a push made with `GITHUB_TOKEN` starts no workflow run.
 
 ## Publishing a tag that has no release
 
@@ -42,7 +43,7 @@ back with `gh release edit <newest tag> --latest`.
 
 ## What the workflow refuses
 
-Pushing the tag runs the `gate`, `consumable` and `publish` jobs in
+The run for a tag goes through the `gate`, `consumable` and `publish` jobs in
 [`ci.yml`](.github/workflows/ci.yml), which `needs:` the same lint,
 consumer-smoke and workflow-audit jobs an ordinary push runs — a tag whose own
 CI is red never reaches `publish`. Past that, it will not publish a tag that:
