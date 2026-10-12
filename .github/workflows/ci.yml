@@ -444,6 +444,14 @@ jobs:
           git checkout -q -- gen/go
           echo "✔ proto:check takes a pathspec with magic, and still sees drift through it"
 
+          # A quote in the pathspec is data, not shell: the gate reports the
+          # directory it cannot find instead of failing to parse the value.
+          if task cg:proto:check PROTO_PATHSPEC="gen/it's" > quote.out 2>&1; then
+            echo "✖ proto:check passed a pathspec that names nothing" >&2; exit 1
+          fi
+          grep -q "gen/it's holds no tracked file" quote.out || { cat quote.out >&2; exit 1; }
+          echo "✔ proto:check reads a quote in its pathspec as data"
+
           printf 'package greetv1\n// drifted\n' > gen/go/greet.pb.go
           if task cg:proto:check 2> drift.err; then
             echo "✖ proto:check passed on a stale stub" >&2; exit 1
