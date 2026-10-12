@@ -41,7 +41,6 @@ vars:
   # change that quotes it; the gate covers every other module, and any new
   # one, from the start.
   QUOTING_PENDING:
-    - k8s/Taskfile.yaml
     - node/Taskfile.yaml
     - release/Taskfile.yaml
   # Status markers. The shape carries the meaning, so a line still reads in
