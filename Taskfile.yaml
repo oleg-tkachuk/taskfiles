@@ -195,11 +195,12 @@ tasks:
     # A value interpolated into a script is code: inside double quotes a
     # $(...) in it runs, bare it is word-split. Only the inputs a module
     # declares as shell (`# shell-verbatim:`) may go in unquoted.
+    # demo/ is held to it too: it is the example a consumer copies.
     cmds:
       - bash scripts/check-quoting.test.sh >/dev/null
       - cmd: |-
           set -eu
-          bash scripts/check-quoting.sh {{.MODULE_FILES}}
+          bash scripts/check-quoting.sh {{.MODULE_FILES}} demo/Taskfile.yaml
           printf '%s\n' "{{._LIB_OK}} taskfiles · every value reaches the shell quoted"
 
   check:behaviour:
