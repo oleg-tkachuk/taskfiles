@@ -63,7 +63,7 @@ pre-commit:
       tags: [ci, security]
       glob: ".github/workflows/*.yml"
       # renovate: datasource=pypi depName=zizmor
-      run: pipx run zizmor==1.30.0 --persona=auditor --format=plain .github/workflows/
+      run: pipx run zizmor==1.30.1 --persona=auditor --format=plain .github/workflows/
 
     # 4) The library's own gates: every module parses through Task, declares no
     #    var that would shadow a consumer's, runs quiet, and appears in the
