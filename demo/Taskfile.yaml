@@ -14,6 +14,9 @@ version: "3"
 #
 # See README.md in this directory for the full walkthrough this Taskfile is
 # built to run.
+#
+# Every value reaches a shell through `q`, as in the library's own modules —
+# `task lint` holds this file to the same rule.
 # ─────────────────────────────────────────────────────────────────────────────
 
 silent: true
@@ -25,28 +28,52 @@ vars:
   # KIND_CLUSTER is runtime/kind's own input name — declaring it here, at file
   # level, is what the include sees without being told twice. K8S_CONTEXT
   # derives from it rather than repeating "demo": kind always names a
-  # cluster's context kind-<cluster>, and a value computed from the one knob
-  # cannot drift from it the way two independent literals could.
+  # cluster's context kind-<cluster>.
   KIND_CLUSTER: demo
   K8S_CONTEXT: 'kind-{{.KIND_CLUSTER}}'
+
+  # The registry's ports are read from the kind config, the file kind itself
+  # reads, rather than written here a second time: the host port it maps is
+  # what REGISTRY points at, and the node port it maps to is what the
+  # registry's Service must listen on. Written in two places, a mismatch
+  # leaves a registry that is running and unreachable.
+  KIND_CONFIG: ./deploy/kind-config.yaml
+  REGISTRY_PORT:
+    sh: yq -e '.nodes[0].extraPortMappings[0].hostPort' {{.KIND_CONFIG | q}}
+  REGISTRY_NODE_PORT:
+    sh: yq -e '.nodes[0].extraPortMappings[0].containerPort' {{.KIND_CONFIG | q}}
   # Not the library's own default (localhost:5000): macOS's AirPlay Receiver
   # and OrbStack's own proxy both already claim 5000 on plenty of machines.
-  # See deploy/kind-config.yaml, which maps this same port to the cluster.
-  REGISTRY: localhost:5050
+  REGISTRY: 'localhost:{{.REGISTRY_PORT}}'
   # registry:2 serves plain HTTP. docker figures that out on its own for
   # loopback addresses; helm's OCI client does not — without this, chart:push
   # fails with "server gave HTTP response to HTTPS client".
   HELM_FLAGS: --plain-http
+  # runtime/kind pins image.tag on install; the repository has to match the
+  # image release pushed, or IfNotPresent finds nothing and the node pulls
+  # from a registry it cannot reach. Set from REGISTRY rather than kept in the
+  # chart's values, where it would be a second copy of it.
+  HELM_UPGRADE_FLAGS: '--set image.repository={{printf "%s/%s" .REGISTRY .PROJECT_NAME | q}}'
   # deploy/registry is this demo's own throwaway plumbing (an upstream
   # registry:2 image, unhardened, because that image has no non-root user to
   # run as) — not something this repo ships. Same reasoning TRIVY_SKIP_DIRS's
   # own default excludes .claude for: it is not code the security step exists
   # to judge.
   TRIVY_SKIP_DIRS: '--skip-dirs .claude --skip-dirs deploy/registry'
+
+  # The in-cluster registry's Helm release and chart.
+  REGISTRY_RELEASE: registry
+  REGISTRY_CHART: ./deploy/registry
+  # How long helm waits for the registry pod to become Ready.
+  REGISTRY_WAIT: 60s
+  # registry:check: attempts, seconds between them, and seconds per attempt.
+  REGISTRY_CHECK_RETRIES: '10'
+  REGISTRY_CHECK_DELAY: '1'
+  REGISTRY_CHECK_TIMEOUT: '2'
+
   # Status markers, same vocabulary the library itself uses.
-  _RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
-  _OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
-  _SKIP: '{{if .NO_COLOR}}○{{else}}{{"\x1b[90m○\x1b[0m"}}{{end}}'
+  _DEMO_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
+  _DEMO_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
 
 includes:
   go:       { taskfile: '{{printf .TASKLIB "go"}}', dir: . }
@@ -73,66 +100,62 @@ tasks:
   cluster:up:
     desc: "Create the kind cluster this demo runs on (no-op if it already exists)"
     status:
-      - kind get clusters 2>/dev/null | grep -qx {{.KIND_CLUSTER}}
+      - kind get clusters 2>/dev/null | grep -qxF -- {{.KIND_CLUSTER | q}}
     cmds:
-      - printf '%s\n' "{{._RUN}} demo · kind · creating cluster {{.KIND_CLUSTER}}"
-      - kind create cluster --name {{.KIND_CLUSTER}} --config ./deploy/kind-config.yaml
-      - printf '%s\n' "{{._OK}} demo · kind · cluster {{.KIND_CLUSTER}} ready (context {{.K8S_CONTEXT}})"
+      - printf '%s demo · kind · creating cluster %s\n' "{{._DEMO_RUN}}" {{.KIND_CLUSTER | q}}
+      - kind create cluster --name {{.KIND_CLUSTER | q}} --config {{.KIND_CONFIG | q}}
+      - printf '%s demo · kind · cluster %s ready (context %s)\n' "{{._DEMO_OK}}" {{.KIND_CLUSTER | q}} {{.K8S_CONTEXT | q}}
 
   cluster:down:
     desc: "Delete the kind cluster and everything on it"
     cmds:
-      - kind delete cluster --name {{.KIND_CLUSTER}}
-      - printf '%s\n' "{{._OK}} demo · kind · cluster {{.KIND_CLUSTER}} removed"
+      - kind delete cluster --name {{.KIND_CLUSTER | q}}
+      - printf '%s demo · kind · cluster %s removed\n' "{{._DEMO_OK}}" {{.KIND_CLUSTER | q}}
 
   registry:up:
     desc: "Install the in-cluster registry (helm upgrade --install, idempotent)"
     deps: [cluster:up]
     cmds:
-      - printf '%s\n' "{{._RUN}} demo · registry · helm upgrade --install"
+      - printf '%s demo · registry · helm upgrade --install\n' "{{._DEMO_RUN}}"
       - >-
-        helm upgrade --install registry ./deploy/registry
-        --kube-context {{.K8S_CONTEXT}}
-        --namespace {{.K8S_NAMESPACE}} --create-namespace
-        --wait --timeout 60s
-      - printf '%s\n' "{{._OK}} demo · registry · installed in {{.K8S_NAMESPACE}}"
+        helm upgrade --install {{.REGISTRY_RELEASE | q}} {{.REGISTRY_CHART | q}}
+        --kube-context {{.K8S_CONTEXT | q}}
+        --namespace {{.K8S_NAMESPACE | q}} --create-namespace
+        --set nodePort={{.REGISTRY_NODE_PORT | q}}
+        --wait --timeout {{.REGISTRY_WAIT | q}}
+      - printf '%s demo · registry · installed in %s\n' "{{._DEMO_OK}}" {{.K8S_NAMESPACE | q}}
 
   registry:down:
     desc: "Remove the in-cluster registry"
     cmds:
       - >-
-        helm uninstall registry
-        --kube-context {{.K8S_CONTEXT}}
-        --namespace {{.K8S_NAMESPACE}} --ignore-not-found
+        helm uninstall {{.REGISTRY_RELEASE | q}}
+        --kube-context {{.K8S_CONTEXT | q}}
+        --namespace {{.K8S_NAMESPACE | q}} --ignore-not-found
 
   registry:check:
-    desc: "Fail fast when {{.REGISTRY}} is not reachable"
+    desc: "Fail fast when the demo registry is not reachable"
     # registry:2 serves plain HTTP, not TLS — the library's own registry
     # checks (monorepo:registry:check, release:doctor) probe https:// because
-    # a real OCI registry has one; this one deliberately does not, so this
-    # checks http:// instead of copying that scheme by habit.
+    # a real OCI registry has one; this one deliberately does not.
     #
-    # Retries for a few seconds rather than checking once: helm --wait returns
-    # as soon as the pod itself is Ready, which is sooner than kube-proxy has
-    # necessarily finished programming the NodePort's rules — a single check
-    # right after `task up` can lose that race and report the registry down
-    # when it is only slow to answer yet.
+    # Retried rather than checked once: helm --wait returns as soon as the pod
+    # itself is Ready, which is sooner than kube-proxy has necessarily
+    # finished programming the NodePort's rules — a single check right after
+    # `task up` can lose that race and report the registry down when it is
+    # only slow to answer yet. curl's own retry, connection refusals included.
     preconditions:
       - sh: >-
-          ok=0;
-          for _ in 1 2 3 4 5 6 7 8 9 10; do
-            case "$(curl -s --max-time 2 -o /dev/null -w '%{http_code}' http://{{.REGISTRY}}/v2/ 2>/dev/null || printf '%s' 000)" in
-              200|401|403) ok=1; break ;;
-            esac;
-            sleep 1;
-          done;
-          test "$ok" = 1
+          curl -fsS -o /dev/null
+          --retry {{.REGISTRY_CHECK_RETRIES | q}} --retry-delay {{.REGISTRY_CHECK_DELAY | q}}
+          --retry-all-errors --max-time {{.REGISTRY_CHECK_TIMEOUT | q}}
+          {{printf "http://%s/v2/" .REGISTRY | q}}
         msg: |-
           {{.REGISTRY}} is not answering.
           Run `task up` first — it creates the kind cluster and the registry
           together, with the port already mapped.
     cmds:
-      - printf '%s\n' "{{._OK}} demo · registry · {{.REGISTRY}} reachable"
+      - printf '%s demo · registry · %s reachable\n' "{{._DEMO_OK}}" {{.REGISTRY | q}}
 
   up:
     desc: "Bring up the cluster and the registry — run this first"
@@ -140,7 +163,7 @@ tasks:
       - task: cluster:up
       - task: registry:up
       - task: registry:check
-      - printf '%s\n' "{{._OK}} demo · ready — {{.REGISTRY}} is live, task deploy next"
+      - printf '%s demo · ready — %s is live, task deploy next\n' "{{._DEMO_OK}}" {{.REGISTRY | q}}
 
   down:
     desc: "Tear down everything this demo created"
@@ -173,11 +196,12 @@ tasks:
   deploy:
     desc: "Build, push and install the demo service on the local cluster"
     deps: [registry:check]
+    # local:install loads the image into kind's nodes itself before it
+    # installs, so there is no separate image:load step here.
     cmds:
       - task: release:deploy
-      - task: local:image:load
       - task: local:install
-      - printf '%s\n' "{{._OK}} demo · deployed — task k8s:port-forward to reach it"
+      - printf '%s demo · deployed — task k8s:port-forward to reach it\n' "{{._DEMO_OK}}"
 
   sign:
     desc: "Sign the published image and chart, then verify both"

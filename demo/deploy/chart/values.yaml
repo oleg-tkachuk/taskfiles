@@ -1,8 +1,9 @@
 replicaCount: 1
 
 image:
-  # Matches REGISTRY in ../../Taskfile.yaml.
-  repository: localhost:5050/taskfiles-demo
+  # The image name alone. ../../Taskfile.yaml sets the full repository from
+  # REGISTRY when it installs, so the registry is written down in one place.
+  repository: taskfiles-demo
   tag: ""
   pullPolicy: IfNotPresent
 

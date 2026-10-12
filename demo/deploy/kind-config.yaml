@@ -8,7 +8,10 @@
 # OrbStack's own proxy both already claim 5000 on plenty of machines, and the
 # failure mode is a registry that looks reachable and answers every request
 # with the wrong service's 404 — a confusing thing to debug on someone else's
-# first run of this demo. See REGISTRY in ../Taskfile.yaml.
+# first run of this demo.
+#
+# This file is the one place both ports are written: ../Taskfile.yaml reads
+# hostPort into REGISTRY and containerPort into the registry's nodePort.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
