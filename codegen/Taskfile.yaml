@@ -65,6 +65,7 @@ version: "3"
 # was just generated — the gate failing against its own generator. Normalising
 # here is what makes generation idempotent.
 # ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _CG_GEN_CMD GENERATE_CMD _CG_BUF_FLAGS BUF_FLAGS _CG_SQLC_FLAGS SQLC_FLAGS _CG_GOIMPORTS_FLAGS GOIMPORTS_FLAGS _CG_PATHS_Q
 
 silent: true
 
@@ -126,17 +127,17 @@ tasks:
   regenerate:
     desc: "Regenerate everything this component ships generated"
     cmds:
-      - printf '%s\n' "{{._CG_RUN}} {{._CG_NAME}} · gen · mocks → proto → generate → sqlc"
+      - printf '%s %s · gen · mocks → proto → generate → sqlc\n' "{{._CG_RUN}}" {{._CG_NAME | q}}
       - task: mocks
       - task: proto
       - task: generate
       - task: sqlc
-      - printf '%s\n' "{{._CG_OK}} {{._CG_NAME}} · gen · regenerated"
+      - printf '%s %s · gen · regenerated\n' "{{._CG_OK}}" {{._CG_NAME | q}}
 
   mocks:
     desc: "Regenerate the interface mocks"
     preconditions:
-      - sh: test -f {{._CG_MOCK_CFG}}
+      - sh: test -f {{._CG_MOCK_CFG | q}}
         msg: "{{._CG_MOCK_CFG}} not found — set MOCKERY_CONFIG"
     cmds:
       # `go run` resolves the version from go.mod, so the generator is the one
@@ -144,7 +145,7 @@ tasks:
       # rewrites every file in an older template, and a diff that size invites
       # hand-editing one mock instead — which is how an interface method ships
       # with no mock at all.
-      - go run {{._CG_MOCK_MOD}} --config {{._CG_MOCK_CFG}}
+      - go run {{._CG_MOCK_MOD | q}} --config {{._CG_MOCK_CFG | q}}
       - task: _normalise
 
   proto:
@@ -160,7 +161,7 @@ tasks:
       # Checked before generating, so it fires whether the stray copy arrived
       # just now or several commits ago — the point is to be loud, which is why
       # this is a tripwire and not a .gitignore entry.
-      - sh: '{{if ._CG_FORBID}}! ls -d {{._CG_FORBID}} >/dev/null 2>&1{{else}}true{{end}}'
+      - sh: '{{if ._CG_FORBID}}! ls -d {{range (splitList " " ._CG_FORBID | compact)}}{{q .}} {{end}} >/dev/null 2>&1{{else}}true{{end}}'
         msg: |-
           {{._CG_FORBID}} exists — that is a stray second copy of the generated
           stubs, written by running the generator from the wrong directory.
@@ -174,12 +175,12 @@ tasks:
         cmd: |-
           set -eu
           {{if ._CG_PLUGINS}}
-          export GOBIN="$PWD/{{._CG_BIN}}"
+          export GOBIN="$PWD"/{{._CG_BIN | q}}
           export PATH="$GOBIN:$PATH"
-          go install {{._CG_PLUGINS}}
+          go install {{range (splitList " " ._CG_PLUGINS | compact)}}{{q .}} {{end}}
           {{end}}
-          {{if ._CG_BUF_PATH}}export PATH="{{._CG_BUF_PATH}}:$PATH"{{end}}
-          buf generate {{._CG_BUF_FLAGS}} {{._CG_BUF_IN}} --template {{.ITEM}}
+          {{if ._CG_BUF_PATH}}export PATH={{._CG_BUF_PATH | q}}:"$PATH"{{end}}
+          buf generate {{._CG_BUF_FLAGS}} {{if ._CG_BUF_IN}}{{._CG_BUF_IN | q}}{{end}} --template {{.ITEM | q}}
       - task: _normalise
 
   generate:
@@ -198,7 +199,7 @@ tasks:
       - sh: '{{if ._CG_SQLC_MOD}}true{{else}}command -v sqlc >/dev/null{{end}}'
         msg: "sqlc is not installed — https://docs.sqlc.dev/en/latest/overview/install.html, or set SQLC_MODULE to run it through `go run`"
     cmds:
-      - '{{if ._CG_SQLC_MOD}}go run {{._CG_SQLC_MOD}} generate{{else}}sqlc generate{{end}} {{._CG_SQLC_FLAGS}}'
+      - '{{if ._CG_SQLC_MOD}}go run {{._CG_SQLC_MOD | q}} generate{{else}}sqlc generate{{end}} {{._CG_SQLC_FLAGS}}'
 
   check:
     desc: "Fail when any generated output is stale against the working tree"
@@ -276,7 +277,7 @@ tasks:
           # understand. A gate that cannot name what it watches must refuse:
           # passing here would report a clean tree it never looked at.
           if [ -z "$out" ]; then
-            printf '%s\n' "{{._CG_ERR}} {{._CG_NAME}} · gen · no out: path in $templates — set PROTO_PATHSPEC" >&2
+            printf '%s %s · gen · no out: path in %s — set PROTO_PATHSPEC\n' "{{._CG_ERR}}" {{._CG_NAME | q}} "$templates" >&2
             exit 1
           fi
           watched=''
@@ -288,7 +289,7 @@ tasks:
             # to be told which directory holds the output.
             case "$d" in
               . | ./)
-                printf '%s\n' "{{._CG_ERR}} {{._CG_NAME}} · gen · $templates writes to the component root — set PROTO_PATHSPEC to the directory that holds the stubs" >&2
+                printf '%s %s · gen · %s writes to the component root — set PROTO_PATHSPEC to the directory that holds the stubs\n' "{{._CG_ERR}}" {{._CG_NAME | q}} "$templates" >&2
                 exit 1
                 ;;
             esac
@@ -296,13 +297,13 @@ tasks:
             # generated output that is gitignored, or a directory nobody has
             # committed yet. Said out loud rather than counted as clean.
             if [ -z "$(git ls-files -- "$d")" ]; then
-              printf '%s\n' "{{._CG_SKIP}} {{._CG_NAME}} · gen · $d holds no tracked file — not checked"
+              printf '%s %s · gen · %s holds no tracked file — not checked\n' "{{._CG_SKIP}}" {{._CG_NAME | q}} "$d"
             else
               watched="$watched $d"
             fi
           done
           if [ -z "$watched" ]; then
-            printf '%s\n' "{{._CG_ERR}} {{._CG_NAME}} · gen · every stub directory is untracked — this gate checks nothing" >&2
+            printf '%s %s · gen · every stub directory is untracked — this gate checks nothing\n' "{{._CG_ERR}}" {{._CG_NAME | q}} >&2
             exit 1
           fi
       # Against the working tree, as mocks:check explains. Additions inside a
@@ -353,13 +354,13 @@ tasks:
       - cmd: |-
           set -eu
           if ! cmp -s {{.OUT | q}} {{.OUT | q}}.after; then
-            printf '%s\n' "{{._CG_ERR}} {{._CG_NAME}} · gen · {{.STALE}}; regenerating changed:" >&2
+            printf '%s %s · gen · %s; regenerating changed:\n' "{{._CG_ERR}}" {{._CG_NAME | q}} {{.STALE | q}} >&2
             diff {{.OUT | q}} {{.OUT | q}}.after | sed -n 's/^[<>] [^ ]* //p' | LC_ALL=C sort -u | sed 's/^/    /' >&2
             rm -f {{.OUT | q}} {{.OUT | q}}.after
             exit 1
           fi
           rm -f {{.OUT | q}} {{.OUT | q}}.after
-          printf '%s\n' "{{._CG_OK}} {{._CG_NAME}} · gen · {{.FRESH}}"
+          printf '%s %s · gen · %s\n' "{{._CG_OK}}" {{._CG_NAME | q}} {{.FRESH | q}}
 
   _normalise:
     internal: true
