@@ -25,6 +25,21 @@ nothing happens: no tag, no error, just a run that says so.
 The pushed tag re-triggers `ci.yml`, whose `gate`, `consumable` and `publish`
 jobs pick it up from there.
 
+## Publishing a tag that has no release
+
+A tag can end up with no GitHub release — `semantic-release` pushed it and then
+failed before handing it to `ci.yml`. Run the verification for that tag by
+hand, from the tag itself:
+
+```bash
+gh workflow run ci.yml --ref vX.Y.Z -f tag=vX.Y.Z
+```
+
+`--ref` matters: every job checks out the tag, and a workflow taken from
+`main` calls scripts in `.github/scripts/` that a tag older than them does not
+have. Publishing an older tag after a newer one makes it `Latest`; move that
+back with `gh release edit <newest tag> --latest`.
+
 ## What the workflow refuses
 
 Pushing the tag runs the `gate`, `consumable` and `publish` jobs in
