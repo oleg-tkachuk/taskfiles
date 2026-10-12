@@ -79,7 +79,7 @@ tasks:
           fail=0
 
           name={{._UV_NAME | q}}
-          py={{.PY | q}}
+          py={{.PY | default "" | q}}
           src={{._UV_SRC | q}}
           say() { printf '%s %s · doctor · %s\n' "$1" "$name" "$2"; }
           bad() { say '{{._UV_ERR}}' "$1" >&2; fail=1; }
