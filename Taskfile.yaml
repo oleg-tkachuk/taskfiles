@@ -46,7 +46,6 @@ vars:
     - codegen/Taskfile.yaml
     - compose/Taskfile.yaml
     - cosign/Taskfile.yaml
-    - github/Taskfile.yaml
     - go/Taskfile.yaml
     - hcloud/Taskfile.yaml
     - helm/Taskfile.yaml

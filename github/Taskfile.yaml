@@ -90,6 +90,6 @@ tasks:
           }
           trap restore EXIT
 
-          echo "▲ lifting enforce_admins on $repo@$branch — {{.REASON}}"
+          printf '▲ lifting enforce_admins on %s@%s — %s\n' "$repo" "$branch" {{.REASON | q}}
           gh api -X DELETE "$api" >/dev/null
-          git push --force-with-lease origin {{.REF}}:"$branch"
+          git push --force-with-lease origin {{.REF | q}}:"$branch"
