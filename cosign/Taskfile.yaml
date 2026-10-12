@@ -40,6 +40,9 @@ version: "3"
 #   SYFT_FLAGS         verbatim extra syft flags
 #   SBOM_INSECURE      "1" when the registry serves a certificate syft rejects
 #
+# The *_FLAGS inputs are spliced in as shell, verbatim; every other value is
+# quoted where it reaches a shell.
+#
 # The default configuration signs with a local key pair and no transparency
 # log, because that is what a private registry can actually verify against.
 # `task cosign:keygen` writes both the keys and a signing config that has no
@@ -52,6 +55,7 @@ version: "3"
 # quietly unsigned is the whole failure mode this module exists to prevent; if
 # you want it off for a run, say so with COSIGN_SIGN=0.
 # ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _CS_SIGN_FLAGS COSIGN_SIGN_FLAGS _CS_VERIFY_FLAGS COSIGN_VERIFY_FLAGS _CS_SYFT_FLAGS SYFT_FLAGS
 
 silent: true
 
@@ -102,7 +106,7 @@ tasks:
     # otherwise still demand cosign be installed just to decide there was
     # nothing to do.
     status:
-      - test -f {{._CS_KEY}}
+      - test -f {{._CS_KEY | q}}
     cmds:
       - task: _keygen
 
@@ -112,15 +116,15 @@ tasks:
       - sh: command -v cosign >/dev/null
         msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/"
     cmds:
-      - mkdir -p {{._CS_DIR}}
-      - cmd: cd {{._CS_DIR}} && COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign generate-key-pair
+      - mkdir -p {{._CS_DIR | q}}
+      - cmd: cd {{._CS_DIR | q}} && COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign generate-key-pair
       # No Rekor, Fulcio, TSA or OIDC: key-based signing that a private
       # registry can verify without reaching the public transparency log.
       - >-
         cosign signing-config create --no-default-rekor --no-default-fulcio
-        --no-default-tsa --no-default-oidc --out {{._CS_CONFIG}}
-      - printf '%s\n' "{{._CS_OK}} {{._CS_NAME}} · cosign · wrote {{._CS_DIR}}/cosign.{key,pub} + signing-config.json"
-      - printf '%s\n' "{{._CS_WARN}} {{._CS_NAME}} · cosign · commit cosign.pub, keep cosign.key out of the repo"
+        --no-default-tsa --no-default-oidc --out {{._CS_CONFIG | q}}
+      - printf '%s %s · cosign · wrote %s/cosign.{key,pub} + signing-config.json\n' "{{._CS_OK}}" {{._CS_NAME | q}} {{._CS_DIR | q}}
+      - printf '%s %s · cosign · commit cosign.pub, keep cosign.key out of the repo\n' "{{._CS_WARN}}" {{._CS_NAME | q}}
 
   # A COMPOSITE, named for the work: a fixed, ordered pipeline over sibling
   # tasks that each exist and each run on their own.
@@ -140,7 +144,7 @@ tasks:
     # internal task because Task evaluates preconditions BEFORE status, so a
     # status guard cannot skip past the internal task's own preconditions.
     status:
-      - test '{{._CS_ON}}' = '0'
+      - test {{._CS_ON | q}} = 0
     cmds:
       - task: image
       - task: chart
@@ -152,7 +156,7 @@ tasks:
     # internal task because Task evaluates preconditions BEFORE status, so a
     # status guard cannot skip past the internal task's own preconditions.
     status:
-      - test '{{._CS_ON}}' = '0'
+      - test {{._CS_ON | q}} = 0
     cmds:
       - task: _sign
         vars: { REF: "{{._REL_IMAGE}}:{{._CS_VERSION}}" }
@@ -163,7 +167,7 @@ tasks:
     # internal task because Task evaluates preconditions BEFORE status, so a
     # status guard cannot skip past the internal task's own preconditions.
     status:
-      - test '{{._CS_ON}}' = '0'
+      - test {{._CS_ON | q}} = 0
     cmds:
       - task: _sign
         vars: { REF: "{{._CS_CHART_REF}}:{{._CS_VERSION}}" }
@@ -174,7 +178,7 @@ tasks:
     # internal task because Task evaluates preconditions BEFORE status, so a
     # status guard cannot skip past the internal task's own preconditions.
     status:
-      - test '{{._CS_ON}}' = '0'
+      - test {{._CS_ON | q}} = 0
     cmds:
       - task: _attest
         vars: { REF: "{{._REL_IMAGE}}:{{._CS_VERSION}}" }
@@ -187,7 +191,7 @@ tasks:
     # internal task because Task evaluates preconditions BEFORE status, so a
     # status guard cannot skip past the internal task's own preconditions.
     status:
-      - test '{{._CS_ON}}' = '0'
+      - test {{._CS_ON | q}} = 0
     cmds:
       - task: _verify
 
@@ -198,9 +202,9 @@ tasks:
     preconditions:
       - sh: command -v cosign >/dev/null
         msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/"
-      - sh: test -f {{._CS_PUB}}
+      - sh: test -f {{._CS_PUB | q}}
         msg: "{{._CS_PUB}} not found — nothing to verify against (run `task cosign:keygen`)"
-      - sh: test -n '{{._CS_VERSION}}'
+      - sh: test -n {{._CS_VERSION | q}}
         msg: "no version resolved — include the shared `release` module under the name `release` beside this one"
     vars:
       # A literal `for:` list is taken verbatim — templates in its items are
@@ -209,20 +213,20 @@ tasks:
     cmds:
       - for: { var: REFS }
         cmd: >-
-          cosign verify {{._CS_VERIFY_FLAGS}} --key {{._CS_PUB}} '{{.ITEM}}' >/dev/null 2>&1
-          && printf '%s\n' "{{._CS_OK}} {{._CS_NAME}} · cosign · verified {{.ITEM}}"
-          || { printf '%s\n' "{{._CS_ERR}} {{._CS_NAME}} · cosign · unsigned or bad signature: {{.ITEM}}" >&2; exit 1; }
+          cosign verify {{._CS_VERIFY_FLAGS}} --key {{._CS_PUB | q}} {{.ITEM | q}} >/dev/null 2>&1
+          && printf '%s %s · cosign · verified %s\n' "{{._CS_OK}}" {{._CS_NAME | q}} {{.ITEM | q}}
+          || { printf '%s %s · cosign · unsigned or bad signature: %s\n' "{{._CS_ERR}}" {{._CS_NAME | q}} {{.ITEM | q}} >&2; exit 1; }
 
   _sign:
     internal: true
     requires:
       vars: [REF]
     preconditions:
-      - sh: test -n '{{._CS_VERSION}}'
+      - sh: test -n {{._CS_VERSION | q}}
         msg: "no version resolved — include the shared `release` module under the name `release` beside this one"
       - sh: command -v cosign >/dev/null
         msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/ (or set COSIGN_SIGN=0)"
-      - sh: test -f {{._CS_KEY}}
+      - sh: test -f {{._CS_KEY | q}}
         msg: "{{._CS_KEY}} not found — run `task cosign:keygen`, or set COSIGN_SIGN=0 to publish unsigned"
       # Always passed, so always required: it is what keeps signing off the
       # public transparency log. Missing, cosign failed on its own message.
@@ -231,22 +235,22 @@ tasks:
     cmds:
       - >-
         COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign sign --yes
-        --signing-config {{._CS_CONFIG | q}} --key {{._CS_KEY}}
-        {{._CS_SIGN_FLAGS}} '{{.REF}}' >/dev/null
-      - printf '%s\n' "{{._CS_OK}} {{._CS_NAME}} · cosign · signed {{.REF}}"
+        --signing-config {{._CS_CONFIG | q}} --key {{._CS_KEY | q}}
+        {{._CS_SIGN_FLAGS}} {{.REF | q}} >/dev/null
+      - printf '%s %s · cosign · signed %s\n' "{{._CS_OK}}" {{._CS_NAME | q}} {{.REF | q}}
 
   _attest:
     internal: true
     requires:
       vars: [REF]
     preconditions:
-      - sh: test -n '{{._CS_VERSION}}'
+      - sh: test -n {{._CS_VERSION | q}}
         msg: "no version resolved — include the shared `release` module under the name `release` beside this one"
       - sh: command -v syft >/dev/null
         msg: "syft is not installed — https://github.com/anchore/syft#installation (or set COSIGN_SIGN=0)"
       - sh: command -v cosign >/dev/null
         msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/ (or set COSIGN_SIGN=0)"
-      - sh: test -f {{._CS_KEY}}
+      - sh: test -f {{._CS_KEY | q}}
         msg: "{{._CS_KEY}} not found — run `task cosign:keygen`, or set COSIGN_SIGN=0"
       - sh: test -f {{._CS_CONFIG | q}}
         msg: "{{._CS_CONFIG}} not found — run `task cosign:keygen`, or set COSIGN_SIGNING_CONFIG"
@@ -269,8 +273,10 @@ tasks:
           d="$(mktemp -d "${TMPDIR:-/tmp}/sbom-XXXXXX")"
           trap 'rm -rf "$d"' EXIT
           sb="$d/sbom.json"
-          {{if eq (.SBOM_INSECURE | default "0") "1"}}SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY=true {{end}}syft {{._CS_SYFT_FLAGS}} '{{.REF}}' -q -o {{._CS_SBOM_FORMAT}}="$sb"
+          ref={{.REF | q}}
+          fmt={{._CS_SBOM_FORMAT | q}}
+          {{if eq (.SBOM_INSECURE | default "0") "1"}}SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY=true {{end}}syft {{._CS_SYFT_FLAGS}} "$ref" -q -o "$fmt=$sb"
           COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign attest --yes \
-            --signing-config {{._CS_CONFIG | q}} --key {{._CS_KEY}} \
-            --predicate "$sb" --type {{._CS_SBOM_TYPE | q}} {{._CS_SIGN_FLAGS}} '{{.REF}}' >/dev/null
-      - printf '%s\n' "{{._CS_OK}} {{._CS_NAME}} · cosign · SBOM attested to {{.REF}}"
+            --signing-config {{._CS_CONFIG | q}} --key {{._CS_KEY | q}} \
+            --predicate "$sb" --type {{._CS_SBOM_TYPE | q}} {{._CS_SIGN_FLAGS}} "$ref" >/dev/null
+      - printf '%s %s · cosign · SBOM attested to %s\n' "{{._CS_OK}}" {{._CS_NAME | q}} {{.REF | q}}
