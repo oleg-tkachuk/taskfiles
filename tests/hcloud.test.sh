@@ -5,9 +5,10 @@ source "$(dirname "$0")/lib.sh"
 
 shim hcloud '
 case "$*" in
-  "server list -l "*" -o noheader -o columns=name")
+  "server list -l "*" -o json")
     echo "token=${HCLOUD_TOKEN:-} selector=$4" >> "$CALLS"
-    printf "web-1\nweb-2\n" ;;
+    if [ -n "${FAKE_NO_SERVERS:-}" ]; then echo "[]"; exit 0; fi
+    printf "%s" "[{\"id\":1,\"name\":\"web-1\",\"status\":\"running\"},{\"id\":2,\"name\":\"web-2\",\"status\":\"off\"}]" ;;
   "server list -l "*" -o columns="*) ;;
   "server "*) ;;
   *) exit 1 ;;
@@ -40,6 +41,14 @@ reset_calls
 run_task hcloud:protect HCLOUD_SELECTOR=role=web
 expect_status ok "protect: protects every matched server"
 expect_call "hcloud server enable-protection web-1 delete rebuild" "protect: each protection level is its own argument"
+expect_call "hcloud server enable-protection web-2 delete rebuild" "protect: every server the JSON lists is acted on"
+
+export FAKE_NO_SERVERS=1
+reset_calls
+run_task hcloud:poweron HCLOUD_SELECTOR=role=web
+expect_status fail "no match: a selector matching no server is refused"
+refute_call "hcloud server poweron" "no match: nothing is acted on"
+unset FAKE_NO_SERVERS
 
 run_task hcloud:shutdown "HCLOUD_SELECTOR_CMD=cat sel.txt"
 expect_output "every server matching the selector that \`cat sel.txt\` prints" "prompt: a looked-up selector is named as the command that prints it"

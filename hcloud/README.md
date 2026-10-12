@@ -14,6 +14,10 @@ includes:
   hcloud: { taskfile: '{{printf .TASKLIB "hcloud"}}', dir: . }
 ```
 
+Needs the [hcloud CLI](https://github.com/hetznercloud/cli), and
+[jq](https://jqlang.org/download/) for every task that acts on servers: the
+names a selector matches are read from the CLI's JSON, not from its table.
+
 `dir: .` is required: it pins the module's commands to the including
 component's directory. The namespace above is the convention used across this
 workspace — tasks then read `hcloud:<task>`.

@@ -44,6 +44,8 @@ version: "3"
 # is the task that answers what does: it lists every resource the selector
 # matches, not only the servers.
 #
+# Requires the hcloud CLI, and jq for every task that acts on servers.
+#
 # ── Inputs ───────────────────────────────────────────────────────────────────
 # Pass these at the include's own `vars:`, not the consumer's top-level
 # `vars:`. In a repository with more than one component the top level is
@@ -142,9 +144,13 @@ vars:
   # The selector, and the servers it matches. Every task that acts on servers
   # goes through this, because all of them must refuse an empty match rather
   # than loop zero times and report success.
+  #
+  # Names come from the CLI's JSON through jq, not from its table: the table
+  # is laid out for a person, and its columns and header are the CLI's to
+  # change.
   _HC_EACH_SERVER: |
     {{._HC_SELECTOR}}
-    servers="$(hcloud server list -l "$selector" -o noheader -o columns=name)"
+    servers="$(hcloud server list -l "$selector" -o json | jq -r '.[].name')"
     if [ -z "$servers" ]; then
       printf '%s\n' "{{._HC_ERR}} $svc · hcloud · no server matches $selector" >&2
       exit 1
@@ -215,6 +221,8 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
+      - sh: command -v jq >/dev/null
+        msg: "jq not installed — https://jqlang.org/download/"
     cmds:
       # Changes nothing. HCLOUD_STATUS narrows what is DISPLAYED, not what the
       # selector matched: the guard above still refuses a selector that matches
@@ -255,6 +263,8 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
+      - sh: command -v jq >/dev/null
+        msg: "jq not installed — https://jqlang.org/download/"
     cmds:
       # No prompt: starting a stopped server takes nothing away, and this is
       # the task an operator reaches for when something else already did.
@@ -274,6 +284,8 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
+      - sh: command -v jq >/dev/null
+        msg: "jq not installed — https://jqlang.org/download/"
     prompt: "Send an ACPI shutdown to every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}?"
     cmds:
       # Graceful at the machine level and nowhere else: Hetzner sends the ACPI
@@ -295,6 +307,8 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
+      - sh: command -v jq >/dev/null
+        msg: "jq not installed — https://jqlang.org/download/"
     prompt: "Send an ACPI reboot to every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}?"
     cmds:
       # The middle rung. Whatever runs inside the server has its own restart
@@ -318,6 +332,8 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
+      - sh: command -v jq >/dev/null
+        msg: "jq not installed — https://jqlang.org/download/"
     prompt: "Cut power to every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}} without a clean shutdown?"
     cmds:
       # The plug. Anything mid-write inside the server is mid-write when the
@@ -339,6 +355,8 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
+      - sh: command -v jq >/dev/null
+        msg: "jq not installed — https://jqlang.org/download/"
     prompt: "Hard reset every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}? No clean shutdown."
     cmds:
       # For the server that has stopped answering entirely, where the
@@ -367,6 +385,8 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
+      - sh: command -v jq >/dev/null
+        msg: "jq not installed — https://jqlang.org/download/"
     cmds:
       # No prompt: this only ever takes capability away, and the task that
       # gives it back is the one that asks. Running it on a server that is
@@ -387,6 +407,8 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
+      - sh: command -v jq >/dev/null
+        msg: "jq not installed — https://jqlang.org/download/"
     prompt: "Lift {{._HC_PROTECTION}} protection on every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}?"
     cmds:
       # The only task here that makes the fleet easier to destroy, which is why
@@ -409,6 +431,8 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
+      - sh: command -v jq >/dev/null
+        msg: "jq not installed — https://jqlang.org/download/"
       - sh: command -v ssh >/dev/null
         msg: "ssh not installed — `hcloud server ssh` resolves the address and then execs ssh from PATH"
     cmds:
@@ -447,6 +471,8 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
+      - sh: command -v jq >/dev/null
+        msg: "jq not installed — https://jqlang.org/download/"
     cmds:
       # Below `ssh`: this needs nothing of the guest at all, which is what
       # makes it the way into a server that never finished booting.
