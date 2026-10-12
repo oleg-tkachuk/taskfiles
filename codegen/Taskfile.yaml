@@ -250,7 +250,8 @@ tasks:
       # overrides it for a layout the templates do not express.
       _CG_PROTO_OUT:
         sh: |-
-          if [ -n '{{._CG_PROTO_SPEC}}' ]; then printf '%s' '{{._CG_PROTO_SPEC}}'; exit 0; fi
+          spec={{._CG_PROTO_SPEC | q}}
+          if [ -n "$spec" ]; then printf '%s' "$spec"; exit 0; fi
           awk 'BEGIN { q = "\047" }
                /^[ \t]*out:[ \t]*/ {
                  v = $0
