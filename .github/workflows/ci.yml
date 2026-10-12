@@ -311,12 +311,12 @@ jobs:
         # one --from-literal each.
         run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-sealed-secrets.sh"
 
-      - name: 'Verify: python passes the source dir and typecheck module as data'
+      - name: 'Verify: python passes each source dir and the typecheck module as data'
         if: needs.changes.outputs.smoke_skippable != 'true'
         # uv as the representative of the python family; a shim records every
-        # call. PY_SRC carries a space, PY a command substitution that used to
-        # run in doctor, and TYPECHECK_MODULE must reach Python as an argument
-        # rather than as code.
+        # call. PY_SRC lists two directories that must arrive as two arguments,
+        # PY carries a command substitution that used to run in doctor, and
+        # TYPECHECK_MODULE must reach Python as an argument rather than as code.
         run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-python.sh"
 
       - name: 'Verify: auth passes its flags through and refuses a TTL that is not a number'
