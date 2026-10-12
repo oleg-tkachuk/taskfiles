@@ -45,6 +45,7 @@ component's directory. Tasks then read `github:<task>`.
 |---|---|---|
 | `GH_REPO` | the `origin` remote | `owner/name` |
 | `GH_BRANCH` | `main` | the protected branch |
+| `GH_REMOTE` | `origin` | the git remote pushed to; it must point at `GH_REPO`, or nothing is lifted |
 | `REF` | `HEAD` | what to push |
 | `REASON` | — | **required**; recorded beside the flag change |
 
@@ -53,6 +54,11 @@ component's directory. Tasks then read `github:<task>`.
 ```bash
 task github:force-push REASON="drop the secret from 3 published commits"
 ```
+
+Protection comes down on `GH_REPO` and the push goes to `GH_REMOTE`, so the
+task refuses before lifting anything when the remote points at another
+repository. If protection cannot be restored afterwards, the task fails even
+when the push succeeded.
 
 `REASON` is not decoration. It is what the next reader sees when they ask why
 protection was off for ninety seconds, and requiring it is what stops the task

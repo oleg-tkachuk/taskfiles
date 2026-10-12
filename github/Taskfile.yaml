@@ -15,6 +15,7 @@ version: "3"
 #
 #   GH_REPO      owner/name           (default: the origin remote)
 #   GH_BRANCH    protected branch     (default: main)
+#   GH_REMOTE    git remote to push   (default: origin)
 #
 # ── Why this module exists ───────────────────────────────────────────────────
 # A protected `main` with `enforce_admins` on refuses EVERY direct ref update,
@@ -55,6 +56,7 @@ tasks:
       REPO:
         sh: '{{if .GH_REPO}}echo {{.GH_REPO | q}}{{else}}gh repo view --json nameWithOwner -q .nameWithOwner{{end}}'
       BRANCH: '{{.GH_BRANCH | default "main"}}'
+      REMOTE: '{{.GH_REMOTE | default "origin"}}'
       REF: '{{.REF | default "HEAD"}}'
     preconditions:
       - sh: command -v gh >/dev/null
@@ -64,8 +66,22 @@ tasks:
     cmds:
       - cmd: |-
           set -eu
-          repo={{.REPO | q}}; branch={{.BRANCH | q}}
+          repo={{.REPO | q}}; branch={{.BRANCH | q}}; remote={{.REMOTE | q}}
           api="repos/$repo/branches/$branch/protection/enforce_admins"
+
+          # Protection comes down on $repo, so the push has to land there.
+          # GH_REPO and the remote are set apart, and nothing else ties them:
+          # with the remote on a fork, protection was lifted on one repository
+          # and the force-push sent to another.
+          url=$(git remote get-url "$remote")
+          path=${url%.git}; path=${path%/}
+          name=${path##*/}; owner=${path%/*}; owner=${owner##*[/:]}
+          lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+          if [ "$(lower "$owner/$name")" != "$(lower "$repo")" ]; then
+            echo "✖ remote '$remote' is $url, not $repo — refusing to lift protection on one and push to the other." >&2
+            echo "  Set GH_REMOTE to the remote for $repo, or GH_REPO to the repository '$remote' points at." >&2
+            exit 1
+          fi
 
           # Only restore what was actually on. Turning it ON afterwards when it
           # had been OFF would be this task inventing policy rather than
@@ -83,13 +99,26 @@ tasks:
           # line is already on screen.
           echo "   if this dies, restore protection with:  gh api -X POST $api"
 
+          # Restored once, by whichever comes first: the explicit call after the
+          # push, or the EXIT trap when anything before it fails. A restore that
+          # fails is the task failing, whatever the push did — the protection
+          # is still off, and an exit status of 0 would say otherwise.
+          restored=0
           restore() {
-            gh api -X POST "$api" >/dev/null 2>&1 \
-              && echo "✔ enforce_admins restored on $repo@$branch" \
-              || echo "✖ COULD NOT RESTORE enforce_admins on $repo@$branch — run the line above NOW"
+            [ "$restored" = 0 ] || return 0
+            restored=1
+            if gh api -X POST "$api" >/dev/null 2>&1; then
+              echo "✔ enforce_admins restored on $repo@$branch"
+            else
+              echo "✖ COULD NOT RESTORE enforce_admins on $repo@$branch — run the line above NOW" >&2
+              return 1
+            fi
           }
           trap restore EXIT
 
           printf '▲ lifting enforce_admins on %s@%s — %s\n' "$repo" "$branch" {{.REASON | q}}
           gh api -X DELETE "$api" >/dev/null
-          git push --force-with-lease origin {{.REF | q}}:"$branch"
+          pushed=0
+          git push --force-with-lease "$remote" {{.REF | q}}:"$branch" || pushed=$?
+          restore || exit 1
+          exit "$pushed"
