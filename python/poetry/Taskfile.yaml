@@ -13,7 +13,7 @@ version: "3"
 #
 #   PROJECT_NAME           label in log lines
 #   PY                     interpreter to build the venv on (default python3)
-#   PY_SRC                 source directory for lint/format  (default src)
+#   PY_SRC                 source directories, space-separated (default src)
 #   PY_TEST_FLAGS          default "-q"
 #   POETRY_INSTALL_FLAGS   e.g. "--no-interaction --no-root"
 #
@@ -34,7 +34,7 @@ version: "3"
 # it yet — a Rust toolchain in the middle of `poetry install`. Set it per
 # project, and move it when the runtime moves.
 # ─────────────────────────────────────────────────────────────────────────────
-# shell-verbatim: _PY_TEST_CMD TEST_CMD _PY_LINT_CMD LINT_CMD _PY_FMT_CMD FORMAT_CMD _PY_TC_CMD TYPECHECK_CMD _PY_TEST_FLAGS PY_TEST_FLAGS _PY_UPDATE_FLAGS POETRY_UPDATE_FLAGS _PY_LOCK_FLAGS POETRY_LOCK_FLAGS _PY_INSTALL_FLAGS POETRY_INSTALL_FLAGS
+# shell-verbatim: _PY_TEST_CMD TEST_CMD _PY_LINT_CMD LINT_CMD _PY_FMT_CMD FORMAT_CMD _PY_TC_CMD TYPECHECK_CMD _PY_TEST_FLAGS PY_TEST_FLAGS _PY_UPDATE_FLAGS POETRY_UPDATE_FLAGS _PY_LOCK_FLAGS POETRY_LOCK_FLAGS _PY_INSTALL_FLAGS POETRY_INSTALL_FLAGS _PY_SRC_ARGS
 
 silent: true
 
@@ -42,6 +42,10 @@ vars:
   _PY_NAME: '{{.PROJECT_NAME | default "python"}}'
   _PY_BIN: '{{.PY | default "python3"}}'
   _PY_SRC: '{{.PY_SRC | default "src"}}'
+  # PY_SRC is a list of directories, space-separated (`src tests examples`).
+  # Each goes to the tool as its own quoted argument: quoted whole, the list
+  # reached ruff and mypy as one path that does not exist.
+  _PY_SRC_ARGS: '{{range (splitList " " ._PY_SRC | compact)}}{{q .}} {{end}}'
   _PY_TEST_CMD: '{{.TEST_CMD | default "pytest"}}'
   _PY_LINT_CMD: '{{.LINT_CMD | default "ruff check"}}'
   _PY_FMT_CMD: '{{.FORMAT_CMD | default "ruff format"}}'
@@ -77,7 +81,6 @@ tasks:
 
           name={{._PY_NAME | q}}
           py={{._PY_BIN | q}}
-          src={{._PY_SRC | q}}
           say() { printf '%s %s · doctor · %s\n' "$1" "$name" "$2"; }
           bad() { say '{{._PY_ERR}}' "$1" >&2; fail=1; }
 
@@ -101,8 +104,10 @@ tasks:
             [ -f poetry.lock ] \
               && say '{{._PY_OK}}' "poetry.lock is here" \
               || say '{{._PY_WARN}}' "no poetry.lock yet — run lock before install"
-            [ -d "$src" ] \
-              || say '{{._PY_WARN}}' "PY_SRC $src is not a directory — lint and format would find nothing"
+            for src in {{._PY_SRC_ARGS}}; do
+              [ -d "$src" ] \
+                || say '{{._PY_WARN}}' "PY_SRC $src is not a directory — lint and format would find nothing"
+            done
           fi
 
           say '{{._PY_OK}}' "install flags {{._PY_INSTALL_FLAGS}}"
@@ -141,7 +146,7 @@ tasks:
     deps: [install]
     cmds:
       - printf '%s %s · py · %s\n' "{{._PY_RUN}}" {{._PY_NAME | q}} {{._PY_LINT_CMD | q}}
-      - poetry run {{._PY_LINT_CMD}} {{._PY_SRC | q}}
+      - poetry run {{._PY_LINT_CMD}} {{._PY_SRC_ARGS}}
       - printf '%s %s · py · lint clean\n' "{{._PY_OK}}" {{._PY_NAME | q}}
 
   fmt:
@@ -151,7 +156,7 @@ tasks:
     aliases: [format]
     deps: [install]
     cmds:
-      - poetry run {{._PY_FMT_CMD}} {{._PY_SRC | q}}
+      - poetry run {{._PY_FMT_CMD}} {{._PY_SRC_ARGS}}
       - printf '%s %s · py · formatted\n' "{{._PY_OK}}" {{._PY_NAME | q}}
 
   typecheck:
@@ -181,7 +186,7 @@ tasks:
             exit 1
           fi
           printf '%s %s · py · %s\n' "{{._PY_RUN}}" {{._PY_NAME | q}} {{._PY_TC_CMD | q}}
-          poetry run {{._PY_TC_CMD}} {{._PY_SRC | q}}
+          poetry run {{._PY_TC_CMD}} {{._PY_SRC_ARGS}}
           printf '%s %s · py · types clean\n' "{{._PY_OK}}" {{._PY_NAME | q}}
 
   lock:
