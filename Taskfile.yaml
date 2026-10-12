@@ -47,8 +47,6 @@ vars:
     - hcloud/Taskfile.yaml
     - k8s/Taskfile.yaml
     - node/Taskfile.yaml
-    - python/poetry/Taskfile.yaml
-    - python/uv/Taskfile.yaml
     - release/Taskfile.yaml
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.

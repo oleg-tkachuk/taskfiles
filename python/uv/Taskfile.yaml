@@ -36,6 +36,7 @@ version: "3"
 # reproducible path — `uv sync` on an unchanged lock is a no-op measured in
 # milliseconds, so it is cheap to depend on.
 # ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _UV_TEST_CMD TEST_CMD _UV_LINT_CMD LINT_CMD _UV_FMT_CMD FORMAT_CMD _UV_TC_CMD TYPECHECK_CMD _UV_TEST_FLAGS PY_TEST_FLAGS _UV_LOCK_FLAGS UV_LOCK_FLAGS _UV_SYNC UV_SYNC_FLAGS _UV_PY
 
 silent: true
 
@@ -52,7 +53,7 @@ vars:
   _UV_SYNC: '{{.UV_SYNC_FLAGS | default "--group dev"}}'
   # uv picks an interpreter from .python-version or the pyproject constraint
   # unless one is named; pin PY to the version the deployed image runs.
-  _UV_PY: '{{if .PY}} --python {{.PY}}{{end}}'
+  _UV_PY: '{{if .PY}} --python {{.PY | q}}{{end}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _UV_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -76,7 +77,10 @@ tasks:
           set -u
           fail=0
 
-          say() { printf '%s %s · doctor · %s\n' "$1" '{{._UV_NAME}}' "$2"; }
+          name={{._UV_NAME | q}}
+          py={{.PY | q}}
+          src={{._UV_SRC | q}}
+          say() { printf '%s %s · doctor · %s\n' "$1" "$name" "$2"; }
           bad() { say '{{._UV_ERR}}' "$1" >&2; fail=1; }
 
           command -v uv >/dev/null 2>&1 \
@@ -86,12 +90,12 @@ tasks:
           # Unpinned is a supported answer here, unlike poetry's: uv reads
           # .python-version or the pyproject constraint when PY says nothing.
           # Printing which of the two happened is the whole point.
-          if [ -z '{{.PY}}' ]; then
+          if [ -z "$py" ]; then
             say '{{._UV_OK}}' "interpreter: uv's choice (PY unset)"
-          elif command -v '{{.PY}}' >/dev/null 2>&1; then
-            say '{{._UV_OK}}' "interpreter {{.PY}} ($('{{.PY}}' -V 2>&1))"
+          elif command -v "$py" >/dev/null 2>&1; then
+            say '{{._UV_OK}}' "interpreter $py ($("$py" -V 2>&1))"
           else
-            say '{{._UV_WARN}}' "interpreter {{.PY}} is not on PATH — uv will try to fetch it"
+            say '{{._UV_WARN}}' "interpreter $py is not on PATH — uv will try to fetch it"
           fi
 
           if [ ! -f pyproject.toml ]; then
@@ -101,8 +105,8 @@ tasks:
             [ -f uv.lock ] \
               && say '{{._UV_OK}}' "uv.lock is here" \
               || say '{{._UV_WARN}}' "no uv.lock yet — run lock before install"
-            [ -d '{{._UV_SRC}}' ] \
-              || say '{{._UV_WARN}}' "PY_SRC {{._UV_SRC}} is not a directory — lint and format would find nothing"
+            [ -d "$src" ] \
+              || say '{{._UV_WARN}}' "PY_SRC $src is not a directory — lint and format would find nothing"
           fi
 
           say '{{._UV_OK}}' "sync flags {{._UV_SYNC}}"
@@ -119,25 +123,25 @@ tasks:
       - sh: command -v uv >/dev/null
         msg: "uv is not installed — https://docs.astral.sh/uv/getting-started/installation/"
     cmds:
-      - printf '%s\n' "{{._UV_RUN}} {{._UV_NAME}} · uv · sync"
+      - printf '%s %s · uv · sync\n' "{{._UV_RUN}}" {{._UV_NAME | q}}
       - uv sync {{._UV_SYNC}}{{._UV_PY}}
-      - printf '%s\n' "{{._UV_OK}} {{._UV_NAME}} · uv · dependencies installed"
+      - printf '%s %s · uv · dependencies installed\n' "{{._UV_OK}}" {{._UV_NAME | q}}
 
   test:
     desc: "pytest"
     deps: [install]
     cmds:
-      - printf '%s\n' "{{._UV_RUN}} {{._UV_NAME}} · uv · {{._UV_TEST_CMD}}"
+      - printf '%s %s · uv · %s\n' "{{._UV_RUN}}" {{._UV_NAME | q}} {{._UV_TEST_CMD | q}}
       - uv run {{._UV_TEST_CMD}} {{._UV_TEST_FLAGS}}
-      - printf '%s\n' "{{._UV_OK}} {{._UV_NAME}} · uv · tests pass"
+      - printf '%s %s · uv · tests pass\n' "{{._UV_OK}}" {{._UV_NAME | q}}
 
   lint:
     desc: "ruff check"
     deps: [install]
     cmds:
-      - printf '%s\n' "{{._UV_RUN}} {{._UV_NAME}} · uv · {{._UV_LINT_CMD}}"
-      - uv run {{._UV_LINT_CMD}} {{._UV_SRC}}
-      - printf '%s\n' "{{._UV_OK}} {{._UV_NAME}} · uv · lint clean"
+      - printf '%s %s · uv · %s\n' "{{._UV_RUN}}" {{._UV_NAME | q}} {{._UV_LINT_CMD | q}}
+      - uv run {{._UV_LINT_CMD}} {{._UV_SRC | q}}
+      - printf '%s %s · uv · lint clean\n' "{{._UV_OK}}" {{._UV_NAME | q}}
 
   fmt:
     desc: "ruff format"
@@ -146,32 +150,32 @@ tasks:
     aliases: [format]
     deps: [install]
     cmds:
-      - uv run {{._UV_FMT_CMD}} {{._UV_SRC}}
-      - printf '%s\n' "{{._UV_OK}} {{._UV_NAME}} · uv · formatted"
+      - uv run {{._UV_FMT_CMD}} {{._UV_SRC | q}}
+      - printf '%s %s · uv · formatted\n' "{{._UV_OK}}" {{._UV_NAME | q}}
 
   typecheck:
     desc: "mypy (skipped when mypy is not a project dependency)"
     deps: [install]
     status:
-      - "! uv run python -c 'import {{._UV_TC_MOD}}' >/dev/null 2>&1"
+      - "! uv run python -c 'import importlib, sys; importlib.import_module(sys.argv[1])' {{._UV_TC_MOD | q}} >/dev/null 2>&1"
     cmds:
-      - printf '%s\n' "{{._UV_RUN}} {{._UV_NAME}} · uv · {{._UV_TC_CMD}}"
-      - uv run {{._UV_TC_CMD}} {{._UV_SRC}}
-      - printf '%s\n' "{{._UV_OK}} {{._UV_NAME}} · uv · types clean"
+      - printf '%s %s · uv · %s\n' "{{._UV_RUN}}" {{._UV_NAME | q}} {{._UV_TC_CMD | q}}
+      - uv run {{._UV_TC_CMD}} {{._UV_SRC | q}}
+      - printf '%s %s · uv · types clean\n' "{{._UV_OK}}" {{._UV_NAME | q}}
 
   lock:
     desc: "Regenerate uv.lock without changing any version"
     cmds:
       - uv lock {{._UV_LOCK_FLAGS}}
-      - printf '%s\n' "{{._UV_OK}} {{._UV_NAME}} · uv · uv.lock regenerated"
+      - printf '%s %s · uv · uv.lock regenerated\n' "{{._UV_OK}}" {{._UV_NAME | q}}
 
   deps:update:
     desc: "Bump dependencies within their pyproject constraints, then refresh the lock"
     cmds:
-      - printf '%s\n' "{{._UV_RUN}} {{._UV_NAME}} · uv · lock --upgrade"
+      - printf '%s %s · uv · lock --upgrade\n' "{{._UV_RUN}}" {{._UV_NAME | q}}
       - uv lock --upgrade {{._UV_LOCK_FLAGS}}
       - uv sync {{._UV_SYNC}}
-      - printf '%s\n' "{{._UV_OK}} {{._UV_NAME}} · uv · deps bumped — review uv.lock, then lint + test"
+      - printf '%s %s · uv · deps bumped — review uv.lock, then lint + test\n' "{{._UV_OK}}" {{._UV_NAME | q}}
 
   deps:outdated:
     desc: "Show dependencies with a newer version available (read-only)"
