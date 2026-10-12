@@ -24,6 +24,7 @@ version: "3"
 #   TAIL           backlog for `logs`                     (default 200)
 #   COMPOSE_ENGINE    default "docker compose"; e.g. "podman compose"
 # ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _CMP_CMD COMPOSE_ENGINE
 
 silent: true
 
@@ -32,7 +33,9 @@ vars:
   # The engine is an input: `docker compose` is the default because it is what
   # most machines have, but the module asks nothing of it that podman does not
   # also answer, and a consumer on podman had no way to say so.
-  _CMP_CMD: '{{.COMPOSE_ENGINE | default "docker compose"}} -f {{.COMPOSE_FILE | default "docker-compose.yaml"}}'
+  # A command, spliced into the tasks as shell: the engine is shell by
+  # contract, the file is data and is quoted here.
+  _CMP_CMD: '{{.COMPOSE_ENGINE | default "docker compose"}} -f {{.COMPOSE_FILE | default "docker-compose.yaml" | q}}'
   _CMP_NAME: '{{.PROJECT_NAME | default "stack"}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
@@ -44,46 +47,46 @@ tasks:
   up:
     desc: "Start the stack and wait until every service is healthy"
     preconditions:
-      - sh: test -f {{._CMP_FILE}}
+      - sh: test -f {{._CMP_FILE | q}}
         msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     cmds:
-      - printf '%s\n' "{{._CMP_RUN}} {{._CMP_NAME}} · compose · up ({{._CMP_FILE}})"
+      - printf '%s %s · compose · up (%s)\n' "{{._CMP_RUN}}" {{._CMP_NAME | q}} {{._CMP_FILE | q}}
       - "{{._CMP_CMD}} up -d --wait"
       - task: ps
-      - printf '%s\n' "{{._CMP_OK}} {{._CMP_NAME}} · compose · stack healthy"
+      - printf '%s %s · compose · stack healthy\n' "{{._CMP_OK}}" {{._CMP_NAME | q}}
 
   build:
     desc: "Rebuild the images the stack is composed of, then start it"
     preconditions:
-      - sh: test -f {{._CMP_FILE}}
+      - sh: test -f {{._CMP_FILE | q}}
         msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     cmds:
       - "{{._CMP_CMD}} up -d --build --wait"
-      - printf '%s\n' "{{._CMP_OK}} {{._CMP_NAME}} · compose · rebuilt and healthy"
+      - printf '%s %s · compose · rebuilt and healthy\n' "{{._CMP_OK}}" {{._CMP_NAME | q}}
 
   down:
     desc: "Stop the stack. Volumes are preserved."
     preconditions:
-      - sh: test -f {{._CMP_FILE}}
+      - sh: test -f {{._CMP_FILE | q}}
         msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     cmds:
       - "{{._CMP_CMD}} down"
-      - printf '%s\n' "{{._CMP_OK}} {{._CMP_NAME}} · compose · stopped (volumes kept)"
+      - printf '%s %s · compose · stopped (volumes kept)\n' "{{._CMP_OK}}" {{._CMP_NAME | q}}
 
   reset:
     desc: "Stop the stack and DELETE its volumes — local data is lost"
     preconditions:
-      - sh: test -f {{._CMP_FILE}}
+      - sh: test -f {{._CMP_FILE | q}}
         msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     prompt: "Delete every volume of {{._CMP_FILE}}? Local database contents are lost."
     cmds:
       - "{{._CMP_CMD}} down -v"
-      - printf '%s\n' "{{._CMP_OK}} {{._CMP_NAME}} · compose · torn down, volumes dropped"
+      - printf '%s %s · compose · torn down, volumes dropped\n' "{{._CMP_OK}}" {{._CMP_NAME | q}}
 
   ps:
     desc: "Show what is running"
     preconditions:
-      - sh: test -f {{._CMP_FILE}}
+      - sh: test -f {{._CMP_FILE | q}}
         msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     cmds:
       - "{{._CMP_CMD}} ps"
@@ -92,7 +95,7 @@ tasks:
     desc: "Tail the stack's logs (SERVICE=... for one of them)"
     interactive: true
     preconditions:
-      - sh: test -f {{._CMP_FILE}}
+      - sh: test -f {{._CMP_FILE | q}}
         msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     cmds:
-      - "{{._CMP_CMD}} logs -f --tail={{.TAIL | default \"200\"}} {{.SERVICE | default \"\"}}"
+      - "{{._CMP_CMD}} logs -f --tail={{.TAIL | default \"200\" | q}} {{if .SERVICE}}{{.SERVICE | q}}{{end}}"
