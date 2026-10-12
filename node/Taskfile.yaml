@@ -35,10 +35,15 @@ version: "3"
 #   SCRIPT_GENERATE   default generate
 #   LINT_FIX_FLAGS    what `lint:fix` appends       (default --fix)
 #
+# PM, PM_EXEC, PM_INSTALL, E2E_SETUP and LINT_FIX_FLAGS are shell fragments by
+# contract (a command, or flags), so they reach the shell word-split. Every
+# other input is data and is quoted.
+#
 # Every task is a thin wrapper over a package.json script, which keeps the
 # whole developer surface visible in `task --list-all` instead of split across
 # two tools.
 # ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _NODE_PM PM _NODE_EXEC PM_EXEC PM_INSTALL _NODE_E2E_SETUP E2E_SETUP _NODE_FIX LINT_FIX_FLAGS
 
 silent: true
 
@@ -82,37 +87,37 @@ tasks:
       - node_modules/.modules.yaml
       - node_modules/.package-lock.json
     cmds:
-      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_PM}} install"
+      - printf '%s %s · node · %s install\n' "{{._NODE_RUN}}" {{._NODE_NAME | q}} {{._NODE_PM | q}}
       - >-
         {{if .PM_INSTALL}}{{.PM_INSTALL}}{{else if eq ._NODE_PM "npm"}}npm ci{{else}}{{._NODE_PM}} install --frozen-lockfile{{end}}
-      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · dependencies installed"
+      - printf '%s %s · node · dependencies installed\n' "{{._NODE_OK}}" {{._NODE_NAME | q}}
 
   dev:
     desc: "Start the dev server"
     interactive: true
     cmds:
-      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_PM}} run {{._NODE_DEV}}"
-      - "{{._NODE_PM}} run {{._NODE_DEV}}"
+      - printf '%s %s · node · %s run %s\n' "{{._NODE_RUN}}" {{._NODE_NAME | q}} {{._NODE_PM | q}} {{._NODE_DEV | q}}
+      - '{{._NODE_PM}} run {{._NODE_DEV | q}}'
 
   build:
     desc: "Build the production bundle"
     cmds:
-      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_PM}} run {{._NODE_BUILD}}"
-      - "{{._NODE_PM}} run {{._NODE_BUILD}}"
-      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · bundle built"
+      - printf '%s %s · node · %s run %s\n' "{{._NODE_RUN}}" {{._NODE_NAME | q}} {{._NODE_PM | q}} {{._NODE_BUILD | q}}
+      - '{{._NODE_PM}} run {{._NODE_BUILD | q}}'
+      - printf '%s %s · node · bundle built\n' "{{._NODE_OK}}" {{._NODE_NAME | q}}
 
   lint:
     desc: "Run the lint script (read-only)"
     cmds:
-      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_LINT}}"
-      - "{{._NODE_PM}} run {{._NODE_LINT}}"
-      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · lint clean"
+      - printf '%s %s · node · %s\n' "{{._NODE_RUN}}" {{._NODE_NAME | q}} {{._NODE_LINT | q}}
+      - '{{._NODE_PM}} run {{._NODE_LINT | q}}'
+      - printf '%s %s · node · lint clean\n' "{{._NODE_OK}}" {{._NODE_NAME | q}}
 
   lint:fix:
     desc: "Run the lint script with --fix"
     cmds:
-      - "{{._NODE_PM}} run {{._NODE_LINT}} {{._NODE_FIX}}"
-      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · lint fixed"
+      - "{{._NODE_PM}} run {{._NODE_LINT | q}} {{._NODE_FIX}}"
+      - printf '%s %s · node · lint fixed\n' "{{._NODE_OK}}" {{._NODE_NAME | q}}
 
   typecheck:
     desc: "Run the typecheck script, skipped where the project declares none"
@@ -121,33 +126,34 @@ tasks:
       # `pnpm run` on a missing script is an error, so ask package.json first.
       - cmd: |-
           set -eu
-          if ! node -e 'process.exit(require("./package.json").scripts?.["{{._NODE_TYPECHECK}}"] ? 0 : 1)' 2>/dev/null; then
-            printf '%s\n' "{{._NODE_SKIP}} {{._NODE_NAME}} · node · no {{._NODE_TYPECHECK}} script — skipped"
+          script={{._NODE_TYPECHECK | q}}
+          if ! node -e 'process.exit(require("./package.json").scripts?.[process.argv[1]] ? 0 : 1)' "$script" 2>/dev/null; then
+            printf '%s %s · node · no %s script — skipped\n' "{{._NODE_SKIP}}" {{._NODE_NAME | q}} {{._NODE_TYPECHECK | q}}
             exit 0
           fi
-          printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_TYPECHECK}}"
-          {{._NODE_PM}} run {{._NODE_TYPECHECK}}
-          printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · types check"
+          printf '%s %s · node · %s\n' "{{._NODE_RUN}}" {{._NODE_NAME | q}} {{._NODE_TYPECHECK | q}}
+          {{._NODE_PM}} run "$script"
+          printf '%s %s · node · types check\n' "{{._NODE_OK}}" {{._NODE_NAME | q}}
 
   test:
     desc: "Run the test script"
     cmds:
-      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_TEST}}"
-      - "{{._NODE_PM}} run {{._NODE_TEST}}"
-      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · tests pass"
+      - printf '%s %s · node · %s\n' "{{._NODE_RUN}}" {{._NODE_NAME | q}} {{._NODE_TEST | q}}
+      - '{{._NODE_PM}} run {{._NODE_TEST | q}}'
+      - printf '%s %s · node · tests pass\n' "{{._NODE_OK}}" {{._NODE_NAME | q}}
 
   test:e2e:
     desc: "Run the end-to-end suite, preparing its browser first"
     cmds:
-      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_E2E}}"
+      - printf '%s %s · node · %s\n' "{{._NODE_RUN}}" {{._NODE_NAME | q}} {{._NODE_E2E | q}}
       # Playwright needs its browser downloaded before the first run and says so
       # only by failing. Another runner prepares differently, or not at all, so
       # the step is an input — set E2E_SETUP to "none" when there is nothing to
       # do. Not "": `default` fires on an empty value too, so an empty string
       # would silently give back the default rather than switching it off.
       - '{{if ne ._NODE_E2E_SETUP "none"}}{{._NODE_PM}} {{._NODE_E2E_SETUP}} >/dev/null{{end}}'
-      - "{{._NODE_PM}} run {{._NODE_E2E}}"
-      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · e2e pass"
+      - '{{._NODE_PM}} run {{._NODE_E2E | q}}'
+      - printf '%s %s · node · e2e pass\n' "{{._NODE_OK}}" {{._NODE_NAME | q}}
 
   verify:
     desc: "Lint then build — the pre-push gate"
@@ -173,13 +179,15 @@ tasks:
           set -u
           fail=0
 
-          say() { printf '%s %s · doctor · %s\n' "$1" '{{._NODE_NAME}}' "$2"; }
+          name={{._NODE_NAME | q}}
+          say() { printf '%s %s · doctor · %s\n' "$1" "$name" "$2"; }
           bad() { say '{{._NODE_ERR}}' "$1" >&2; fail=1; }
 
           # ─── the manager ──────────────────────────────────────────────────
-          pm={{._NODE_PM}}
+          pm={{._NODE_PM | q}}
+          pm_exec={{._NODE_EXEC | q}}
           if command -v "$pm" >/dev/null 2>&1; then
-            say '{{._NODE_OK}}' "package manager $pm ({{._NODE_EXEC}} for one-off tools)"
+            say '{{._NODE_OK}}' "package manager $pm ($pm_exec for one-off tools)"
           else
             bad "package manager $pm is not on PATH"
           fi
@@ -216,6 +224,9 @@ tasks:
             # others — flint-chart ships `test` and `typecheck` and calls only
             # `install`. What is worth saying is which task would fail if it
             # were called, which is not obvious from the script name alone.
+            build={{._NODE_BUILD | q}}
+            lint={{._NODE_LINT | q}}
+            test={{._NODE_TEST | q}}
             if ! command -v node >/dev/null 2>&1; then
               say '{{._NODE_WARN}}' "node is not on PATH — package.json scripts not checked"
             else
@@ -228,12 +239,12 @@ tasks:
                       ? process.argv[i]
                       : process.argv[i] + " (task " + process.argv[i + 1] + ")");
                 if (want.length) console.log(want.join(", "));
-              ' '{{._NODE_BUILD}}' build '{{._NODE_LINT}}' lint '{{._NODE_TEST}}' test 2>/dev/null) || {
+              ' "$build" build "$lint" lint "$test" test 2>/dev/null) || {
                 bad "package.json does not parse"; missing=""; }
               if [ -n "$missing" ]; then
                 say '{{._NODE_WARN}}' "no script for: $missing — those tasks would fail"
               else
-                say '{{._NODE_OK}}' "scripts {{._NODE_BUILD}}, {{._NODE_LINT}}, {{._NODE_TEST}} are declared"
+                say '{{._NODE_OK}}' "scripts $build, $lint, $test are declared"
               fi
             fi
           fi
@@ -244,9 +255,9 @@ tasks:
   generate:
     desc: "Run the codegen script"
     cmds:
-      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_GEN}}"
-      - "{{._NODE_PM}} run {{._NODE_GEN}}"
-      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · generated"
+      - printf '%s %s · node · %s\n' "{{._NODE_RUN}}" {{._NODE_NAME | q}} {{._NODE_GEN | q}}
+      - '{{._NODE_PM}} run {{._NODE_GEN | q}}'
+      - printf '%s %s · node · generated\n' "{{._NODE_OK}}" {{._NODE_NAME | q}}
 
   deps:update:
     desc: "Bump dependencies to the latest minor/patch (no majors), then reinstall"
@@ -257,13 +268,13 @@ tasks:
       # inside its own tree builder with a message naming neither the manager
       # nor the component that chose it. The log said `npm-check-updates` and
       # nothing else. Now it says who ran it.
-      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_EXEC}} npm-check-updates --target minor"
+      - printf '%s %s · node · %s npm-check-updates --target minor\n' "{{._NODE_RUN}}" {{._NODE_NAME | q}} {{._NODE_EXEC | q}}
       # `dlx` is pnpm's; npm spells the same thing `npx`. Hardcoding one of
       # them made this task fail with "Unknown command: dlx" on every npm repo.
       - "{{._NODE_EXEC}} npm-check-updates --target minor --upgrade"
-      - printf '%s\n' "{{._NODE_RUN}} {{._NODE_NAME}} · node · {{._NODE_PM}} install"
+      - printf '%s %s · node · %s install\n' "{{._NODE_RUN}}" {{._NODE_NAME | q}} {{._NODE_PM | q}}
       - "{{._NODE_PM}} install"
-      - printf '%s\n' "{{._NODE_OK}} {{._NODE_NAME}} · node · deps bumped — review the lockfile diff, then verify"
+      - printf '%s %s · node · deps bumped — review the lockfile diff, then verify\n' "{{._NODE_OK}}" {{._NODE_NAME | q}}
 
   deps:outdated:
     desc: "Show dependencies with a newer version available (read-only)"
