@@ -54,7 +54,6 @@ vars:
     - k8s/Taskfile.yaml
     - monorepo/Taskfile.yaml
     - node/Taskfile.yaml
-    - pnpm/Taskfile.yaml
     - python/poetry/Taskfile.yaml
     - python/uv/Taskfile.yaml
     - release/Taskfile.yaml

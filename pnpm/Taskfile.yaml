@@ -202,7 +202,7 @@ tasks:
             exit 1
           fi
 
-          spec='{{.SPEC}}'
+          spec={{.SPEC | q}}
           [ "$spec" = "current-major" ] && spec=${current%%.*}
           target=$(npm view "pnpm@$spec" version --json 2>/dev/null | node -p 'const v=JSON.parse(require("fs").readFileSync(0,"utf8"));Array.isArray(v)?v[v.length-1]:v' 2>/dev/null)
           case "$target" in
