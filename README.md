@@ -119,6 +119,11 @@ value is itself a template. So `TASKLIB: '...//%s?ref={{.V | default "v2.2.0"}}'
 does not resolve — it reaches git as a literal ref and fails. The version is a
 constant in the file, which is what pinning means anyway.
 
+`task lint` is the whole gate, and it includes the behaviour tests in
+`tests/<module>.test.sh`: each runs a module's tasks against shims for the tools
+it calls and asserts on the exit status, the output and the argv the shims saw.
+A fix to a module comes with a case there that fails without it.
+
 `task surface` prints every module's tasks from this checkout, which is the one
 view a consumer cannot get: `task --list-all` there shows what that repository
 included, not what the library offers.
