@@ -35,7 +35,10 @@ version: "3"
 #                  argo-cd-argocd-server wearing the label argocd-server.
 #   ARGOCD_PORT    local port for server:port-forward     (default 8443)
 #   K8S_CONTEXT    pin a cluster                          (default: current)
+#
+# APP_PREFIX is matched as a literal prefix, not a regular expression.
 # ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _ARGO_KUBECTL
 
 silent: true
 
@@ -48,7 +51,9 @@ vars:
   # saw the real value, and `grep -E '^'` then matched every application in
   # the namespace. The tasks below read .APP_PREFIX directly, which works for
   # a value passed at include time and at call time alike.
-  _ARGO_KUBECTL: 'kubectl{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT}}{{end}}'
+  # A command fragment, spliced into the tasks as shell: the context inside it
+  # is quoted here, where it is built.
+  _ARGO_KUBECTL: 'kubectl{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT | q}}{{end}}'
   _ARGO_SERVER: '{{.ARGOCD_SERVER | default "argocd-server"}}'
   _ARGO_LABEL: '{{.ARGOCD_SERVER_LABEL | default "argocd-server"}}'
   _ARGO_PORT: '{{.ARGOCD_PORT | default "8443"}}'
@@ -68,7 +73,7 @@ tasks:
       # `requires` only asserts the var was set; an empty value passes it and
       # then matches everything. This is the one place where "no filter" and
       # "filter that matches all" have to be told apart.
-      - sh: '[ -n "{{.APP_PREFIX}}" ]'
+      - sh: '[ -n {{.APP_PREFIX | q}} ]'
         msg: |-
           APP_PREFIX is empty — refusing to hard-refresh.
           An empty prefix matches EVERY application in the namespace,
@@ -90,16 +95,18 @@ tasks:
         sh: |-
           {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1 || exit 0
           set -eu -o pipefail
-          {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} get applications.argoproj.io \
+          {{._ARGO_KUBECTL}} -n {{._ARGO_NS | q}} get applications.argoproj.io \
             -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
-            | { grep -E '^{{.APP_PREFIX}}' || true; }
+            | prefix={{.APP_PREFIX | q}} awk 'index($0, ENVIRON["prefix"]) == 1'
     cmds:
       - for: { var: _ARGO_APPS }
         cmd: >-
-          {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} patch application.argoproj.io {{.ITEM}} --type merge
+          {{._ARGO_KUBECTL}} -n {{._ARGO_NS | q}} patch application.argoproj.io {{.ITEM | q}} --type merge
           -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' >/dev/null
-          && printf '%s\n' "{{._ARGO_OK}} argocd · hard-refreshed {{.ITEM}}"
-      - '{{if not ._ARGO_APPS}}printf "%s\n" "{{._ARGO_SKIP}} argocd · no application matches {{.APP_PREFIX}}* in {{._ARGO_NS}}"{{end}}'
+          && printf '%s argocd · hard-refreshed %s\n' "{{._ARGO_OK}}" {{.ITEM | q}}
+      - >-
+        {{if not ._ARGO_APPS}}printf '%s argocd · no application matches %s* in %s\n'
+        "{{._ARGO_SKIP}}" {{.APP_PREFIX | q}} {{._ARGO_NS | q}}{{end}}
 
   list:
     desc: "Show the sync + health state of every application matching APP_PREFIX"
@@ -107,9 +114,10 @@ tasks:
       - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
     cmds:
       - >-
-        {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} get applications.argoproj.io
+        {{._ARGO_KUBECTL}} -n {{._ARGO_NS | q}} get applications.argoproj.io
         -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status
-        {{if .APP_PREFIX}}| grep -E '^(NAME|{{.APP_PREFIX}})'{{end}}
+        {{if .APP_PREFIX}}| prefix={{.APP_PREFIX | q}}
+        awk 'index($0, "NAME") == 1 || index($0, ENVIRON["prefix"]) == 1'{{end}}
 
   # ═══ the server itself ══════════════════════════════════════════════════════
   #
@@ -123,10 +131,10 @@ tasks:
     status:
       - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
     cmds:
-      - printf '%s\n' "{{._ARGO_RUN}} argocd · server · https://localhost:{{._ARGO_PORT}}"
+      - printf '%s argocd · server · https://localhost:%s\n' "{{._ARGO_RUN}}" {{._ARGO_PORT | q}}
       - >-
-        {{._ARGO_KUBECTL}} -n {{._ARGO_NS}}
-        port-forward svc/{{._ARGO_SERVER}} {{._ARGO_PORT}}:443
+        {{._ARGO_KUBECTL}} -n {{._ARGO_NS | q}}
+        port-forward svc/{{._ARGO_SERVER | q}} {{._ARGO_PORT | q}}:443
 
   server:password:
     desc: "Print the initial admin password"
@@ -136,7 +144,7 @@ tasks:
     # is an answer rather than a failure.
     cmds:
       - cmd: |-
-          pw=$({{._ARGO_KUBECTL}} -n {{._ARGO_NS}} get secret argocd-initial-admin-secret \
+          pw=$({{._ARGO_KUBECTL}} -n {{._ARGO_NS | q}} get secret argocd-initial-admin-secret \
                  -o jsonpath='{.data.password}' 2>/dev/null | base64 -d) || true
           if [ -n "$pw" ]; then
             printf '%s\n' "$pw"
@@ -155,7 +163,7 @@ tasks:
       # in a task, and leaves the hash empty — after which the patch below
       # succeeded and wrote an empty admin.password, locking admin out of a
       # server this then restarted.
-      - sh: '[ -n "{{.ARGOCD_ADMIN_PASSWORD}}" ]'
+      - sh: '[ -n {{.ARGOCD_ADMIN_PASSWORD | q}} ]'
         msg: |-
           ARGOCD_ADMIN_PASSWORD is empty — refusing to set it.
           An empty value does not clear the password, it writes one no login
@@ -176,7 +184,7 @@ tasks:
           set -eu
           hash=$(argocd account bcrypt --password {{.ARGOCD_ADMIN_PASSWORD | q}})
           [ -n "$hash" ]
-          {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} patch secret argocd-secret \
+          {{._ARGO_KUBECTL}} -n {{._ARGO_NS | q}} patch secret argocd-secret \
             -p "{\"stringData\":{\"admin.password\":\"${hash}\",\"admin.passwordMtime\":\"$(date -u +%FT%TZ)\"}}" >/dev/null
       - task: server:restart
       - printf '%s\n' "{{._ARGO_OK}} argocd · server · admin password set"
@@ -186,8 +194,8 @@ tasks:
     status:
       - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
     cmds:
-      - "{{._ARGO_KUBECTL}} -n {{._ARGO_NS}} rollout restart deploy/{{._ARGO_SERVER}} >/dev/null"
-      - "{{._ARGO_KUBECTL}} -n {{._ARGO_NS}} rollout status deploy/{{._ARGO_SERVER}} --timeout={{.ROLLOUT_TIMEOUT | default \"2m\"}}"
+      - "{{._ARGO_KUBECTL}} -n {{._ARGO_NS | q}} rollout restart deploy/{{._ARGO_SERVER | q}} >/dev/null"
+      - "{{._ARGO_KUBECTL}} -n {{._ARGO_NS | q}} rollout status deploy/{{._ARGO_SERVER | q}} --timeout={{.ROLLOUT_TIMEOUT | default \"2m\" | q}}"
       - printf '%s\n' "{{._ARGO_OK}} argocd · server · rolled"
 
   server:status:
@@ -195,7 +203,7 @@ tasks:
     status:
       - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
     cmds:
-      - "{{._ARGO_KUBECTL}} -n {{._ARGO_NS}} get pods -o wide"
+      - "{{._ARGO_KUBECTL}} -n {{._ARGO_NS | q}} get pods -o wide"
 
   server:logs:
     desc: "Tail the Argo server logs (Ctrl-C to stop)"
@@ -203,5 +211,5 @@ tasks:
       - "! {{._ARGO_KUBECTL}} version --request-timeout=3s >/dev/null 2>&1"
     cmds:
       - >-
-        {{._ARGO_KUBECTL}} -n {{._ARGO_NS}} logs -l app.kubernetes.io/name={{._ARGO_LABEL}}
-        -f --tail={{.LOG_TAIL | default "100"}}
+        {{._ARGO_KUBECTL}} -n {{._ARGO_NS | q}} logs -l app.kubernetes.io/name={{._ARGO_LABEL | q}}
+        -f --tail={{.LOG_TAIL | default "100" | q}}

@@ -41,7 +41,6 @@ vars:
   # change that quotes it; the gate covers every other module, and any new
   # one, from the start.
   QUOTING_PENDING:
-    - argocd/Taskfile.yaml
     - cosign/Taskfile.yaml
     - go/Taskfile.yaml
     - k8s/Taskfile.yaml
