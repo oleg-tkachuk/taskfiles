@@ -34,7 +34,12 @@ vars:
   _RT_SVC: '{{.PROJECT_NAME | default "service"}}'
   _RT_CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
   _RT_K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
-  _RT_CTX: '{{.K8S_CONTEXT | default "k3d-k3s-default"}}'
+  # The cluster the image is imported into and the context helm installs to
+  # are one choice, not two: k3d names a cluster's context k3d-<cluster>. With
+  # the context fixed at k3d-k3s-default, K3D_CLUSTER moved the image to one
+  # cluster while the chart went to another. "k3s-default" is k3d's own default.
+  _RT_CLUSTER: '{{.K3D_CLUSTER | default "k3s-default"}}'
+  _RT_CTX: '{{.K8S_CONTEXT | default (printf "k3d-%s" ._RT_CLUSTER)}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _RT_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -47,8 +52,8 @@ tasks:
     preconditions:
       - sh: command -v k3d >/dev/null
         msg: "k3d is not installed — https://k3d.io/stable/"
-      - sh: k3d cluster list -o json 2>/dev/null | grep -q '"name"'
-        msg: "no k3d cluster exists — `k3d cluster create`"
+      - sh: k3d cluster get {{._RT_CLUSTER | q}} >/dev/null 2>&1
+        msg: "no k3d cluster named {{._RT_CLUSTER}} — `k3d cluster create {{._RT_CLUSTER}}`, or set K3D_CLUSTER"
     cmds:
       - printf '%s %s · local · k3d cluster present\n' "{{._RT_OK}}" {{._RT_SVC | q}}
 
@@ -57,7 +62,7 @@ tasks:
     deps: [check]
     cmds:
       - printf '%s %s · local · k3d image import %s:%s\n' "{{._RT_RUN}}" {{._RT_SVC | q}} {{._REL_IMAGE | q}} {{._REL_VERSION | q}}
-      - k3d image import {{._REL_IMAGE | q}}:{{._REL_VERSION | q}} {{if .K3D_CLUSTER}}--cluster {{.K3D_CLUSTER | q}}{{end}}
+      - k3d image import {{._REL_IMAGE | q}}:{{._REL_VERSION | q}} --cluster {{._RT_CLUSTER | q}}
       - printf '%s %s · local · image inside k3d\n' "{{._RT_OK}}" {{._RT_SVC | q}}
 
   install:

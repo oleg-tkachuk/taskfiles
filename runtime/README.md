@@ -51,10 +51,10 @@ The same vars `release` reads — `PROJECT_NAME`, `REGISTRY`, `IMAGE_NAMESPACE`,
 
 | Var | Default | Meaning |
 |---|---|---|
-| `K8S_CONTEXT` | the runtime's usual name | `orbstack`, `minikube`, `kind-kind`, ... |
+| `K8S_CONTEXT` | the runtime's usual name | `orbstack`, `minikube`; for kind and k3d, the named cluster's context — `kind-<KIND_CLUSTER>`, `k3d-<K3D_CLUSTER>` |
 | `VALUES` | — | a values file for `install` |
 | `HELM_UPGRADE_FLAGS` | — | extra flags for `install` |
-| `KIND_CLUSTER` / `K3D_CLUSTER` | — | when the cluster is not the default one |
+| `KIND_CLUSTER` / `K3D_CLUSTER` | `kind` / `k3s-default` | the cluster the image is loaded into and the chart installed on; `check` fails when it does not exist |
 
 ## Examples
 

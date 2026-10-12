@@ -34,7 +34,12 @@ vars:
   _RT_SVC: '{{.PROJECT_NAME | default "service"}}'
   _RT_CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
   _RT_K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
-  _RT_CTX: '{{.K8S_CONTEXT | default "kind-kind"}}'
+  # The cluster the image is loaded into and the context helm installs to are
+  # one choice, not two: kind names a cluster's context kind-<cluster>. With
+  # the context fixed at kind-kind, KIND_CLUSTER moved the image to one
+  # cluster while the chart went to another. "kind" is kind's own default.
+  _RT_CLUSTER: '{{.KIND_CLUSTER | default "kind"}}'
+  _RT_CTX: '{{.K8S_CONTEXT | default (printf "kind-%s" ._RT_CLUSTER)}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _RT_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -47,8 +52,8 @@ tasks:
     preconditions:
       - sh: command -v kind >/dev/null
         msg: "kind is not installed — https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
-      - sh: kind get clusters 2>/dev/null | grep -q .
-        msg: "no kind cluster exists — `kind create cluster`"
+      - sh: kind get clusters 2>/dev/null | grep -qxF -- {{._RT_CLUSTER | q}}
+        msg: "no kind cluster named {{._RT_CLUSTER}} — `kind create cluster --name {{._RT_CLUSTER}}`, or set KIND_CLUSTER"
     cmds:
       - printf '%s %s · local · kind cluster present\n' "{{._RT_OK}}" {{._RT_SVC | q}}
 
@@ -59,7 +64,7 @@ tasks:
     deps: [check]
     cmds:
       - printf '%s %s · local · kind load docker-image %s:%s\n' "{{._RT_RUN}}" {{._RT_SVC | q}} {{._REL_IMAGE | q}} {{._REL_VERSION | q}}
-      - kind load docker-image {{._REL_IMAGE | q}}:{{._REL_VERSION | q}} {{if .KIND_CLUSTER}}--name {{.KIND_CLUSTER | q}}{{end}}
+      - kind load docker-image {{._REL_IMAGE | q}}:{{._REL_VERSION | q}} --name {{._RT_CLUSTER | q}}
       - printf '%s %s · local · image inside kind\n' "{{._RT_OK}}" {{._RT_SVC | q}}
 
   install:
