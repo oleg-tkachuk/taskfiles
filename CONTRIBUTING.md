@@ -50,6 +50,13 @@ Every module's variables are `_PREFIX_`-scoped internally (see
 [Variable scoping](README.md#variable-scoping)) — a bare name declared inside
 a module would shadow whatever the consumer set.
 
+A value that reaches a shell goes through `q`: `{{.NAME | q}}`, outside any
+quotes, or into a shell variable once (`name={{.NAME | q}}`) and `"$name"`
+after that. Inside double quotes a `$(...)` in the value would run. An input
+that is shell by contract — a command, verbatim flags — is declared on one
+line, `# shell-verbatim: _KUBECTL FLAGS`, and only those may go in unquoted.
+`check:quoting` holds every module to this.
+
 ## Commit messages
 
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/),
