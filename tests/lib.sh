@@ -8,6 +8,12 @@
 
 set -euo pipefail
 
+# A git hook runs `task lint` with GIT_DIR, GIT_INDEX_FILE and friends pointing
+# at this repository. Inherited, they make every git call in a fixture act on
+# the real repository instead of the consumer's: a `git init` there rewrites
+# its config. So every one of them is cleared before a test touches git.
+while IFS= read -r var; do unset "$var"; done < <(git rev-parse --local-env-vars)
+
 TESTS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # LIB_ROOT may point elsewhere, to run a case against an older module.
 LIB_ROOT=${LIB_ROOT:-$(cd "$TESTS_DIR/.." && pwd)}
