@@ -50,7 +50,6 @@ vars:
     - hcloud/Taskfile.yaml
     - helm/Taskfile.yaml
     - k8s/Taskfile.yaml
-    - monorepo/Taskfile.yaml
     - node/Taskfile.yaml
     - python/poetry/Taskfile.yaml
     - python/uv/Taskfile.yaml
