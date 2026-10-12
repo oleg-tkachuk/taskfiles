@@ -605,6 +605,38 @@ jobs:
           grep -qx 'my ns' argv || { echo "✖ the namespace did not arrive as one argument" >&2; cat argv >&2; exit 1; }
           echo "✔ helm passes the context and namespace as single arguments"
 
+      - name: 'Verify: runtime install passes every value as one argument'
+        if: needs.changes.outputs.smoke_skippable != 'true'
+        # kind as the representative: the runtime variants share this shape,
+        # and check:runtime-install holds them to it. Shims for kind and helm;
+        # the namespace and values path carry spaces, the service name a
+        # command substitution that used to run, and HELM_UPGRADE_FLAGS is
+        # shell by contract and must arrive as flags.
+        run: |
+          set -euo pipefail
+          W="$RUNNER_TEMP/runtimegate"
+          mkdir -p "$W/shims"
+          # shellcheck disable=SC2016 # the shims' own $1 and $@, written literally
+          printf '#!/bin/sh\ncase "$1" in get) echo kind;; esac\nexit 0\n' > "$W/shims/kind"
+          # shellcheck disable=SC2016 # the shim's own $@, written literally
+          printf '#!/bin/sh\nprintf "%%s\\n" "$@" > "%s/argv"\n' "$W" > "$W/shims/helm"
+          chmod +x "$W/shims/kind" "$W/shims/helm"
+          cd "$W"
+          cat > Taskfile.yaml <<YAML
+          version: "3"
+          includes:
+            rt: { taskfile: '$GITHUB_WORKSPACE/taskfiles/runtime/kind', dir: . }
+          tasks: {}
+          YAML
+          # shellcheck disable=SC2016 # the $(...) is the payload, passed literally
+          PATH="$W/shims:$PATH" task rt:install 'PROJECT_NAME=svc$(touch substituted)' 'K8S_NAMESPACE=my ns' \
+            'VALUES=my values.yaml' 'HELM_UPGRADE_FLAGS=--wait --atomic' _REL_IMAGE=img _REL_VERSION=1.2.3
+          test ! -e substituted || { echo "✖ a command substitution in PROJECT_NAME ran" >&2; exit 1; }
+          for arg in 'my ns' 'my values.yaml' --wait --atomic 'image.tag=1.2.3'; do
+            grep -qxF -- "$arg" argv || { echo "✖ helm did not get '$arg' as one argument" >&2; cat argv >&2; exit 1; }
+          done
+          echo "✔ runtime install passes every value as one argument"
+
       - name: 'Verify: auth passes its flags through and refuses a TTL that is not a number'
         if: needs.changes.outputs.smoke_skippable != 'true'
         # step is not installed here; a shim records its argv. STEP_FLAGS is

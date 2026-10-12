@@ -21,6 +21,7 @@ version: "3"
 # alongside `release`, not instead of it: `image:load` moves what
 # `release:image:build` produced.
 # ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: HELM_UPGRADE_FLAGS
 
 silent: true
 
@@ -49,7 +50,7 @@ tasks:
       - sh: kind get clusters 2>/dev/null | grep -q .
         msg: "no kind cluster exists — `kind create cluster`"
     cmds:
-      - printf '%s\n' "{{._RT_OK}} {{._RT_SVC}} · local · kind cluster present"
+      - printf '%s %s · local · kind cluster present\n' "{{._RT_OK}}" {{._RT_SVC | q}}
 
   image:load:
     desc: "Load the built image into the kind cluster's nodes"
@@ -57,9 +58,9 @@ tasks:
     # host's daemon is invisible until it is imported.
     deps: [check]
     cmds:
-      - printf '%s\n' "{{._RT_RUN}} {{._RT_SVC}} · local · kind load docker-image {{._REL_IMAGE}}:{{._REL_VERSION}}"
-      - kind load docker-image {{._REL_IMAGE}}:{{._REL_VERSION}} {{if .KIND_CLUSTER}}--name {{.KIND_CLUSTER}}{{end}}
-      - printf '%s\n' "{{._RT_OK}} {{._RT_SVC}} · local · image inside kind"
+      - printf '%s %s · local · kind load docker-image %s:%s\n' "{{._RT_RUN}}" {{._RT_SVC | q}} {{._REL_IMAGE | q}} {{._REL_VERSION | q}}
+      - kind load docker-image {{._REL_IMAGE | q}}:{{._REL_VERSION | q}} {{if .KIND_CLUSTER}}--name {{.KIND_CLUSTER | q}}{{end}}
+      - printf '%s %s · local · image inside kind\n' "{{._RT_OK}}" {{._RT_SVC | q}}
 
   install:
     desc: "helm upgrade --install from the chart directory, running the local image"
@@ -71,13 +72,13 @@ tasks:
         msg: "helm is not installed — https://helm.sh/docs/intro/install/"
     cmds:
       - task: image:load
-      - printf '%s\n' "{{._RT_RUN}} {{._RT_SVC}} · local · helm upgrade --install into {{._RT_CTX}}/{{._RT_K8S_NS}}"
+      - printf '%s %s · local · helm upgrade --install into %s/%s\n' "{{._RT_RUN}}" {{._RT_SVC | q}} {{._RT_CTX | q}} {{._RT_K8S_NS | q}}
       - >-
-        helm upgrade --install {{._RT_SVC}} {{._RT_CHART_DIR}}
-        --kube-context {{._RT_CTX}}
-        --namespace {{._RT_K8S_NS}} --create-namespace
-        --set image.tag={{._REL_VERSION}}
+        helm upgrade --install {{._RT_SVC | q}} {{._RT_CHART_DIR | q}}
+        --kube-context {{._RT_CTX | q}}
+        --namespace {{._RT_K8S_NS | q}} --create-namespace
+        --set image.tag={{._REL_VERSION | q}}
         --set image.pullPolicy=IfNotPresent
-        {{.HELM_UPGRADE_FLAGS | default ""}}
-        {{if .VALUES}}--values {{.VALUES}}{{end}}
-      - printf '%s\n' "{{._RT_OK}} {{._RT_SVC}} · local · {{._REL_VERSION}} installed into {{._RT_CTX}}"
+        {{.HELM_UPGRADE_FLAGS}}
+        {{if .VALUES}}--values {{.VALUES | q}}{{end}}
+      - printf '%s %s · local · %s installed into %s\n' "{{._RT_OK}}" {{._RT_SVC | q}} {{._REL_VERSION | q}} {{._RT_CTX | q}}
