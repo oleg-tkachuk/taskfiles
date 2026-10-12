@@ -42,7 +42,6 @@ vars:
   # one, from the start.
   QUOTING_PENDING:
     - argocd/Taskfile.yaml
-    - checkov/Taskfile.yaml
     - codegen/Taskfile.yaml
     - compose/Taskfile.yaml
     - cosign/Taskfile.yaml
