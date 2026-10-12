@@ -73,6 +73,7 @@ version: "3"
 # input is read as `{{.NAME | default ...}}` and every derived value is prefixed
 # `_HC_`.
 # ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: HCLOUD_TOKEN_CMD HCLOUD_SELECTOR_CMD CLI_ARGS _HC_TOKEN _HC_SELECTOR _HC_EACH_SERVER _HC_FAN_OUT _HC_ONE_SERVER _HC_PROTECTION_ARGS
 
 silent: true
 
@@ -84,6 +85,8 @@ vars:
   # rebuild replaces the disk in place, which loses everything on it without
   # ever deleting the server.
   _HC_PROTECTION: '{{.HCLOUD_PROTECTION | default "delete rebuild"}}'
+  # The levels as separate, quoted arguments.
+  _HC_PROTECTION_ARGS: '{{range (regexSplit "\\s+" (trim ._HC_PROTECTION) -1)}}{{q .}} {{end}}'
   _HC_SSH_USER: '{{.HCLOUD_SSH_USER | default "root"}}'
   _HC_SSH_PORT: '{{.HCLOUD_SSH_PORT | default "22"}}'
   # Opt-in by an explicit value, like _HC_PAID: `{{.X | default "0"}}` yields
@@ -101,13 +104,22 @@ vars:
   # The token, resolved inside the task rather than in an `env:` stanza. Task
   # evaluates `env:` BEFORE preconditions, so a token fetched there runs before
   # the check that would have explained why it could not be.
+  #
+  # Every task starts with this, so it also sets `svc`, the label the log
+  # lines below print — a shell variable, so a project name is never code.
+  #
+  # The branch is in the template, not in the shell, so the command only ever
+  # appears inside `$( )`. A shell `[ -n "…" ]` test put it inside double
+  # quotes first, and a command with an odd number of them broke the script —
+  # the failure checkov's CHECKOV_VERSION_CMD already hit and fixed this way.
   _HC_TOKEN: |
-    if [ -n "{{.HCLOUD_TOKEN_CMD}}" ]; then
-      HCLOUD_TOKEN="$({{.HCLOUD_TOKEN_CMD}})"
-      export HCLOUD_TOKEN
-    fi
+    svc={{._HC_SVC | q}}
+    {{if .HCLOUD_TOKEN_CMD -}}
+    HCLOUD_TOKEN="$({{.HCLOUD_TOKEN_CMD}})"
+    export HCLOUD_TOKEN
+    {{end -}}
     if [ -z "${HCLOUD_TOKEN:-}" ]; then
-      printf '%s\n' "{{._HC_ERR}} {{._HC_SVC}} · hcloud · no HCLOUD_TOKEN, and no HCLOUD_TOKEN_CMD to get one from" >&2
+      printf '%s\n' "{{._HC_ERR}} $svc · hcloud · no HCLOUD_TOKEN, and no HCLOUD_TOKEN_CMD to get one from" >&2
       exit 1
     fi
 
@@ -116,12 +128,14 @@ vars:
   # matching no server at all, and refusing that would hide the resources the
   # task exists to show.
   _HC_SELECTOR: |
-    selector="{{.HCLOUD_SELECTOR}}"
-    if [ -z "$selector" ] && [ -n "{{.HCLOUD_SELECTOR_CMD}}" ]; then
+    selector={{.HCLOUD_SELECTOR | default "" | q}}
+    {{if .HCLOUD_SELECTOR_CMD -}}
+    if [ -z "$selector" ]; then
       selector="$({{.HCLOUD_SELECTOR_CMD}})"
     fi
+    {{end -}}
     if [ -z "$selector" ]; then
-      printf '%s\n' "{{._HC_ERR}} {{._HC_SVC}} · hcloud · no HCLOUD_SELECTOR: an empty one matches every server in the project" >&2
+      printf '%s\n' "{{._HC_ERR}} $svc · hcloud · no HCLOUD_SELECTOR: an empty one matches every server in the project" >&2
       exit 1
     fi
 
@@ -132,7 +146,7 @@ vars:
     {{._HC_SELECTOR}}
     servers="$(hcloud server list -l "$selector" -o noheader -o columns=name)"
     if [ -z "$servers" ]; then
-      printf '%s\n' "{{._HC_ERR}} {{._HC_SVC}} · hcloud · no server matches $selector" >&2
+      printf '%s\n' "{{._HC_ERR}} $svc · hcloud · no server matches $selector" >&2
       exit 1
     fi
 
@@ -150,7 +164,7 @@ vars:
     hc_each() {
       _verb="$1"
       shift
-      printf '%s\n' "{{._HC_RUN}} {{._HC_SVC}} · hcloud · $_verb ·$(printf ' %s' $servers)"
+      printf '%s\n' "{{._HC_RUN}} $svc · hcloud · $_verb ·$(printf ' %s' $servers)"
 
       _failed=""
       for server in $servers; do
@@ -161,7 +175,7 @@ vars:
 
       if [ -n "$_failed" ]; then
         printf '\n'
-        printf '%s\n' "{{._HC_ERR}} {{._HC_SVC}} · hcloud · $_verb did not take on:$_failed" >&2
+        printf '%s\n' "{{._HC_ERR}} $svc · hcloud · $_verb did not take on:$_failed" >&2
         return 1
       fi
     }
@@ -174,7 +188,7 @@ vars:
   # where it is used.
   _HC_ONE_SERVER: |
     if [ -z "$want" ]; then
-      printf '%s\n' "{{._HC_ERR}} {{._HC_SVC}} · hcloud · $what needs a server. The selector matches:" >&2
+      printf '%s\n' "{{._HC_ERR}} $svc · hcloud · $what needs a server. The selector matches:" >&2
       printf '  %s\n' $servers >&2
       exit 1
     fi
@@ -187,7 +201,7 @@ vars:
     done
 
     if [ "$found" = no ]; then
-      printf '%s\n' "{{._HC_ERR}} {{._HC_SVC}} · hcloud · $want is not matched by the selector. It matches:" >&2
+      printf '%s\n' "{{._HC_ERR}} $svc · hcloud · $want is not matched by the selector. It matches:" >&2
       printf '  %s\n' $servers >&2
       exit 1
     fi
@@ -210,7 +224,7 @@ tasks:
           set -euo pipefail
           {{._HC_TOKEN}}
           {{._HC_EACH_SERVER}}
-          hcloud server list -l "$selector" -o columns={{._HC_COLUMNS}}{{if .HCLOUD_STATUS}} --status {{.HCLOUD_STATUS}}{{end}}
+          hcloud server list -l "$selector" -o columns={{._HC_COLUMNS | q}}{{if .HCLOUD_STATUS}} --status {{.HCLOUD_STATUS | q}}{{end}}
 
   inventory:
     desc: "Every resource the selector matches, not just the servers (HCLOUD_PAID_ONLY=1 for the billable ones)"
@@ -253,14 +267,14 @@ tasks:
           hc_each poweron
 
           printf '\n'
-          printf '%s\n' "{{._HC_OK}} {{._HC_SVC}} · hcloud · powered on — the guests need a moment"
+          printf '%s\n' "{{._HC_OK}} $svc · hcloud · powered on — the guests need a moment"
 
   shutdown:
     desc: "ACPI shutdown — the power button, and the guest decides what to do with it"
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
-    prompt: "Send an ACPI shutdown to every server matching {{.HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR_CMD}}?"
+    prompt: "Send an ACPI shutdown to every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}?"
     cmds:
       # Graceful at the machine level and nowhere else: Hetzner sends the ACPI
       # event and the guest acts on it, so whatever runs inside learns about it
@@ -274,14 +288,14 @@ tasks:
           hc_each shutdown
 
           printf '\n'
-          printf '%s\n' "{{._HC_OK}} {{._HC_SVC}} · hcloud · shutdown sent — back up with hcloud:poweron"
+          printf '%s\n' "{{._HC_OK}} $svc · hcloud · shutdown sent — back up with hcloud:poweron"
 
   reboot:
     desc: "ACPI reboot — for a server whose kernel lives but whose agent does not"
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
-    prompt: "Send an ACPI reboot to every server matching {{.HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR_CMD}}?"
+    prompt: "Send an ACPI reboot to every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}?"
     cmds:
       # The middle rung. Whatever runs inside the server has its own restart
       # and is the one to prefer — `hcloud:ssh` is how you reach it; `reset`
@@ -297,14 +311,14 @@ tasks:
           hc_each reboot
 
           printf '\n'
-          printf '%s\n' "{{._HC_OK}} {{._HC_SVC}} · hcloud · reboot sent"
+          printf '%s\n' "{{._HC_OK}} $svc · hcloud · reboot sent"
 
   poweroff:
     desc: "Cut power without a clean shutdown — for when the guest cannot answer"
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
-    prompt: "Cut power to every server matching {{.HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR_CMD}} without a clean shutdown?"
+    prompt: "Cut power to every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}} without a clean shutdown?"
     cmds:
       # The plug. Anything mid-write inside the server is mid-write when the
       # power goes, so this is the right command only when the guest has
@@ -318,14 +332,14 @@ tasks:
           hc_each poweroff
 
           printf '\n'
-          printf '%s\n' "{{._HC_OK}} {{._HC_SVC}} · hcloud · power cut — back up with hcloud:poweron"
+          printf '%s\n' "{{._HC_OK}} $svc · hcloud · power cut — back up with hcloud:poweron"
 
   reset:
     desc: "Hard reset — a power cut and a start in one, for an unresponsive server"
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
-    prompt: "Hard reset every server matching {{.HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR_CMD}}? No clean shutdown."
+    prompt: "Hard reset every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}? No clean shutdown."
     cmds:
       # For the server that has stopped answering entirely, where the
       # alternative is poweroff followed by poweron and a wait in between.
@@ -338,7 +352,7 @@ tasks:
           hc_each reset
 
           printf '\n'
-          printf '%s\n' "{{._HC_OK}} {{._HC_SVC}} · hcloud · reset sent"
+          printf '%s\n' "{{._HC_OK}} $svc · hcloud · reset sent"
 
   # ═══ the freeze ═════════════════════════════════════════════════════════════
   #
@@ -363,17 +377,17 @@ tasks:
           {{._HC_EACH_SERVER}}
           {{._HC_FAN_OUT}}
 
-          hc_each enable-protection {{._HC_PROTECTION}}
+          hc_each enable-protection {{._HC_PROTECTION_ARGS}}
 
           printf '\n'
-          printf '%s\n' "{{._HC_OK}} {{._HC_SVC}} · hcloud · protected ({{._HC_PROTECTION}}) — release with hcloud:unprotect"
+          printf '%s %s · hcloud · protected (%s) — release with hcloud:unprotect\n' "{{._HC_OK}}" "$svc" {{._HC_PROTECTION | q}}
 
   unprotect:
     desc: "Lift that protection again — asks first"
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
-    prompt: "Lift {{.HCLOUD_PROTECTION | default \"delete rebuild\"}} protection on every server matching {{.HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR_CMD}}?"
+    prompt: "Lift {{._HC_PROTECTION}} protection on every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}?"
     cmds:
       # The only task here that makes the fleet easier to destroy, which is why
       # it is the half that prompts.
@@ -383,10 +397,10 @@ tasks:
           {{._HC_EACH_SERVER}}
           {{._HC_FAN_OUT}}
 
-          hc_each disable-protection {{._HC_PROTECTION}}
+          hc_each disable-protection {{._HC_PROTECTION_ARGS}}
 
           printf '\n'
-          printf '%s\n' "{{._HC_WARN}} {{._HC_SVC}} · hcloud · protection lifted ({{._HC_PROTECTION}}) — these servers can be deleted again"
+          printf '%s %s · hcloud · protection lifted (%s) — these servers can be deleted again\n' "{{._HC_WARN}}" "$svc" {{._HC_PROTECTION | q}}
 
   # ═══ getting in ═════════════════════════════════════════════════════════════
 
@@ -423,10 +437,10 @@ tasks:
           {{._HC_EACH_SERVER}}
 
           what=ssh
-          want="{{.HCLOUD_SERVER}}"
+          want={{.HCLOUD_SERVER | default "" | q}}
           {{._HC_ONE_SERVER}}
 
-          hcloud server ssh {{if eq ._HC_SSH_IPV6 "1"}}--ipv6 {{end}}-u {{._HC_SSH_USER}} -p {{._HC_SSH_PORT}} "$want" {{.CLI_ARGS}}
+          hcloud server ssh {{if eq ._HC_SSH_IPV6 "1"}}--ipv6 {{end}}-u {{._HC_SSH_USER | q}} -p {{._HC_SSH_PORT | q}} "$want" {{.CLI_ARGS}}
 
   console:
     desc: "Open a VNC console on one server — the only way to watch one that will not boot (HCLOUD_SERVER=<name>)"
@@ -447,9 +461,9 @@ tasks:
           {{._HC_EACH_SERVER}}
 
           what=console
-          want="{{.HCLOUD_SERVER}}"
+          want={{.HCLOUD_SERVER | default "" | q}}
           {{._HC_ONE_SERVER}}
 
-          printf '%s\n' "{{._HC_WARN}} {{._HC_SVC}} · hcloud · the url and password below are console access, and short-lived"
+          printf '%s\n' "{{._HC_WARN}} $svc · hcloud · the url and password below are console access, and short-lived"
           printf '\n'
           hcloud server request-console "$want"

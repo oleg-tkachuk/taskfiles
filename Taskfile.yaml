@@ -44,7 +44,6 @@ vars:
     - argocd/Taskfile.yaml
     - cosign/Taskfile.yaml
     - go/Taskfile.yaml
-    - hcloud/Taskfile.yaml
     - k8s/Taskfile.yaml
     - node/Taskfile.yaml
     - release/Taskfile.yaml
