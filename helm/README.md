@@ -20,7 +20,7 @@ includes:
 |---|---|---|
 | `K8S_CONTEXT` | current | pin a cluster |
 | `HELM_NS` | every namespace | limit the scope to one namespace |
-| `CONFIRM` | — | required by `uninstall`; must name the context being emptied |
+| `CONFIRM` | — | required by `uninstall`; must name the context being emptied — `K8S_CONTEXT` when pinned, the current context otherwise |
 | `RELEASE` | — | required by `uninstall`; one release name, or `all` |
 | `HELM_UNINSTALL_FLAGS` | — | verbatim extra flags for `helm uninstall` |
 
@@ -70,6 +70,10 @@ wrong cluster, which is the mistake that actually happens: the current context
 is ambient state nobody re-reads before typing a command. So `CONFIRM` has to
 name the context, and the releases are listed before the prompt asks — so the
 question is answered with the list in view rather than from memory.
+
+The listing covers releases in every state, a stuck `pending-install` or
+`uninstalling` included. A release that fails to uninstall is named, the rest
+are still tried, and the task fails.
 
 ---
 
