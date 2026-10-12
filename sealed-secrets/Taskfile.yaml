@@ -34,17 +34,20 @@ version: "3"
 # with --dry-run=client and hand it to kubeseal, so the plaintext never leaves
 # this machine and the output is encrypted to a key only the controller holds.
 # ─────────────────────────────────────────────────────────────────────────────
-# shell-verbatim: _SS_KUBECTL _SS_SEAL KUBESEAL_FLAGS
+# shell-verbatim: _SS_CTX _SS_KUBECTL _SS_SEAL KUBESEAL_FLAGS FROM
 
 silent: true
 
 vars:
   _SS_NS: '{{.SEALED_SECRETS_NS | default "sealed-secrets"}}'
   _SS_CTRL: '{{.SEALED_SECRETS_CONTROLLER | default "sealed-secrets-controller"}}'
-  # Command fragments, spliced into the tasks as shell: the values inside them
-  # are quoted here, where they are built.
-  _SS_KUBECTL: 'kubectl{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT | q}}{{end}}'
-  _SS_SEAL: 'kubeseal --controller-namespace {{.SEALED_SECRETS_NS | default "sealed-secrets" | q}} --controller-name {{.SEALED_SECRETS_CONTROLLER | default "sealed-secrets-controller" | q}} --format yaml {{.KUBESEAL_FLAGS | default ""}}'
+  # kubectl and kubeseal both take the pinned context. kubeseal fetches the
+  # controller's certificate from whatever cluster it talks to, so leaving it
+  # on the current context sealed to that cluster's key while the manifest was
+  # meant for the pinned one — a secret its own controller can never open.
+  _SS_CTX: '{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT | q}}{{end}}'
+  _SS_KUBECTL: 'kubectl{{._SS_CTX}}'
+  _SS_SEAL: 'kubeseal{{._SS_CTX}} --controller-namespace {{._SS_NS | q}} --controller-name {{._SS_CTRL | q}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _SS_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
@@ -55,58 +58,65 @@ tasks:
     desc: "Seal one key/value into a SealedSecret manifest"
     requires:
       vars: [namespace, name, key, value, output]
-    preconditions:
-      - sh: command -v kubeseal >/dev/null
-        msg: "kubeseal is not installed — https://github.com/bitnami-labs/sealed-secrets#installation"
     cmds:
-      - mkdir -p {{dir .output | q}}
-      - >-
-        {{._SS_KUBECTL}} create secret generic {{.name | q}}
-        --namespace {{.namespace | q}}
-        --from-literal={{ printf "%s=%s" .key .value | q }}
-        --dry-run=client -o yaml
-        | {{._SS_SEAL}} > {{.output | q}}
-      - printf '%s sealed-secrets · %s/%s → %s\n' "{{._SS_OK}}" {{.namespace | q}} {{.name | q}} {{.output | q}}
+      - task: _seal
+        vars:
+          namespace: '{{.namespace}}'
+          name: '{{.name}}'
+          output: '{{.output}}'
+          FROM: '--from-literal={{printf "%s=%s" .key .value | q}}'
 
   seal:file:
     desc: "Seal every key in an env file into one SealedSecret manifest"
     requires:
       vars: [namespace, name, file, output]
     preconditions:
-      - sh: command -v kubeseal >/dev/null
-        msg: "kubeseal is not installed — https://github.com/bitnami-labs/sealed-secrets#installation"
       - sh: test -f {{.file | q}}
         msg: "{{.file}} not found"
     cmds:
-      - mkdir -p {{dir .output | q}}
-      - >-
-        {{._SS_KUBECTL}} create secret generic {{.name | q}}
-        --namespace {{.namespace | q}}
-        --from-env-file={{.file | q}}
-        --dry-run=client -o yaml
-        | {{._SS_SEAL}} > {{.output | q}}
-      - printf '%s sealed-secrets · %s/%s → %s\n' "{{._SS_OK}}" {{.namespace | q}} {{.name | q}} {{.output | q}}
+      - task: _seal
+        vars:
+          namespace: '{{.namespace}}'
+          name: '{{.name}}'
+          output: '{{.output}}'
+          FROM: '--from-env-file={{.file | q}}'
 
   seal:literals:
     desc: "Seal several key/value pairs into one SealedSecret manifest"
     requires:
       vars: [namespace, name, literals, output]
+    # `literals` is split on whitespace, which is what makes the list a list —
+    # a value containing a space belongs in seal:file. Each pair is quoted on
+    # its way into the script, so a quote, a semicolon, a $( ) or a glob in a
+    # value reaches kubectl as data; spliced in bare, it ran as shell.
+    cmds:
+      - task: _seal
+        vars:
+          namespace: '{{.namespace}}'
+          name: '{{.name}}'
+          output: '{{.output}}'
+          FROM: '{{range (regexSplit "\\s+" (trim .literals) -1)}}--from-literal={{q .}} {{end}}'
+
+  _seal:
+    internal: true
+    requires:
+      vars: [namespace, name, output, FROM]
     preconditions:
       - sh: command -v kubeseal >/dev/null
         msg: "kubeseal is not installed — https://github.com/bitnami-labs/sealed-secrets#installation"
+    # Sealed into a file beside the output and moved over it only once both
+    # kubectl and kubeseal have succeeded. Redirected straight to the output,
+    # a failure in either one truncated a manifest that was already committed.
     cmds:
       - mkdir -p {{dir .output | q}}
-      # Each pair becomes its own argv element, so a value carrying a quote, a
-      # semicolon or a $( ) reaches kubectl as data. `literals` is split on
-      # whitespace, which is what makes the list a list — a value containing a
-      # space belongs in seal:file or in a file of its own.
       - cmd: |-
-          set -eu
-          set --
-          for kv in {{range (splitList " " .literals | compact)}}{{q .}} {{end}}; do set -- "$@" --from-literal="$kv"; done
+          set -euo pipefail
+          tmp=$(mktemp {{printf "%s.XXXXXX" .output | q}})
+          trap 'rm -f "$tmp"' EXIT
           {{._SS_KUBECTL}} create secret generic {{.name | q}} \
-            --namespace {{.namespace | q}} "$@" --dry-run=client -o yaml \
-            | {{._SS_SEAL}} > {{.output | q}}
+            --namespace {{.namespace | q}} {{.FROM}} --dry-run=client -o yaml \
+            | {{._SS_SEAL}} --format yaml {{.KUBESEAL_FLAGS | default ""}} > "$tmp"
+          mv "$tmp" {{.output | q}}
       - printf '%s sealed-secrets · %s/%s → %s\n' "{{._SS_OK}}" {{.namespace | q}} {{.name | q}} {{.output | q}}
 
   seal:merge:
@@ -122,12 +132,13 @@ tasks:
     # rewrites that key's ciphertext and leaves every other key, and the file's
     # structure, as they were. The plaintext only ever reaches kubeseal's stdin.
     cmds:
-      - >-
-        {{._SS_KUBECTL}} create secret generic {{.name | q}}
-        --namespace {{.namespace | q}}
-        --from-literal={{ printf "%s=%s" .key .value | q }}
-        --dry-run=client -o yaml
-        | {{._SS_SEAL}} --merge-into {{.output | q}}
+      - cmd: |-
+          set -euo pipefail
+          {{._SS_KUBECTL}} create secret generic {{.name | q}} \
+            --namespace {{.namespace | q}} \
+            --from-literal={{printf "%s=%s" .key .value | q}} \
+            --dry-run=client -o yaml \
+            | {{._SS_SEAL}} --format yaml {{.KUBESEAL_FLAGS | default ""}} --merge-into {{.output | q}}
       - printf '%s sealed-secrets · %s/%s · %s merged → %s\n' "{{._SS_OK}}" {{.namespace | q}} {{.name | q}} {{.key | q}} {{.output | q}}
 
   pubkey:
@@ -138,6 +149,4 @@ tasks:
     # Committing this lets anyone seal a value for this cluster without reaching
     # it. It is a public key: it can encrypt and cannot decrypt.
     cmds:
-      - >-
-        kubeseal --controller-namespace {{._SS_NS | q}}
-        --controller-name {{._SS_CTRL | q}} --fetch-cert
+      - '{{._SS_SEAL}} --fetch-cert'

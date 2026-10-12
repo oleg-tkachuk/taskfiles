@@ -25,7 +25,7 @@ includes:
 | `SEALED_SECRETS_NS` | `sealed-secrets` | controller namespace |
 | `KUBESEAL_FLAGS` | — | verbatim extra kubeseal flags |
 | `SEALED_SECRETS_CONTROLLER` | `sealed-secrets-controller` | controller name |
-| `K8S_CONTEXT` | current | pin a cluster |
+| `K8S_CONTEXT` | current | pin a cluster — both kubectl and kubeseal use it, so the value is sealed to that cluster's controller key |
 
 Per call: `namespace`, `name`, `output` for both sealing tasks; `key` and
 `value` for `seal`; `file` for `seal:file`.
@@ -90,5 +90,9 @@ list. Each pair then becomes its own argv element, so a value carrying a quote,
 a semicolon or a `$( )` reaches kubectl as data rather than as shell. A value
 that genuinely contains a space has no place in that list; write it to a file
 and use `seal:file`.
+
+A sealing task writes beside `output` and moves the result over it only once
+kubectl and kubeseal have both succeeded, so a failed run leaves an existing
+manifest as it was.
 
 Part of [taskfiles](../README.md).
