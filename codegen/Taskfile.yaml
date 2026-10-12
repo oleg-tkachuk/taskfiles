@@ -275,7 +275,7 @@ tasks:
             exit 1
           fi
           watched=''
-          for d in {{._CG_PROTO_OUT}}; do
+          for d in {{range (splitList " " ._CG_PROTO_OUT | compact)}}{{q .}} {{end}}; do
             # `out: .` is a real template shape, not a mistake: a plugin that
             # carries the subdirectory in `module=` writes from the component
             # root. Watching the root would call every unrelated change a stale
@@ -316,12 +316,17 @@ tasks:
   _cg_snapshot:
     internal: true
     requires: { vars: [PATHS, OUT] }
+    vars:
+      # Each pathspec quoted on its own: PATHS can hold several, and one may
+      # carry pathspec magic such as `:(glob)internal/**/mocks/**`, whose
+      # parenthesis the shell would otherwise read as syntax.
+      _CG_PATHS_Q: '{{range (splitList " " .PATHS | compact)}}{{q .}} {{end}}'
     cmds:
       - cmd: |-
           set -eu
           mkdir -p "$(dirname {{.OUT | q}})"
           files={{.OUT | q}}.files
-          git ls-files -co --exclude-standard -- {{.PATHS}} | LC_ALL=C sort -u >"$files"
+          git ls-files -co --exclude-standard -- {{._CG_PATHS_Q}} | LC_ALL=C sort -u >"$files"
           : >{{.OUT | q}}
           while IFS= read -r f; do
             if [ -e "$f" ]; then

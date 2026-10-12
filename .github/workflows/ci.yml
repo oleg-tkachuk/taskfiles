@@ -431,6 +431,19 @@ jobs:
           task cg:proto:check | grep -q 'stubs match their sources'
           echo "✔ proto:check passes on a tree whose stubs are committed"
 
+          # Pathspec magic carries a parenthesis, which the shell reads as
+          # syntax unless each pathspec is quoted; the gate died on it before
+          # comparing anything.
+          GLOB_SPEC=':(glob)gen/**'
+          task cg:proto:check PROTO_PATHSPEC="$GLOB_SPEC" | grep -q 'stubs match their sources'
+          printf 'package greetv1\n// drifted\n' > gen/go/greet.pb.go
+          if task cg:proto:check PROTO_PATHSPEC="$GLOB_SPEC" 2> glob.err; then
+            echo "✖ proto:check passed a stale stub under a glob pathspec" >&2; exit 1
+          fi
+          grep -q 'stubs are stale' glob.err
+          git checkout -q -- gen/go
+          echo "✔ proto:check takes a pathspec with magic, and still sees drift through it"
+
           printf 'package greetv1\n// drifted\n' > gen/go/greet.pb.go
           if task cg:proto:check 2> drift.err; then
             echo "✖ proto:check passed on a stale stub" >&2; exit 1
