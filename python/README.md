@@ -31,7 +31,7 @@ drift apart, so the swap keeps working.
 | `test` | pytest | pytest |
 | `lint` | ruff check | ruff check |
 | `fmt` | ruff format — alias `format` | same |
-| `typecheck` | mypy, skipped when it is not a dependency | same |
+| `typecheck` | mypy, skipped with a ○ line when it is not a dependency; fails when the environment cannot be asked | same |
 | `lock` | regenerate `poetry.lock` | regenerate `uv.lock`, no version changes |
 | `deps:outdated` | read-only report | read-only report |
 | `deps:update` | bump within the pyproject constraints, refresh the lock | same |
