@@ -34,6 +34,7 @@ version: "3"
 # it yet — a Rust toolchain in the middle of `poetry install`. Set it per
 # project, and move it when the runtime moves.
 # ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _PY_TEST_CMD TEST_CMD _PY_LINT_CMD LINT_CMD _PY_FMT_CMD FORMAT_CMD _PY_TC_CMD TYPECHECK_CMD _PY_TEST_FLAGS PY_TEST_FLAGS _PY_UPDATE_FLAGS POETRY_UPDATE_FLAGS _PY_LOCK_FLAGS POETRY_LOCK_FLAGS _PY_INSTALL_FLAGS POETRY_INSTALL_FLAGS
 
 silent: true
 
@@ -73,7 +74,10 @@ tasks:
           set -u
           fail=0
 
-          say() { printf '%s %s · doctor · %s\n' "$1" '{{._PY_NAME}}' "$2"; }
+          name={{._PY_NAME | q}}
+          py={{._PY_BIN | q}}
+          src={{._PY_SRC | q}}
+          say() { printf '%s %s · doctor · %s\n' "$1" "$name" "$2"; }
           bad() { say '{{._PY_ERR}}' "$1" >&2; fail=1; }
 
           command -v poetry >/dev/null 2>&1 \
@@ -83,10 +87,10 @@ tasks:
           # The interpreter by the name this module will hand poetry, not by
           # whatever `python3` happens to be: those differ exactly when PY is
           # wrong, which is the case worth catching.
-          if command -v '{{._PY_BIN}}' >/dev/null 2>&1; then
-            say '{{._PY_OK}}' "interpreter {{._PY_BIN}} ($('{{._PY_BIN}}' -V 2>&1))"
+          if command -v "$py" >/dev/null 2>&1; then
+            say '{{._PY_OK}}' "interpreter $py ($("$py" -V 2>&1))"
           else
-            bad "interpreter {{._PY_BIN}} is not on PATH — PY names it, and nothing else here checks"
+            bad "interpreter $py is not on PATH — PY names it, and nothing else here checks"
           fi
 
           if [ ! -f pyproject.toml ]; then
@@ -96,8 +100,8 @@ tasks:
             [ -f poetry.lock ] \
               && say '{{._PY_OK}}' "poetry.lock is here" \
               || say '{{._PY_WARN}}' "no poetry.lock yet — run lock before install"
-            [ -d '{{._PY_SRC}}' ] \
-              || say '{{._PY_WARN}}' "PY_SRC {{._PY_SRC}} is not a directory — lint and format would find nothing"
+            [ -d "$src" ] \
+              || say '{{._PY_WARN}}' "PY_SRC $src is not a directory — lint and format would find nothing"
           fi
 
           say '{{._PY_OK}}' "install flags {{._PY_INSTALL_FLAGS}}"
@@ -115,29 +119,29 @@ tasks:
     preconditions:
       - sh: command -v poetry >/dev/null
         msg: "poetry is not installed — https://python-poetry.org/docs/#installation"
-      - sh: command -v {{._PY_BIN}} >/dev/null
+      - sh: command -v {{._PY_BIN | q}} >/dev/null
         msg: "{{._PY_BIN}} is not on PATH — install it or pass PY=<interpreter>"
     cmds:
-      - printf '%s\n' "{{._PY_RUN}} {{._PY_NAME}} · py · poetry install ({{._PY_BIN}})"
-      - poetry env use {{._PY_BIN}} >/dev/null
+      - printf '%s %s · py · poetry install (%s)\n' "{{._PY_RUN}}" {{._PY_NAME | q}} {{._PY_BIN | q}}
+      - poetry env use {{._PY_BIN | q}} >/dev/null
       - poetry install {{._PY_INSTALL_FLAGS}}
-      - printf '%s\n' "{{._PY_OK}} {{._PY_NAME}} · py · dependencies installed"
+      - printf '%s %s · py · dependencies installed\n' "{{._PY_OK}}" {{._PY_NAME | q}}
 
   test:
     desc: "pytest"
     deps: [install]
     cmds:
-      - printf '%s\n' "{{._PY_RUN}} {{._PY_NAME}} · py · {{._PY_TEST_CMD}}"
+      - printf '%s %s · py · %s\n' "{{._PY_RUN}}" {{._PY_NAME | q}} {{._PY_TEST_CMD | q}}
       - poetry run {{._PY_TEST_CMD}} {{._PY_TEST_FLAGS}}
-      - printf '%s\n' "{{._PY_OK}} {{._PY_NAME}} · py · tests pass"
+      - printf '%s %s · py · tests pass\n' "{{._PY_OK}}" {{._PY_NAME | q}}
 
   lint:
     desc: "ruff check"
     deps: [install]
     cmds:
-      - printf '%s\n' "{{._PY_RUN}} {{._PY_NAME}} · py · {{._PY_LINT_CMD}}"
-      - poetry run {{._PY_LINT_CMD}} {{._PY_SRC}}
-      - printf '%s\n' "{{._PY_OK}} {{._PY_NAME}} · py · lint clean"
+      - printf '%s %s · py · %s\n' "{{._PY_RUN}}" {{._PY_NAME | q}} {{._PY_LINT_CMD | q}}
+      - poetry run {{._PY_LINT_CMD}} {{._PY_SRC | q}}
+      - printf '%s %s · py · lint clean\n' "{{._PY_OK}}" {{._PY_NAME | q}}
 
   fmt:
     desc: "ruff format"
@@ -146,34 +150,34 @@ tasks:
     aliases: [format]
     deps: [install]
     cmds:
-      - poetry run {{._PY_FMT_CMD}} {{._PY_SRC}}
-      - printf '%s\n' "{{._PY_OK}} {{._PY_NAME}} · py · formatted"
+      - poetry run {{._PY_FMT_CMD}} {{._PY_SRC | q}}
+      - printf '%s %s · py · formatted\n' "{{._PY_OK}}" {{._PY_NAME | q}}
 
   typecheck:
     desc: "mypy (skipped when mypy is not a project dependency)"
     deps: [install]
     status:
-      - "! poetry run python -c 'import {{._PY_TC_MOD}}' >/dev/null 2>&1"
+      - "! poetry run python -c 'import importlib, sys; importlib.import_module(sys.argv[1])' {{._PY_TC_MOD | q}} >/dev/null 2>&1"
     cmds:
-      - printf '%s\n' "{{._PY_RUN}} {{._PY_NAME}} · py · {{._PY_TC_CMD}}"
-      - poetry run {{._PY_TC_CMD}} {{._PY_SRC}}
-      - printf '%s\n' "{{._PY_OK}} {{._PY_NAME}} · py · types clean"
+      - printf '%s %s · py · %s\n' "{{._PY_RUN}}" {{._PY_NAME | q}} {{._PY_TC_CMD | q}}
+      - poetry run {{._PY_TC_CMD}} {{._PY_SRC | q}}
+      - printf '%s %s · py · types clean\n' "{{._PY_OK}}" {{._PY_NAME | q}}
 
   lock:
     desc: "Regenerate poetry.lock"
     cmds:
-      - poetry env use {{._PY_BIN}} >/dev/null
+      - poetry env use {{._PY_BIN | q}} >/dev/null
       - poetry lock {{._PY_LOCK_FLAGS}}
-      - printf '%s\n' "{{._PY_OK}} {{._PY_NAME}} · py · poetry.lock regenerated"
+      - printf '%s %s · py · poetry.lock regenerated\n' "{{._PY_OK}}" {{._PY_NAME | q}}
 
   deps:update:
     desc: "Bump dependencies within their pyproject constraints, then refresh the lock"
     # Stays inside the caret/tilde ranges already written in pyproject.toml.
     # Widening those is deps:update:latest.
     cmds:
-      - printf '%s\n' "{{._PY_RUN}} {{._PY_NAME}} · py · poetry update"
+      - printf '%s %s · py · poetry update\n' "{{._PY_RUN}}" {{._PY_NAME | q}}
       - poetry update --no-interaction {{._PY_UPDATE_FLAGS}}
-      - printf '%s\n' "{{._PY_OK}} {{._PY_NAME}} · py · deps bumped — review poetry.lock, then lint + test"
+      - printf '%s %s · py · deps bumped — review poetry.lock, then lint + test\n' "{{._PY_OK}}" {{._PY_NAME | q}}
 
   deps:update:latest:
     desc: "Widen constraints and bump everything, majors included"
@@ -182,9 +186,9 @@ tasks:
     cmds:
       # Idempotent — `poetry self add` on an installed plugin is a no-op.
       - poetry self add poetry-plugin-up >/dev/null
-      - printf '%s\n' "{{._PY_RUN}} {{._PY_NAME}} · py · poetry up --latest (majors included)"
+      - printf '%s %s · py · poetry up --latest (majors included)\n' "{{._PY_RUN}}" {{._PY_NAME | q}}
       - poetry up --latest
-      - printf '%s\n' "{{._PY_OK}} {{._PY_NAME}} · py · review pyproject.toml + poetry.lock, then lint + test"
+      - printf '%s %s · py · review pyproject.toml + poetry.lock, then lint + test\n' "{{._PY_OK}}" {{._PY_NAME | q}}
 
   deps:outdated:
     desc: "Show dependencies with a newer version available (read-only)"
