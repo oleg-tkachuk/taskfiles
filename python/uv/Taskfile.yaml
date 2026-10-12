@@ -174,7 +174,9 @@ tasks:
     cmds:
       - printf '%s %s · uv · lock --upgrade\n' "{{._UV_RUN}}" {{._UV_NAME | q}}
       - uv lock --upgrade {{._UV_LOCK_FLAGS}}
-      - uv sync {{._UV_SYNC}}
+      # The same interpreter install syncs on; without it this rebuilt the venv
+      # on whichever Python uv found first.
+      - uv sync {{._UV_SYNC}}{{._UV_PY}}
       - printf '%s %s · uv · deps bumped — review uv.lock, then lint + test\n' "{{._UV_OK}}" {{._UV_NAME | q}}
 
   deps:outdated:
