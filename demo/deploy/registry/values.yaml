@@ -4,5 +4,7 @@ image:
 
 # The port both the container and the Service listen on.
 port: 5000
-# Must match kind-config.yaml's extraPortMappings.containerPort.
+# ../../Taskfile.yaml sets this from kind-config.yaml's
+# extraPortMappings.containerPort on install; this default only lets the chart
+# render on its own.
 nodePort: 30500

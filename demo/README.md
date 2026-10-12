@@ -20,6 +20,7 @@ names the task it runs.
 | Docker (or OrbStack/Podman) | `docker build`, `kind`'s nodes |
 | [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) | the local cluster |
 | kubectl, [helm](https://helm.sh/docs/intro/install/) | everything cluster-side |
+| [yq](https://github.com/mikefarah/yq#install) | reading the registry's ports from `deploy/kind-config.yaml` |
 | [cosign](https://docs.sigstore.dev/cosign/system_config/installation/), [syft](https://github.com/anchore/syft#installation) | `sign` |
 | [gitleaks](https://github.com/gitleaks/gitleaks#installing), [trivy](https://github.com/aquasecurity/trivy#installation), [hadolint](https://github.com/hadolint/hadolint#install), [golangci-lint](https://golangci-lint.run/docs/welcome/install/) | `scan`, `verify` |
 
@@ -156,8 +157,10 @@ Port 5050, not the library's default 5000: macOS's AirPlay Receiver and
 OrbStack's own proxy both already answer on 5000 on plenty of machines, and
 the failure mode is a registry that looks reachable and answers every
 request with the wrong service's 404 — a confusing thing to debug on a first
-run. [Taskfile.yaml](Taskfile.yaml) sets `REGISTRY` explicitly for exactly
-this reason.
+run. The port is written once, in
+[deploy/kind-config.yaml](deploy/kind-config.yaml): [Taskfile.yaml](Taskfile.yaml)
+reads `REGISTRY` and the registry's node port from it, so changing the mapping
+there moves the registry, the image it pushes and the chart that runs it.
 
 This is the one piece of this demo that is not a library task: `release`
 and `cosign` push to whatever `REGISTRY` you tell them, and something has to
@@ -174,8 +177,8 @@ $ task deploy
 ```
 
 `release:deploy` derives the version from git, builds the image, pushes it
-and the chart to `localhost:5050`; `local:image:load` and `local:install`
-then get it onto the kind cluster from there. Check it landed:
+and the chart to `localhost:5050`; `local:install` then loads the image into
+kind's nodes and installs the chart against it. Check it landed:
 
 ```console
 $ task k8s:status
