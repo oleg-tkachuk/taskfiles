@@ -61,6 +61,7 @@ tasks:
       - task: check:runtime-install
       - task: check:quoting
       - task: check:behaviour
+      - task: check:ci-scripts
 
   # ─── gates ──────────────────────────────────────────────────────────────────
 
@@ -215,6 +216,28 @@ tasks:
     vars:
       _BEHAVIOUR_TESTS:
         sh: ls tests/*.test.sh 2>/dev/null | sort | tr '\n' ' '
+
+  check:ci-scripts:
+    desc: "Refuse a workflow script kept in the YAML, a script nothing runs, or one shellcheck rejects"
+    # A script inside a workflow is linted by nothing and runs nowhere but CI.
+    # Steps call .github/scripts/<name>.sh instead; one-command steps stay
+    # inline. shellcheck is best-effort the way check:surface's yq half is:
+    # it warns rather than fails where it is not installed.
+    cmds:
+      - bash scripts/check-ci-scripts.test.sh >/dev/null
+      - bash scripts/check-ci-scripts.sh .github/workflows .github/scripts
+      - for: { var: _CI_SCRIPT_TESTS }
+        cmd: bash {{.ITEM | q}} >/dev/null
+      - cmd: |-
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck -S warning .github/scripts/*.sh scripts/*.sh
+          else
+            printf '%s\n' "{{._LIB_WARN}} taskfiles · shellcheck absent, .github/scripts not linted" >&2
+          fi
+      - printf '%s\n' "{{._LIB_OK}} taskfiles · every workflow script lives in .github/scripts and is run"
+    vars:
+      _CI_SCRIPT_TESTS:
+        sh: ls .github/scripts/*.test.sh 2>/dev/null | sort | tr '\n' ' '
 
   check:readme:
     desc: "Refuse a module with no README, or one the top-level README does not link"
