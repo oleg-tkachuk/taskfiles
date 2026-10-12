@@ -18,10 +18,12 @@ changelog:
       - invalid
       - wontfix
       - question
+      # Renovate labels every pull request it opens. None of them changes
+      # anything a consumer of the modules can observe, so they are noise in a
+      # release note. By label, not author: Renovate acts with a personal
+      # access token, so its pull requests are authored by the token owner.
+      - dependencies
     authors:
-      # Action bumps keep CI current; they change nothing a consumer of the
-      # modules can observe, so they are noise in a release note.
-      - dependabot[bot]
       - github-actions[bot]
   categories:
     - title: 🚀 Features

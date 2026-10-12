@@ -1,0 +1,89 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Renovate runs from .github/workflows/renovate.yml, not the hosted app. That cron decides how often it runs; the schedule here decides what it may do. The whole of Monday rather than a window within it, because a scheduled workflow can start hours late and a narrow window is one it misses.",
+    "Nothing Renovate bumps here is something a consumer of the modules fetches, so no rule below uses fix or feat: release.config.cjs cuts a release from those, and a CI tool bump is not one.",
+    "rebaseWhen keeps branches current because protection on main is strict: without it every pull request goes stale as soon as anything else lands.",
+    "Automerge is on only where CI exercises the change: the action pins and zizmor run in every pull request's own checks. Task does not, see its rule below; the npm packages run only in release.yml, the setup-node version likewise, and the demo's Dockerfile is never built in CI, so those wait for a person. rebase is the only merge method the repository allows."
+  ],
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":dependencyDashboard"
+  ],
+  "timezone": "Europe/Kyiv",
+  "schedule": ["* * * * 1"],
+  "rebaseWhen": "behind-base-branch",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "labels": ["dependencies"],
+  "platformAutomerge": true,
+  "automergeStrategy": "rebase",
+
+  "vulnerabilityAlerts": {
+    "description": "Off, because the token is not granted `Dependabot alerts: read` and without it Renovate only warns once per run and carries on. Granting it and turning this on is one change.",
+    "enabled": false
+  },
+
+  "customManagers": [
+    {
+      "description": "Tool versions no built-in manager sees: TASK_VERSION in ci.yml, and zizmor, which ci.yml and the pre-commit hook in lefthook.yml both run and must run at the same version. The `renovate:` comment directly above each pin carries the datasource and depName, so the patterns know no special cases; both zizmor pins share a depName and therefore move in one pull request. scripts/check-renovate.sh asserts these patterns still match every annotated pin and that every pin is annotated, because the failure mode is silent: Renovate opens no pull request, for ever.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.yml$/", "/^lefthook\\.yml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+?)(?: extractVersion=(?<extractVersion>\\S+?))?\\s+[A-Z0-9_]+_VERSION:\\s*(?<currentValue>\\S+)",
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+?)\\s+run: pipx run \\S+?==(?<currentValue>\\S+)"
+      ]
+    }
+  ],
+
+  "packageRules": [
+    {
+      "description": "Actions are pinned to commit shas with a version comment; Renovate maintains both. Scoped to depType `action` — the `uses:` reference — because the same manager also reports a step's inputs (`node-version:`) as dependencies, and a version input has no digest to pin.",
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["action"],
+      "pinDigests": true,
+      "groupName": "github actions",
+      "semanticCommitType": "ci",
+      "semanticCommitScope": "actions",
+      "automerge": true
+    },
+    {
+      "description": "A step input such as setup-node's `node-version:`. The one there is release.yml's, which no pull request runs.",
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["uses-with"],
+      "semanticCommitType": "ci",
+      "semanticCommitScope": "actions"
+    },
+    {
+      "description": "Task and zizmor: they change what the checks are, never what a consumer fetches. zizmor merges itself: Workflow audit runs the new version on the pull request.",
+      "matchManagers": ["custom.regex"],
+      "semanticCommitType": "ci",
+      "semanticCommitScope": "tools",
+      "automerge": true
+    },
+    {
+      "description": "Not Task, though. Its bump touches only ci.yml, and a workflow-only diff skips Consumer smoke — so the pull request would merge having run the modules under the new Task in Lint alone, never the way a consumer includes them.",
+      "matchDepNames": ["go-task/task"],
+      "automerge": false
+    },
+    {
+      "description": "semantic-release and its plugins move together; a preset ahead of the analyzer it plugs into is the usual way a release run breaks. They run only in release.yml after a merge, so nothing on the pull request proves them.",
+      "matchManagers": ["npm"],
+      "groupName": "release tooling",
+      "semanticCommitType": "build",
+      "semanticCommitScope": "release"
+    },
+    {
+      "description": "The demo is a consumer of the library, not part of it. Its build image and its go directive are one toolchain: an image older than the directive cannot build the module, so the two move in one pull request.",
+      "matchFileNames": ["demo/**"],
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "demo"
+    },
+    {
+      "matchFileNames": ["demo/**"],
+      "matchPackageNames": ["golang", "go"],
+      "groupName": "demo go toolchain"
+    }
+  ]
+}

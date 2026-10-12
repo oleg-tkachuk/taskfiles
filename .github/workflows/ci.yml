@@ -50,6 +50,7 @@ env:
   # since. (It is also Alpine with neither git nor Node, so it cannot serve as
   # a job `container:` — actions/checkout needs both.) Revisit if upstream
   # starts publishing again.
+  # renovate: datasource=github-releases depName=go-task/task extractVersion=^v(?<version>.*)$
   TASK_VERSION: 3.54.0
   # What every checkout below resolves: the dispatched tag when there is one,
   # otherwise whatever triggered this run. workflow_dispatch's own
@@ -77,6 +78,7 @@ jobs:
         # pipx rather than uvx: pipx ships on the runner image, uv does not.
         # Pinned like everything else, and --persona=auditor so this is the
         # strict run rather than the default one.
+        # renovate: datasource=pypi depName=zizmor
         run: pipx run zizmor==1.30.0 --persona=auditor --format=plain .github/workflows/
 
   # Feeds consumer-smoke's `if:` below. That job proves the Task modules work
