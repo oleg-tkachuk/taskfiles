@@ -30,7 +30,7 @@ workspace — tasks then read `argocd:<task>`.
 
 | Var | Default | Meaning |
 |---|---|---|
-| `APP_PREFIX` | — | required; which applications to refresh |
+| `APP_PREFIX` | — | required; which applications to refresh, matched as a literal name prefix |
 | `ARGOCD_SERVER` | `argocd-server` | the server deployment; a Helm release named other than `argocd` prefixes it |
 | `ARGOCD_SERVER_LABEL` | `argocd-server` | `app.kubernetes.io/name` on the server pods — the chart's app label does not carry the release name, so these two differ whenever the release does |
 | `ARGOCD_PORT` | `8443` | local port for `server:port-forward` |
