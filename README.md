@@ -139,6 +139,10 @@ the pre-commit hook, in its `auditor` persona. Actions are pinned to commit
 SHAs with the version in a trailing comment, and Dependabot moves the pins —
 a tag is mutable, and a pin nobody updates is its own problem.
 
+A step longer than one command runs a script from `.github/scripts/` rather
+than carrying it in the YAML, so the script is shellchecked and can be run on
+a laptop. `task lint` refuses a multi-line `run:` and a script no step runs.
+
 #### How a module is written
 
 Guards are `preconditions` (with an explanatory `msg`),
