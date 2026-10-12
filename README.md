@@ -408,6 +408,9 @@ otherwise, clean tree  →  <base>-dev.<committer-ts>.g<sha>
 dirty tree             →  <base>-dev.<committer-ts>.dirty.<now>.g<sha>
 ```
 
+`<base>` is the latest version tag one patch up, so a build after a release
+sorts above it; `VERSION_BASE` sets it by hand.
+
 Committer timestamp rather than wall clock, so a clean tree produces the same
 version on every run — that is what makes the publish path idempotent.
 Timestamp before sha, so SemVer's left-to-right pre-release comparison orders

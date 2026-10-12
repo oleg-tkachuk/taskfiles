@@ -51,7 +51,8 @@ version: "3"
 #   HELM_PACKAGE_FLAGS   extra flags for `helm package`
 #   K8S_NAMESPACE        namespace the chart renders against (default "default")
 #   INFO_ENV_FILE        default ./deploy/info.env
-#   VERSION_BASE         base for untagged builds       (default 0.1.0)
+#   VERSION_BASE         base for untagged builds  (default: latest version
+#                        tag one patch up, or 0.1.0 when there is none)
 #   IMAGE_LATEST     set to 1 to also push a floating :latest beside the
 #                    version tag. Off by default — see the note below.
 #   VERSION_TAG_EXCLUDE  tag glob to keep out of the version (e.g. "api/*")
@@ -148,6 +149,28 @@ vars:
       {{if .VERSION_TAG_EXCLUDE}}--exclude '{{.VERSION_TAG_EXCLUDE}}'{{end}}
       HEAD 2>/dev/null || true
   _REL_TAG: '{{._REL_TAG_RAW | trimPrefix "v"}}'
+  # The base an untagged build counts up from: the newest version tag this
+  # commit descends from, one patch up. It was VERSION_BASE alone, 0.1.0 unless
+  # someone kept it current, so once 1.2.0 was tagged every later build was
+  # 0.1.0-dev… — below the release it followed, and never chosen by a
+  # `>=0.0.0-0` resolver. One patch up puts every build after a tag above it,
+  # a pre-release tag's included. Tags that do not start with a version are
+  # passed over; VERSION_BASE still sets the base outright.
+  _REL_LAST_TAG:
+    sh: >-
+      git describe --tags --abbrev=0 --match 'v[0-9]*' --match '[0-9]*'
+      {{if .VERSION_TAG_EXCLUDE}}--exclude {{.VERSION_TAG_EXCLUDE | q}}{{end}}
+      HEAD 2>/dev/null || true
+  _REL_LAST_CORE: '{{regexFind "^[0-9]+\\.[0-9]+\\.[0-9]+" (._REL_LAST_TAG | trimPrefix "v")}}'
+  # The base when nothing names one and no version tag precedes this commit.
+  _REL_FIRST_BASE: '0.1.0'
+  _REL_BASE: >-
+    {{- if .VERSION_BASE -}}{{.VERSION_BASE}}
+    {{- else if ._REL_LAST_CORE -}}
+    {{- $v := splitList "." ._REL_LAST_CORE -}}
+    {{- index $v 0}}.{{index $v 1}}.{{add1 (index $v 2)}}
+    {{- else -}}{{._REL_FIRST_BASE}}
+    {{- end -}}
   _REL_HELM_LINT_FLAGS: '{{.HELM_LINT_FLAGS | default ""}}'
   _REL_HELM_TPL_FLAGS: '{{.HELM_TEMPLATE_FLAGS | default ""}}'
   _REL_HELM_PKG_FLAGS: '{{.HELM_PACKAGE_FLAGS | default ""}}'
@@ -162,7 +185,7 @@ vars:
     {{- if .APP_VERSION -}}{{.APP_VERSION}}
     {{- else if and ._REL_TAG (not ._REL_DIRTY) -}}{{._REL_TAG}}
     {{- else -}}
-    {{- ._REL_TAG | default .VERSION_BASE | default "0.1.0"}}-dev.{{._REL_CTS}}
+    {{- ._REL_BASE}}-dev.{{._REL_CTS}}
     {{- if ._REL_DIRTY}}.dirty.{{._REL_NOW}}{{end}}.g{{._REL_SHA}}
     {{- end -}}
   _REL_BUILD_TIME:
