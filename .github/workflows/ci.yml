@@ -109,21 +109,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-        run: |
-          set -euo pipefail
-          if [ -z "${BASE:-}" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
-            echo "smoke_skippable=false" >> "$GITHUB_OUTPUT"
-            echo "no usable base for $EVENT — running the full matrix"
-            exit 0
-          fi
-
-          changed=$(git diff --name-only "$BASE" "$HEAD")
-          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '(\.md$|^\.github/)'; then
-            echo "smoke_skippable=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "smoke_skippable=false" >> "$GITHUB_OUTPUT"
-          fi
-          printf 'changed files:\n%s\n' "${changed:-<none>}"
+        run: bash .github/scripts/changes-detect.sh
 
   lint:
     name: Lint
@@ -165,14 +151,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PINNED: ${{ env.TASK_VERSION }}
-        run: |
-          set -euo pipefail
-          latest=$(gh release view --repo go-task/task --json tagName --jq '.tagName' | sed 's/^v//')
-          if [ "$latest" != "$PINNED" ]; then
-            echo "::notice::Task $latest is out; this repository pins $PINNED. Bump TASK_VERSION in this file after reading the changelog."
-          else
-            echo "✔ TASK_VERSION $PINNED is the current release"
-          fi
+        run: bash .github/scripts/lint-task-version-notice.sh
 
       - name: 'Guard: every module lints'
         run: task lint
@@ -230,84 +209,7 @@ jobs:
 
       - name: 'Setup: a consumer that includes the library'
         if: needs.changes.outputs.smoke_skippable != 'true'
-        run: |
-          set -euo pipefail
-          mkdir -p consumer && cd consumer
-          git init -q
-          git config user.email ci@example.invalid
-          git config user.name CI
-          echo placeholder > README.md
-          git add -A && git commit -qm "chore: seed"
-
-          cat > Taskfile.yaml <<'YAML'
-          version: "3"
-          silent: true
-          vars:
-            TASKLIB: '../taskfiles/%s'
-            PROJECT_NAME: smoke
-            IMAGE_NAMESPACE: acme
-            K8S_NAMESPACE: smoke-ns
-            REGISTRY: registry.example.com
-            VERSION_BASE: 9.9.9
-          includes:
-            release:        { taskfile: '{{printf .TASKLIB "release"}}', dir: . }
-            k8s:            { taskfile: '{{printf .TASKLIB "k8s"}}', dir: . }
-            go:             { taskfile: '{{printf .TASKLIB "go"}}', dir: . }
-            python:         { taskfile: '{{printf .TASKLIB "python/poetry"}}', dir: . }
-            pythonuv:       { taskfile: '{{printf .TASKLIB "python/uv"}}', dir: . }
-            node:           { taskfile: '{{printf .TASKLIB "node"}}', dir: . }
-            pnpm:           { taskfile: '{{printf .TASKLIB "pnpm"}}', dir: . }
-            compose:        { taskfile: '{{printf .TASKLIB "compose"}}', dir: . }
-            security:       { taskfile: '{{printf .TASKLIB "security"}}', dir: . }
-            checkov:        { taskfile: '{{printf .TASKLIB "checkov"}}', dir: . }
-            monorepo:       { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: . }
-            argocd:         { taskfile: '{{printf .TASKLIB "argocd"}}', dir: . }
-            auth:           { taskfile: '{{printf .TASKLIB "auth"}}', dir: . }
-            codegen:        { taskfile: '{{printf .TASKLIB "codegen"}}', dir: . }
-            cosign:         { taskfile: '{{printf .TASKLIB "cosign"}}', dir: . }
-            helm:           { taskfile: '{{printf .TASKLIB "helm"}}', dir: . }
-            sealedsecrets:  { taskfile: '{{printf .TASKLIB "sealed-secrets"}}', dir: . }
-            local:          { taskfile: '{{printf .TASKLIB "runtime/orbstack"}}', dir: . }
-            localdocker:    { taskfile: '{{printf .TASKLIB "runtime/docker"}}', dir: . }
-            localk3d:       { taskfile: '{{printf .TASKLIB "runtime/k3d"}}', dir: . }
-            localkind:      { taskfile: '{{printf .TASKLIB "runtime/kind"}}', dir: . }
-            localminikube:  { taskfile: '{{printf .TASKLIB "runtime/minikube"}}', dir: . }
-          tasks: {}
-          YAML
-
-          # A module, so the tasks that compile and generate have something to
-          # act on. Loading a module proves it parses; running one is the only
-          # thing that proves it works, and the two bugs this job exists to
-          # catch — a generator whose output is never normalised, a paired skip
-          # that reports the wrong branch — both parse cleanly.
-          cat > go.mod <<'GOMOD'
-          module example.com/smoke
-
-          go 1.21
-          GOMOD
-
-          cat > smoke.go <<'GOFILE'
-          package smoke
-
-          //go:generate sh -c "printf 'package smoke\n\nconst Generated = true\n' > generated.go"
-
-          // Greeting is what the fixture's test asserts on.
-          func Greeting() string { return "hi" }
-          GOFILE
-
-          cat > smoke_test.go <<'GOTEST'
-          package smoke
-
-          import "testing"
-
-          func TestGreeting(t *testing.T) {
-            if Greeting() != "hi" {
-              t.Fatal("unexpected greeting")
-            }
-          }
-          GOTEST
-
-          git add -A && git commit -qm "chore: fixture"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-setup-consumer.sh"
 
       - name: 'Verify: every module loads side by side'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -325,10 +227,7 @@ jobs:
         # break quietly. COSIGN_SIGN=0 exercises every task's status guard
         # without needing cosign or syft installed, which a real sign/attest
         # run would.
-        run: |
-          set -euo pipefail
-          COSIGN_SIGN=0 task cosign:sign cosign:verify
-          echo "✔ cosign no-ops without a key, syft or the cosign binary"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-cosign-noop.sh"
 
       - name: 'Verify: helm no-ops cleanly with no cluster'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -336,49 +235,14 @@ jobs:
         # helm:list's own status guard skips it when kubectl cannot reach a
         # cluster, which is always true here — this proves that guard, not the
         # Helm listing itself.
-        run: |
-          set -euo pipefail
-          task helm:list
-          echo "✔ helm:list no-ops without a reachable cluster"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-helm-noop.sh"
 
       - name: 'Verify: pnpm:pin:check catches a pnpm shadowing the shim'
         if: needs.changes.outputs.smoke_skippable != 'true'
         # The shadowing pnpm here is the pinned version itself, so a check that
         # only compares versions passes - which is the blind spot this closes.
         # The same PATH with the shim first must still pass.
-        run: |
-          set -euo pipefail
-          PIN=12.7.0
-          SHADOW_MSG="is not corepack's shim"
-          W="$RUNNER_TEMP/pnpm-shadow"
-          mkdir -p "$W/app" "$W/standalone" "$W/shims"
-          command -v corepack >/dev/null || { echo "✖ this runner's Node ships no corepack" >&2; exit 1; }
-          # corepack's own download of the pin, run from its cache rather than
-          # through the shim, is a standalone pnpm without npm installing one.
-          export COREPACK_HOME="$W/corepack"
-          corepack install -g "pnpm@$PIN"
-          standalone="$COREPACK_HOME/v1/pnpm/$PIN/pnpm"
-          test -x "$standalone" || { echo "✖ corepack's cache no longer keeps pnpm at $standalone" >&2; exit 1; }
-          # A wrapper, not a symlink: that launcher finds its own directory from
-          # $0, and through a symlink found on PATH it looks in the wrong place.
-          printf '#!/bin/sh\nexec "%s" "$@"\n' "$standalone" > "$W/standalone/pnpm"
-          chmod +x "$W/standalone/pnpm"
-          corepack enable --install-directory "$W/shims" pnpm
-          cd "$W"
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          includes:
-            pnpm: { taskfile: '$GITHUB_WORKSPACE/taskfiles/pnpm', dir: ., vars: { PNPM_APPS: ["app"] } }
-          YAML
-          printf '{ "name": "shadow", "private": true, "packageManager": "pnpm@%s" }\n' "$PIN" > app/package.json
-
-          if PATH="$W/standalone:$W/shims:$PATH" task pnpm:pin:check 2> shadowed.err; then
-            echo "✖ pin:check passed with a standalone pnpm ahead of the shim" >&2
-            exit 1
-          fi
-          grep -q "$SHADOW_MSG" shadowed.err || { cat shadowed.err >&2; echo "✖ pin:check failed, but not on the shadowing" >&2; exit 1; }
-          PATH="$W/shims:$W/standalone:$PATH" task pnpm:pin:check
-          echo "✔ pin:check fails on a shadowing pnpm and passes with the shim first"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-pnpm-pin-check.sh"
 
       - name: 'Verify: codegen actually generates'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -387,13 +251,7 @@ jobs:
         # tool, so it is the one the library can prove end to end. It also
         # exercises the module's GOWORK=off, which is what made generation fail
         # for a real consumer before it was set.
-        run: |
-          set -euo pipefail
-          test ! -f generated.go
-          task codegen:generate
-          test -f generated.go
-          grep -q 'const Generated = true' generated.go
-          echo "✔ codegen:generate wrote the file its directive asks for"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-codegen-generate.sh"
 
       - name: 'Verify: proto:check derives what it watches, and refuses when it cannot'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -402,117 +260,7 @@ jobs:
         # gate's own behaviours be exercised: the derivation, drift, a
         # regenerated change that is not committed yet, an unparseable
         # template, and a target with nothing committed under it.
-        run: |
-          set -euo pipefail
-          W="$RUNNER_TEMP/protogate"
-          mkdir -p "$W/shims" "$W/gen/go"
-          # The shim stands in for buf: it writes what generation would, which
-          # is whatever canonical.go holds — the stub's "source" here. The
-          # gate regenerates and checks whether that changed the tree.
-          printf '#!/bin/sh\ncp "%s/canonical.go" "%s/gen/go/greet.pb.go"\n' "$W" "$W" > "$W/shims/buf"
-          chmod +x "$W/shims/buf"
-          cd "$W"
-          git init -q . && git config user.email ci@example.com && git config user.name CI
-          printf 'version: v2\nplugins:\n  - local: protoc-gen-go\n    out: gen/go\n' > buf.gen.yaml
-          printf 'package greetv1\n' > canonical.go
-          cp canonical.go gen/go/greet.pb.go
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          includes:
-            cg:
-              taskfile: '$GITHUB_WORKSPACE/taskfiles/codegen'
-              dir: .
-              vars: { PROJECT_NAME: gate, BUF_TEMPLATE: ["buf.gen.yaml"] }
-          tasks: {}
-          YAML
-          git add -A && git commit -qm "seed"
-          export PATH="$W/shims:$PATH"
-
-          task cg:proto:check | grep -q 'stubs match their sources'
-          echo "✔ proto:check passes on a tree whose stubs are committed"
-
-          # Pathspec magic carries a parenthesis, which the shell reads as
-          # syntax unless each pathspec is quoted; the gate died on it before
-          # comparing anything.
-          GLOB_SPEC=':(glob)gen/**'
-          task cg:proto:check PROTO_PATHSPEC="$GLOB_SPEC" | grep -q 'stubs match their sources'
-          printf 'package greetv1\n// drifted\n' > gen/go/greet.pb.go
-          if task cg:proto:check PROTO_PATHSPEC="$GLOB_SPEC" 2> glob.err; then
-            echo "✖ proto:check passed a stale stub under a glob pathspec" >&2; exit 1
-          fi
-          grep -q 'stubs are stale' glob.err
-          git checkout -q -- gen/go
-          echo "✔ proto:check takes a pathspec with magic, and still sees drift through it"
-
-          # A quote in the pathspec is data, not shell: the gate reports the
-          # directory it cannot find instead of failing to parse the value.
-          if task cg:proto:check PROTO_PATHSPEC="gen/it's" > quote.out 2>&1; then
-            echo "✖ proto:check passed a pathspec that names nothing" >&2; exit 1
-          fi
-          grep -q "gen/it's holds no tracked file" quote.out || { cat quote.out >&2; exit 1; }
-          echo "✔ proto:check reads a quote in its pathspec as data"
-
-          # An `out:` path is read from a file, so it is data too: a command
-          # substitution in it must never run.
-          PROBE="$W/substituted"
-          # shellcheck disable=SC2016 # the $(...) is the payload, written literally
-          printf 'version: v2\nplugins:\n  - local: protoc-gen-go\n    out: gen/$(touch %s)\n' "$PROBE" > buf.gen.yaml
-          task cg:proto:check > subst.out 2>&1 || true
-          test ! -e "$PROBE" || { echo "✖ proto:check ran a command substitution from an out: path" >&2; exit 1; }
-          git checkout -q -- buf.gen.yaml
-          echo "✔ proto:check never runs a command substitution from an out: path"
-
-          printf 'package greetv1\n// drifted\n' > gen/go/greet.pb.go
-          if task cg:proto:check 2> drift.err; then
-            echo "✖ proto:check passed on a stale stub" >&2; exit 1
-          fi
-          grep -q 'stubs are stale' drift.err
-          echo "✔ proto:check fails when a stub no longer matches what generation writes"
-          git checkout -q -- gen/go
-
-          # A source change regenerated but not yet committed is a fresh tree:
-          # the gate runs before a commit, so it must pass here.
-          printf 'package greetv1\n// v2\n' > canonical.go
-          task cg:proto >/dev/null
-          task cg:proto:check | grep -q 'stubs match their sources'
-          echo "✔ proto:check passes a regenerated, uncommitted change"
-
-          # The same source change without regenerating is stale.
-          printf 'package greetv1\n// v3\n' > canonical.go
-          if task cg:proto:check 2> source.err; then
-            echo "✖ proto:check passed a source change it was not regenerated for" >&2; exit 1
-          fi
-          grep -q 'stubs are stale' source.err
-          echo "✔ proto:check fails a source change that was not regenerated"
-          printf 'package greetv1\n' > canonical.go
-          git checkout -q -- gen/go
-
-          # `out:` inside a flow mapping: valid YAML, accepted by buf, invisible
-          # to a line parser. The gate must refuse, not report a clean tree.
-          printf 'version: v2\nplugins: [{local: protoc-gen-go, out: gen/go}]\n' > buf.gen.yaml
-          if task cg:proto:check 2> flow.err; then
-            echo "✖ proto:check passed on a template it could not parse" >&2; exit 1
-          fi
-          grep -q 'no out: path in' flow.err
-          echo "✔ proto:check refuses a template whose out: it cannot read"
-
-          # `out: .` is legitimate — a plugin carrying the subdirectory in
-          # `module=` writes from the component root — and watching the root
-          # would report every unrelated change as a stale stub.
-          printf 'version: v2\nplugins:\n  - local: protoc-gen-go\n    out: .\n' > buf.gen.yaml
-          if task cg:proto:check 2> root.err; then
-            echo "✖ proto:check watched the component root" >&2; exit 1
-          fi
-          grep -q 'writes to the component root' root.err
-          echo "✔ proto:check refuses a template that writes to the component root"
-
-          # Every target untracked is a gate that checks nothing, which must be
-          # an error rather than a pass.
-          if task cg:proto:check PROTO_PATHSPEC=gen/nothing 2> empty.err; then
-            echo "✖ proto:check passed with nothing tracked to check" >&2; exit 1
-          fi
-          grep -q 'checks nothing' empty.err
-          echo "✔ proto:check refuses when no watched directory holds a tracked file"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-codegen-proto-check.sh"
 
       - name: 'Verify: the secrets gate asks gitleaks to say where, with values redacted'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -521,26 +269,7 @@ jobs:
         # flags: -v so a finding names its rule, file, line and commit, --redact so
         # neither the secret nor the surrounding match reaches the log. Dropping
         # either one is the regression this guards.
-        run: |
-          set -euo pipefail
-          W="$RUNNER_TEMP/secretsgate"
-          mkdir -p "$W/shims"
-          printf '#!/bin/sh\nprintf "%%s\\n" "$@" > "%s/argv"\nexit 0\n' "$W" > "$W/shims/gitleaks"
-          chmod +x "$W/shims/gitleaks"
-          cd "$W"
-          git init -q . && git config user.email ci@example.com && git config user.name CI
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          includes:
-            sec: { taskfile: '$GITHUB_WORKSPACE/taskfiles/security', dir: . }
-          tasks: {}
-          YAML
-          git add -A && git commit -qm seed
-          PATH="$W/shims:$PATH" task sec:secrets
-
-          grep -qx -- '--redact' argv || { echo "✖ gitleaks was not asked to redact" >&2; cat argv >&2; exit 1; }
-          grep -qx -- '-v' argv       || { echo "✖ gitleaks was not asked to report where" >&2; cat argv >&2; exit 1; }
-          echo "✔ the secrets gate passes both --redact and -v"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-security-secrets.sh"
 
       - name: 'Verify: checkov passes its flags through and treats the version as data'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -548,33 +277,7 @@ jobs:
         # the scan's argv. CHECKOV_FLAGS is shell by contract and must arrive
         # as flags; CHECKOV_VERSION is data — a command substitution in it used
         # to run.
-        run: |
-          set -euo pipefail
-          W="$RUNNER_TEMP/checkovgate"
-          mkdir -p "$W/shims"
-          # shellcheck disable=SC2016 # the shim's own $1 and $@, written literally
-          printf '#!/bin/sh\ncase "$1" in --version) echo 3.3.27; exit 0;; esac\nprintf "%%s\\n" "$@" > "%s/argv"\n' "$W" > "$W/shims/checkov"
-          chmod +x "$W/shims/checkov"
-          cd "$W"
-          printf 'directory: [.]\n' > .checkov.yaml
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          includes:
-            ckv: { taskfile: '$GITHUB_WORKSPACE/taskfiles/checkov', dir: ., vars: { CHECKOV_FLAGS: '--quiet --skip-download' } }
-          tasks: {}
-          YAML
-          export PATH="$W/shims:$PATH"
-
-          task ckv:scan
-          for flag in --quiet --skip-download; do
-            grep -qx -- "$flag" argv || { echo "✖ CHECKOV_FLAGS did not arrive as flags" >&2; cat argv >&2; exit 1; }
-          done
-          echo "✔ checkov passes CHECKOV_FLAGS through as flags"
-
-          # shellcheck disable=SC2016 # the $(...) is the payload, passed literally
-          task ckv:scan 'CHECKOV_VERSION=$(touch substituted)' >/dev/null 2>&1 || true
-          test ! -e substituted || { echo "✖ a command substitution in CHECKOV_VERSION ran" >&2; exit 1; }
-          echo "✔ checkov treats CHECKOV_VERSION as data"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-checkov.sh"
 
       - name: 'Verify: helm passes the context and namespace as single arguments'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -582,28 +285,7 @@ jobs:
         # context and namespace are data: one argument each, never parsed —
         # a command substitution in the context used to run, and a namespace
         # with a space used to split.
-        run: |
-          set -euo pipefail
-          W="$RUNNER_TEMP/helmgate"
-          mkdir -p "$W/shims"
-          printf '#!/bin/sh\nexit 0\n' > "$W/shims/kubectl"
-          # shellcheck disable=SC2016 # the shim's own $@, written literally
-          printf '#!/bin/sh\nprintf "%%s\\n" "$@" > "%s/argv"\n' "$W" > "$W/shims/helm"
-          chmod +x "$W/shims/kubectl" "$W/shims/helm"
-          cd "$W"
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          includes:
-            helm: { taskfile: '$GITHUB_WORKSPACE/taskfiles/helm', dir: . }
-          tasks: {}
-          YAML
-          # shellcheck disable=SC2016 # the $(...) is the payload, passed literally
-          PATH="$W/shims:$PATH" task helm:list 'K8S_CONTEXT=dev$(touch substituted)' 'HELM_NS=my ns'
-          test ! -e substituted || { echo "✖ a command substitution in K8S_CONTEXT ran" >&2; exit 1; }
-          # shellcheck disable=SC2016 # matched literally, as it must arrive
-          grep -qxF 'dev$(touch substituted)' argv || { echo "✖ the context did not arrive as one argument" >&2; cat argv >&2; exit 1; }
-          grep -qx 'my ns' argv || { echo "✖ the namespace did not arrive as one argument" >&2; cat argv >&2; exit 1; }
-          echo "✔ helm passes the context and namespace as single arguments"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-helm-args.sh"
 
       - name: 'Verify: runtime install passes every value as one argument'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -612,55 +294,14 @@ jobs:
         # the namespace and values path carry spaces, the service name a
         # command substitution that used to run, and HELM_UPGRADE_FLAGS is
         # shell by contract and must arrive as flags.
-        run: |
-          set -euo pipefail
-          W="$RUNNER_TEMP/runtimegate"
-          mkdir -p "$W/shims"
-          # shellcheck disable=SC2016 # the shims' own $1 and $@, written literally
-          printf '#!/bin/sh\ncase "$1" in get) echo kind;; esac\nexit 0\n' > "$W/shims/kind"
-          # shellcheck disable=SC2016 # the shim's own $@, written literally
-          printf '#!/bin/sh\nprintf "%%s\\n" "$@" > "%s/argv"\n' "$W" > "$W/shims/helm"
-          chmod +x "$W/shims/kind" "$W/shims/helm"
-          cd "$W"
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          includes:
-            rt: { taskfile: '$GITHUB_WORKSPACE/taskfiles/runtime/kind', dir: . }
-          tasks: {}
-          YAML
-          # shellcheck disable=SC2016 # the $(...) is the payload, passed literally
-          PATH="$W/shims:$PATH" task rt:install 'PROJECT_NAME=svc$(touch substituted)' 'K8S_NAMESPACE=my ns' \
-            'VALUES=my values.yaml' 'HELM_UPGRADE_FLAGS=--wait --atomic' _REL_IMAGE=img _REL_VERSION=1.2.3
-          test ! -e substituted || { echo "✖ a command substitution in PROJECT_NAME ran" >&2; exit 1; }
-          for arg in 'my ns' 'my values.yaml' --wait --atomic 'image.tag=1.2.3'; do
-            grep -qxF -- "$arg" argv || { echo "✖ helm did not get '$arg' as one argument" >&2; cat argv >&2; exit 1; }
-          done
-          echo "✔ runtime install passes every value as one argument"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-runtime-install.sh"
 
       - name: 'Verify: compose splits the engine and keeps the file whole'
         if: needs.changes.outputs.smoke_skippable != 'true'
         # COMPOSE_ENGINE is shell by contract — "podman compose" is a command
         # and its first argument — while COMPOSE_FILE is data and must arrive
         # as one argument even with a space in it. A shim stands in for podman.
-        run: |
-          set -euo pipefail
-          W="$RUNNER_TEMP/composegate"
-          mkdir -p "$W/shims"
-          # shellcheck disable=SC2016 # the shim's own $@, written literally
-          printf '#!/bin/sh\nprintf "%%s\\n" "$@" > "%s/argv"\n' "$W" > "$W/shims/podman"
-          chmod +x "$W/shims/podman"
-          cd "$W"
-          touch 'my compose.yaml'
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          includes:
-            cmp: { taskfile: '$GITHUB_WORKSPACE/taskfiles/compose', dir: ., vars: { COMPOSE_ENGINE: 'podman compose', COMPOSE_FILE: 'my compose.yaml' } }
-          tasks: {}
-          YAML
-          PATH="$W/shims:$PATH" task cmp:logs SERVICE=web
-          [ "$(head -3 argv | tr '\n' '|')" = 'compose|-f|my compose.yaml|' ] || { echo "✖ the engine or the file did not arrive as meant" >&2; cat argv >&2; exit 1; }
-          grep -qx web argv || { echo "✖ SERVICE did not arrive" >&2; cat argv >&2; exit 1; }
-          echo "✔ compose splits the engine and keeps the file whole"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-compose.sh"
 
       - name: 'Verify: sealed-secrets passes the context and paths as data'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -668,30 +309,7 @@ jobs:
         # it through). The context carries a command substitution that used to
         # run; the output sits in a directory with a space; literals split into
         # one --from-literal each.
-        run: |
-          set -euo pipefail
-          W="$RUNNER_TEMP/sealgate"
-          mkdir -p "$W/shims"
-          # shellcheck disable=SC2016 # the shims' own $@, written literally
-          printf '#!/bin/sh\nprintf "%%s\\n" "$@" > "%s/argv"\necho "kind: Secret"\n' "$W" > "$W/shims/kubectl"
-          printf '#!/bin/sh\ncat\n' > "$W/shims/kubeseal"
-          chmod +x "$W/shims/kubectl" "$W/shims/kubeseal"
-          cd "$W"
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          includes:
-            ss: { taskfile: '$GITHUB_WORKSPACE/taskfiles/sealed-secrets', dir: . }
-          tasks: {}
-          YAML
-          # shellcheck disable=SC2016 # the $(...) is the payload, passed literally
-          PATH="$W/shims:$PATH" task ss:seal:literals name=app namespace=prod 'literals=A=1 B=two' \
-            'output=out dir/app.yaml' 'K8S_CONTEXT=dev$(touch substituted)'
-          test ! -e substituted || { echo "✖ a command substitution in K8S_CONTEXT ran" >&2; exit 1; }
-          test -f 'out dir/app.yaml' || { echo "✖ the output path with a space was not honoured" >&2; exit 1; }
-          for arg in --from-literal=A=1 --from-literal=B=two; do
-            grep -qx -- "$arg" argv || { echo "✖ kubectl did not get $arg" >&2; cat argv >&2; exit 1; }
-          done
-          echo "✔ sealed-secrets passes the context and paths as data"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-sealed-secrets.sh"
 
       - name: 'Verify: python passes the source dir and typecheck module as data'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -699,29 +317,7 @@ jobs:
         # call. PY_SRC carries a space, PY a command substitution that used to
         # run in doctor, and TYPECHECK_MODULE must reach Python as an argument
         # rather than as code.
-        run: |
-          set -euo pipefail
-          W="$RUNNER_TEMP/pythongate"
-          mkdir -p "$W/shims" "$W/my src"
-          # shellcheck disable=SC2016 # the shim's own $1 and $@, written literally
-          printf '#!/bin/sh\ncase "$1" in --version) echo "uv 0.13.0"; exit 0;; esac\nprintf "%%s|" "$@" >> "%s/calls"; printf "\\n" >> "%s/calls"\n' "$W" "$W" > "$W/shims/uv"
-          chmod +x "$W/shims/uv"
-          cd "$W"
-          touch pyproject.toml uv.lock
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          includes:
-            py: { taskfile: '$GITHUB_WORKSPACE/taskfiles/python/uv', dir: ., vars: { PY_SRC: 'my src', TYPECHECK_MODULE: 'mypy' } }
-          tasks: {}
-          YAML
-          export PATH="$W/shims:$PATH"
-          # shellcheck disable=SC2016 # the $(...) is the payload, passed literally
-          task py:doctor 'PY=py$(touch substituted)' >/dev/null 2>&1 || true
-          test ! -e substituted || { echo "✖ a command substitution in PY ran" >&2; exit 1; }
-          task py:typecheck
-          grep -qxF 'run|python|-c|import importlib.util, sys; sys.exit(0 if importlib.util.find_spec(sys.argv[1]) else int(sys.argv[2]))|mypy|3|' calls || { echo "✖ the typecheck module did not arrive as an argument" >&2; cat calls >&2; exit 1; }
-          grep -qxF 'run|mypy|my src|' calls || { echo "✖ PY_SRC did not arrive as one argument" >&2; cat calls >&2; exit 1; }
-          echo "✔ python passes the source dir and typecheck module as data"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-python.sh"
 
       - name: 'Verify: auth passes its flags through and refuses a TTL that is not a number'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -730,34 +326,7 @@ jobs:
         # $(( )), which evaluates text as an expression, so anything but digits
         # must be refused before it gets there — a command substitution in it
         # used to run.
-        run: |
-          set -euo pipefail
-          W="$RUNNER_TEMP/authgate"
-          mkdir -p "$W/shims"
-          printf '#!/bin/sh\nprintf "%%s\\n" "$@" > "%s/argv"\ncat >/dev/null\n' "$W" > "$W/shims/step"
-          chmod +x "$W/shims/step"
-          cd "$W"
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          includes:
-            auth: { taskfile: '$GITHUB_WORKSPACE/taskfiles/auth', dir: . }
-          tasks: {}
-          YAML
-          export PATH="$W/shims:$PATH"
-
-          task auth:mint-token JWT_TTL_SECONDS=60 STEP_FLAGS='--no-password --insecure'
-          for flag in --no-password --insecure; do
-            grep -qx -- "$flag" argv || { echo "✖ STEP_FLAGS did not arrive as flags" >&2; cat argv >&2; exit 1; }
-          done
-          echo "✔ auth passes STEP_FLAGS through as flags"
-
-          # shellcheck disable=SC2016 # the $(...) is the payload, passed literally
-          if task auth:mint-token 'JWT_TTL_SECONDS=0 + $(touch substituted)' 2> ttl.err; then
-            echo "✖ auth minted with a TTL that is not a number" >&2; exit 1
-          fi
-          test ! -e substituted || { echo "✖ a command substitution in the TTL ran" >&2; exit 1; }
-          grep -q 'must be a whole number' ttl.err
-          echo "✔ auth refuses a TTL that is not a number, without running it"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-auth.sh"
 
       - name: 'Verify: gosec runs the module''s own tool before one on PATH'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -767,34 +336,7 @@ jobs:
         # gosec on PATH; a module without one falls back to PATH; and with
         # neither the task fails naming `go get -tool`. The tool here is a local
         # stand-in that records its argv, so nothing is fetched.
-        run: |
-          set -euo pipefail
-          W="$RUNNER_TEMP/gosec-tool"
-          mkdir -p "$W/fake/cmd/gosec" "$W/withtool" "$W/plain" "$W/shims"
-          cd "$W"
-          printf 'module example.com/fake\n\ngo 1.24\n' > fake/go.mod
-          printf 'package main\n\nimport (\n\t"os"\n\t"strings"\n)\n\nfunc main() { _ = os.WriteFile("argv", []byte("tool "+strings.Join(os.Args[1:], " ")), 0o644) }\n' > fake/cmd/gosec/main.go
-          printf 'module example.com/withtool\n\ngo 1.24\n\nrequire example.com/fake v0.0.0\n\nreplace example.com/fake => ../fake\n\ntool example.com/fake/cmd/gosec\n' > withtool/go.mod
-          printf 'module example.com/plain\n\ngo 1.24\n' > plain/go.mod
-          printf '#!/bin/sh\nprintf "path %%s" "$*" > argv\n' > shims/gosec
-          chmod +x shims/gosec
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          includes:
-            sec: { taskfile: '$GITHUB_WORKSPACE/taskfiles/security', dir: ., vars: { GO_MODULES: ["withtool", "plain"], GOSEC_FLAGS: "-quiet" } }
-          tasks: {}
-          YAML
-          PATH="$W/shims:$PATH" task sec:gosec
-
-          [ "$(cat withtool/argv)" = "tool -quiet ./..." ] || { echo "✖ the module's tool was not used" >&2; cat withtool/argv >&2; exit 1; }
-          [ "$(cat plain/argv)" = "path -quiet ./..." ]   || { echo "✖ PATH gosec was not the fallback" >&2; cat plain/argv >&2; exit 1; }
-
-          rm -f plain/argv
-          if NO_COLOR=1 task sec:gosec 2> missing.err; then
-            echo "✖ gosec passed with no gosec for a module to run" >&2; exit 1
-          fi
-          grep -q 'go get -tool github.com/securego/gosec/v2/cmd/gosec' missing.err || { cat missing.err >&2; exit 1; }
-          echo "✔ gosec prefers the module's tool, falls back to PATH, and names go get -tool"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-security-gosec.sh"
 
       - name: 'Verify: pnpm:pin:update survives a postinstall that calls pnpm'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -805,50 +347,7 @@ jobs:
         # builds that PATH, then asserts the pin moved AND the postinstall ran
         # on the new version - skipping the script outright would pass the
         # first half and fail the second.
-        run: |
-          set -euo pipefail
-          PIN_FROM=12.4.0
-          PIN_TO=12.7.0
-          MARKER=postinstall-ran.txt
-          W="$RUNNER_TEMP/pnpm-smoke"
-          mkdir -p "$W/app" "$W/standalone" "$W/shims"
-          command -v corepack >/dev/null || { echo "✖ this runner's Node ships no corepack" >&2; exit 1; }
-          # The standalone pnpm is corepack's own download of $PIN_FROM, run
-          # straight from its cache rather than through the shim - the same
-          # binary, minus the shim, which is all "standalone" means here.
-          export COREPACK_HOME="$W/corepack"
-          corepack install -g "pnpm@$PIN_FROM"
-          standalone="$COREPACK_HOME/v1/pnpm/$PIN_FROM/pnpm"
-          test -x "$standalone" || { echo "✖ corepack's cache no longer keeps pnpm at $standalone" >&2; exit 1; }
-          # A wrapper, not a symlink: that launcher finds its own directory from
-          # $0, and through a symlink found on PATH it looks in the wrong place.
-          printf '#!/bin/sh\nexec "%s" "$@"\n' "$standalone" > "$W/standalone/pnpm"
-          chmod +x "$W/standalone/pnpm"
-          corepack enable --install-directory "$W/shims" pnpm
-          export PATH="$W/standalone:$W/shims:$PATH"
-          cd "$W"
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          includes:
-            pnpm: { taskfile: '$GITHUB_WORKSPACE/taskfiles/pnpm', dir: ., vars: { PNPM_APPS: ["app"] } }
-          YAML
-          cat > app/package.json <<JSON
-          { "name": "smoke", "private": true, "packageManager": "pnpm@$PIN_FROM",
-            "scripts": { "postinstall": "pnpm --version > $MARKER" } }
-          JSON
-          task pnpm:pin:update:major -- "$PIN_TO"
-          pm=$(node -p "require('./app/package.json').packageManager")
-          case "$pm" in
-            pnpm@"$PIN_TO"+sha512.*) ;;
-            *) echo "✖ packageManager is $pm, want pnpm@$PIN_TO with its hash" >&2; exit 1 ;;
-          esac
-          test -f app/pnpm-lock.yaml || { echo "✖ pin:update wrote no lockfile" >&2; exit 1; }
-          ran=$(cat "app/$MARKER" 2>/dev/null || true)
-          if [ "$ran" != "$PIN_TO" ]; then
-            echo "✖ postinstall ran as '${ran:-nothing}', want $PIN_TO" >&2
-            exit 1
-          fi
-          echo "✔ pin:update moved the pin and ran postinstall on $PIN_TO"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-pnpm-pin-update.sh"
 
       - name: 'Verify: the go module compiles, tests and builds'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -857,14 +356,7 @@ jobs:
         # deliberately: GO_MAIN defaults to ./cmd/..., which this fixture does
         # not have, and a package with no main is the shape most consumers of
         # the other three tasks actually are.
-        run: |
-          set -euo pipefail
-          task go:fmt
-          task go:fmt:check
-          task go:compile
-          task go:test
-          task go:tidy
-          echo "✔ the go module's tasks run against a real module"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-go-build.sh"
 
       - name: 'Verify: go:fmt:check catches what go:fmt would rewrite'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -874,16 +366,7 @@ jobs:
         # file" would pass on dirty code every time. Un-formatting a file and
         # asserting the non-zero exit is the only way to prove the wrapper's
         # own pass/fail logic, not just that gofmt runs.
-        run: |
-          set -euo pipefail
-          printf 'package smoke\nfunc   Bad ( )   {}\n' > badfmt.go
-          if task go:fmt:check; then
-            echo "✖ go:fmt:check passed on a file gofmt -l would list" >&2
-            exit 1
-          fi
-          rm badfmt.go
-          task go:fmt:check
-          echo "✔ go:fmt:check fails on unformatted code and passes on clean code"
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-go-fmt-check.sh"
 
       - name: "Verify: the consumer's vars reach the modules"
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -891,13 +374,7 @@ jobs:
         # The scoping rule the whole library is built around: a var declared in
         # a module would shadow this. VERSION_BASE is the cheapest observable
         # proof that it does not.
-        run: |
-          set -euo pipefail
-          version=$(task release:version)
-          case "$version" in
-            9.9.9-dev.*) echo "✔ consumer vars reach the modules ($version)" ;;
-            *) echo "✖ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
-          esac
+        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-consumer-vars.sh"
 
   # Dispatches the release; the release itself is
   # .github/workflows/release.yml, which computes the version and creates the
@@ -928,26 +405,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: 'Setup: check out the CI scripts'
+        # Only .github/scripts, under ci/: this job needs nothing
+        # else from the tree.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.CHECKOUT_REF }}
+          path: ci
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
       - name: Dispatch the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          # --input rather than -f: client_payload is nested and the form
-          # syntax cannot express that. Both values come from Actions itself,
-          # never from a contributor, and arrive through env rather than an
-          # Actions expression inside the script, so nothing here is
-          # substituted into the shell before it runs.
-          gh api "repos/${GITHUB_REPOSITORY}/dispatches" --input - <<JSON
-          {
-            "event_type": "release",
-            "client_payload": {
-              "sha": "${GITHUB_SHA}",
-              "ci_run_id": "${GITHUB_RUN_ID}"
-            }
-          }
-          JSON
-          printf '%s\n' "dispatched release for ${GITHUB_SHA}"
+        run: bash "$GITHUB_WORKSPACE/ci/.github/scripts/release-dispatch.sh"
 
   # Cutting a tag is the only thing consumers actually see: they pin
   # `?ref=vX.Y.Z`, so a tag is a promise that this exact tree can be included
@@ -996,17 +468,7 @@ jobs:
         # tagged commit, under a tag push and a workflow_dispatch alike.
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet origin/main >/dev/null; then
-            git fetch --quiet origin main:refs/remotes/origin/main
-          fi
-          if git merge-base --is-ancestor HEAD origin/main; then
-            echo "✔ $TAG is a commit on main"
-            exit 0
-          fi
-          echo "::error::Releases must be cut from main. $TAG points at a commit main does not contain, so it would publish a tree that never passed CI on main — and consumers pinning ?ref=$TAG would fetch exactly that tree."
-          exit 1
+        run: bash .github/scripts/gate-main-only.sh
 
       - name: 'Guard: the tag is SemVer'
         # Helm and OCI both reject a chart version that is not SemVer-2, and
@@ -1014,13 +476,7 @@ jobs:
         # a chart version is a tag no consumer can use.
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          tag="$TAG"
-          case "$tag" in
-            v[0-9]*.[0-9]*.[0-9]*) echo "✔ $tag is SemVer-shaped" ;;
-            *) echo "✖ $tag is not vMAJOR.MINOR.PATCH" >&2; exit 1 ;;
-          esac
+        run: bash .github/scripts/gate-semver.sh
 
   consumable:
     name: Consumable over git
@@ -1028,6 +484,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: 'Setup: check out the CI scripts'
+        # Only .github/scripts, under ci/: the modules themselves
+        # must still arrive over the git include below, not from a checkout.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ env.CHECKOUT_REF }}
+          path: ci
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
       - name: 'Setup: Task'
         uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
@@ -1048,59 +515,10 @@ jobs:
         env:
           REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag || github.ref_name }}
-        # Deliberately NOT a local checkout: this is the only step that proves
+        # Deliberately NOT the local checkout: this is the only step that proves
         # the published tag can be fetched, that every module resolves through
         # the git include path, and that the trust prompt does not block CI.
-        run: |
-          set -euo pipefail
-          mkdir consumer && cd consumer
-          git init -q
-          git config user.email ci@example.invalid
-          git config user.name CI
-          echo placeholder > README.md
-          git add -A && git commit -qm "chore: seed"
-
-          cat > Taskfile.yaml <<YAML
-          version: "3"
-          silent: true
-          vars:
-            TASKLIB: 'https://github.com/OWNER_REPO.git//%s?ref=TAGVALUE'
-            PROJECT_NAME: smoke
-            IMAGE_NAMESPACE: acme
-            K8S_NAMESPACE: smoke-ns
-            REGISTRY: registry.example.com
-            VERSION_BASE: 9.9.9
-          includes:
-            release:  { taskfile: '{{printf .TASKLIB "release"}}', dir: . }
-            k8s:      { taskfile: '{{printf .TASKLIB "k8s"}}', dir: . }
-            go:       { taskfile: '{{printf .TASKLIB "go"}}', dir: . }
-            python:   { taskfile: '{{printf .TASKLIB "python/poetry"}}', dir: . }
-            node:     { taskfile: '{{printf .TASKLIB "node"}}', dir: . }
-            compose:  { taskfile: '{{printf .TASKLIB "compose"}}', dir: . }
-            security: { taskfile: '{{printf .TASKLIB "security"}}', dir: . }
-            monorepo: { taskfile: '{{printf .TASKLIB "monorepo"}}', dir: . }
-            argocd:   { taskfile: '{{printf .TASKLIB "argocd"}}', dir: . }
-            auth:     { taskfile: '{{printf .TASKLIB "auth"}}', dir: . }
-            local:    { taskfile: '{{printf .TASKLIB "runtime/orbstack"}}', dir: . }
-          tasks: {}
-          YAML
-          # python rather than sed: the substitution is literal, so a tag
-          # carrying a `|`, a `&` or a backslash cannot rewrite the expression
-          # or leak into the shell.
-          python3 - "$REPO" "$TAG" <<'SUBST'
-          import sys, pathlib
-          p = pathlib.Path("Taskfile.yaml")
-          p.write_text(p.read_text().replace("OWNER_REPO", sys.argv[1]).replace("TAGVALUE", sys.argv[2]))
-          SUBST
-
-          # --yes accepts the first-fetch trust prompt; unattended, that prompt
-          # is a hang rather than a question.
-          task --yes --list-all > /dev/null
-          version=$(task --yes release:version)
-          case "$version" in
-            9.9.9-dev.*) echo "✔ the published tag includes and resolves ($version)" ;;
-            *) echo "✖ expected a 9.9.9 base, got $version" >&2; exit 1 ;;
-          esac
+        run: bash "$GITHUB_WORKSPACE/ci/.github/scripts/consumable-include.sh"
 
   publish:
     name: Publish
@@ -1127,11 +545,4 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         # Notes come from merged PRs since the previous tag, which is why
         # opening one carries a label — see .github/release.yml.
-        run: |
-          set -euo pipefail
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "✔ release $TAG already exists"
-            exit 0
-          fi
-          gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
-          echo "✔ released $TAG"
+        run: bash .github/scripts/publish-release.sh
