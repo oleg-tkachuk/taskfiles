@@ -29,8 +29,8 @@ version: "3"
 #   TRIVY_SCANNERS     default "--scanners vuln,secret"
 #   TRIVY_SUBCOMMAND   default "fs"; "image" to scan a built image instead
 #   TRIVY_TARGET       what to scan              (default ".")
-#   TRIVY_SKIP_DIRS    trivy's skip flags, verbatim  (default "--skip-dirs .claude");
-#                      replaces the default, so keep .claude in a value of your own
+#   TRIVY_SKIP_DIRS    list of directories trivy walks past (default [".claude"]);
+#                      replaces the default, so keep .claude in a list of your own
 #   TRIVY_FLAGS        extra trivy flags
 #   BUF_BREAKING_FLAGS extra buf breaking flags
 #   HADOLINT_FLAGS     hadolint flags (default "--failure-threshold error")
@@ -43,7 +43,7 @@ version: "3"
 # ─────────────────────────────────────────────────────────────────────────────
 # shell-verbatim: CMD _SEC_PRUNE SCAN_EXCLUDE _SEC_GOSEC_FLAGS GOSEC_FLAGS _SEC_VULN_FLAGS GOVULNCHECK_FLAGS
 # shell-verbatim: _SEC_LINT_FLAGS GOLANGCI_FLAGS _SEC_GL_FLAGS GITLEAKS_FLAGS _SEC_TRIVY_SCAN TRIVY_SCANNERS
-# shell-verbatim: _SEC_TRIVY_SKIP TRIVY_SKIP_DIRS _SEC_TRIVY_FLAGS TRIVY_FLAGS _SEC_TRIVY_CONFIG_FLAGS
+# shell-verbatim: _SEC_TRIVY_FLAGS TRIVY_FLAGS _SEC_TRIVY_CONFIG_FLAGS
 # shell-verbatim: TRIVY_CONFIG_FLAGS _SEC_BUF_FLAGS BUF_BREAKING_FLAGS _SEC_HADOLINT_FLAGS HADOLINT_FLAGS
 
 silent: true
@@ -73,7 +73,11 @@ vars:
   # every finding arrives twice — once against code that ships and once against
   # a tree nobody builds. find-based discovery prunes them through _SEC_PRUNE;
   # trivy walks the filesystem itself and has to be told separately.
-  _SEC_TRIVY_SKIP: '{{.TRIVY_SKIP_DIRS | default "--skip-dirs .claude"}}'
+  # A list of directories, one --skip-dirs each. It was trivy's flags
+  # verbatim under a name that promised directories, so a bare directory
+  # became a second positional argument to trivy.
+  _SEC_TRIVY_SKIP:
+    ref: 'default (list ".claude") .TRIVY_SKIP_DIRS'
   _SEC_TRIVY_FLAGS: '{{.TRIVY_FLAGS | default ""}}'
   # Its own input, not a share of TRIVY_FLAGS: `trivy config` and `trivy fs`
   # are two invocations with two flag sets, and a flag meant for one is an
@@ -190,10 +194,10 @@ tasks:
         msg: "trivy is not installed — https://github.com/aquasecurity/trivy#installation"
     cmds:
       - printf '%s sec · trivy %s %s\n' "{{._SEC_RUN}}" {{._SEC_TRIVY_SUB | q}} {{._SEC_TRIVY_TARGET | q}}
-      - trivy {{._SEC_TRIVY_SUB | q}} {{._SEC_TRIVY_SCAN}} --exit-code 1 --quiet {{._SEC_TRIVY_SKIP}} {{._SEC_TRIVY_FLAGS}} {{._SEC_TRIVY_TARGET | q}}
+      - trivy {{._SEC_TRIVY_SUB | q}} {{._SEC_TRIVY_SCAN}} --exit-code 1 --quiet {{range $d := ._SEC_TRIVY_SKIP}}--skip-dirs {{$d | q}} {{end}} {{._SEC_TRIVY_FLAGS}} {{._SEC_TRIVY_TARGET | q}}
       # Misconfiguration findings are informational: they are dense, noisy, and
       # blocking on them would stop every release for a Kubernetes default.
-      - trivy config --exit-code 0 --quiet {{._SEC_TRIVY_SKIP}} {{._SEC_TRIVY_CONFIG_FLAGS}} .
+      - trivy config --exit-code 0 --quiet {{range $d := ._SEC_TRIVY_SKIP}}--skip-dirs {{$d | q}} {{end}} {{._SEC_TRIVY_CONFIG_FLAGS}} .
       - printf '%s sec · trivy clean\n' "{{._SEC_OK}}"
 
   proto:breaking:
