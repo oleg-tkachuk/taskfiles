@@ -20,7 +20,7 @@ printf '{\n    "CKV_K8S_1"\n}\n' > "$CONSUMER/.checkov.baseline"
 export FAKE_CRASH=1
 run_task checkov:baseline
 expect_status fail "baseline: a crashed run fails the task"
-expect_output "the baseline was not written" "baseline: says the baseline was not written"
+expect_output ".checkov.baseline was not written" "baseline: says the baseline was not written"
 expect_output "Traceback: boom" "baseline: shows what checkov printed"
 refute_output "baselined findings" "baseline: does not report a count it never produced"
 unset FAKE_CRASH
@@ -28,6 +28,18 @@ unset FAKE_CRASH
 run_task checkov:baseline
 expect_status ok "baseline: a run that wrote the baseline passes, findings or not"
 expect_output "baselined findings: 1 → 2" "baseline: reports the count before and after"
+
+# A baseline under another name is one checkov never writes: refused up front.
+consumer checkov checkov "{ CHECKOV_BASELINE: security/accepted.json }"
+reset_calls
+run_task checkov:baseline
+expect_status fail "baseline: a name checkov never writes is refused"
+expect_output "checkov writes .checkov.baseline into the directory it scans" "baseline: the refusal says where checkov writes"
+refute_call "--create-baseline" "baseline: checkov does not run for a name it would never write"
+consumer checkov checkov "{ CHECKOV_BASELINE: deploy/.checkov.baseline }"
+reset_calls
+run_task checkov:baseline
+refute_output "and nowhere else" "baseline: the name checkov writes is accepted in any directory"
 
 # Pinned and absent: the shimmed checkov is 3.2.0, so 3.3.18 goes through uvx.
 shim uvx 'exit 0'

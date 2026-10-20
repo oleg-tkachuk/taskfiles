@@ -21,7 +21,7 @@ includes:
 | Var | Default | Meaning |
 |---|---|---|
 | `CHECKOV_CONFIG` | `.checkov.yaml` | the config `scan` and `baseline` pass to checkov |
-| `CHECKOV_BASELINE` | `.checkov.baseline` | findings already accepted; `scan` reports only what is new. Required to exist only when the config names a baseline — a config without one scans everything |
+| `CHECKOV_BASELINE` | `.checkov.baseline` | findings already accepted; `scan` reports only what is new. Required to exist only when the config names a baseline — a config without one scans everything. `checkov:baseline` takes only `<scanned directory>/.checkov.baseline`: checkov writes no other name |
 | `CHECKOV_VERSION` | — | the version to run, whatever is installed |
 | `CHECKOV_VERSION_CMD` | — | a command printing one, for a version that already lives somewhere |
 | `CHECKOV_FRAMEWORKS` | `["github_actions", "dockerfile", "helm", "kubernetes"]` | list of frameworks the triage view walks |

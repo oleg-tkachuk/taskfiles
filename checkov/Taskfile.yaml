@@ -38,7 +38,10 @@ silent: true
 
 vars:
   _CKV_CFG: '{{.CHECKOV_CONFIG | default ".checkov.yaml"}}'
-  _CKV_BASE: '{{.CHECKOV_BASELINE | default ".checkov.baseline"}}'
+  # The one name checkov writes a baseline under, in the directory it scans;
+  # --create-baseline takes no path.
+  _CKV_BASE_NAME: .checkov.baseline
+  _CKV_BASE: '{{.CHECKOV_BASELINE | default ._CKV_BASE_NAME}}'
   _CKV_FW:
     ref: 'default (list "github_actions" "dockerfile" "helm" "kubernetes") .CHECKOV_FRAMEWORKS'
   # A real list, not a string this module splits. `ref:` is what keeps it one
@@ -216,6 +219,10 @@ tasks:
       # Either is enough — see _CKV_RESOLVE.
       - sh: command -v checkov >/dev/null || command -v uvx >/dev/null
         msg: "neither checkov nor uv is installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
+      # A baseline under any other name is one checkov never writes, so the run
+      # below always ended in "the baseline was not written".
+      - sh: test {{base ._CKV_BASE | q}} = {{._CKV_BASE_NAME | q}}
+        msg: "CHECKOV_BASELINE is {{._CKV_BASE}}, and checkov writes {{._CKV_BASE_NAME}} into the directory it scans and nowhere else — point it at <that directory>/{{._CKV_BASE_NAME}}"
     prompt: |
       Regenerating the baseline accepts every CURRENT finding as permitted,
       including any regression introduced since the last run. Do this after
@@ -250,7 +257,8 @@ tasks:
           status=0
           run_checkov --config-file {{._CKV_CFG | q}} {{._CKV_FLAGS}} --create-baseline >"$log" 2>&1 || status=$?
           if ! [ {{._CKV_BASE | q}} -nt "$stamp" ]; then
-            printf '%s\n' "{{._CKV_ERR}} checkov · the baseline was not written (checkov exited ${status}); the last of its output:" >&2
+            printf '%s checkov · %s was not written (checkov exited %s); checkov writes %s into the directory it scans. The last of its output:\n' \
+              "{{._CKV_ERR}}" {{._CKV_BASE | q}} "$status" {{._CKV_BASE_NAME | q}} >&2
             tail -n {{._CKV_LOG_TAIL | q}} "$log" | sed 's/^/    /' >&2
             exit 1
           fi
