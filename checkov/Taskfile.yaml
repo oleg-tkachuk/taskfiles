@@ -62,9 +62,9 @@ vars:
   # nothing.
   #
   # Unpinned is unchanged: whatever is on PATH, and the install page when there
-  # is nothing there. Pinned and absent goes through `pipx run`, because
-  # checkov is a Python tool and that is how it is installed at a version
-  # without touching what else the machine has.
+  # is nothing there. Pinned and absent goes through `uvx`, because checkov
+  # is a Python tool and that is how it runs at a version without touching
+  # what else the machine has.
   #
   # CHECKOV_VERSION_CMD is for a version that already lives somewhere, so that
   # naming it here does not make a second copy to keep in step — the same
@@ -104,11 +104,11 @@ vars:
       run_checkov() { checkov "$@"; }
     elif [ "$checkov_installed" = "$checkov_version" ]; then
       run_checkov() { checkov "$@"; }
-    elif command -v pipx >/dev/null 2>&1; then
-      printf '%s\n' "{{._CKV_RUN}} checkov · ${checkov_version} through pipx, not the ${checkov_installed:-none} on PATH"
-      run_checkov() { pipx run "checkov==${checkov_version}" "$@"; }
+    elif command -v uvx >/dev/null 2>&1; then
+      printf '%s\n' "{{._CKV_RUN}} checkov · ${checkov_version} through uvx, not the ${checkov_installed:-none} on PATH"
+      run_checkov() { uvx "checkov@${checkov_version}" "$@"; }
     else
-      printf '%s\n' "{{._CKV_ERR}} checkov ${checkov_version} is pinned, ${checkov_installed:-nothing} is installed, and pipx is absent — pipx install checkov==${checkov_version}" >&2
+      printf '%s\n' "{{._CKV_ERR}} checkov ${checkov_version} is pinned, ${checkov_installed:-nothing} is installed, and uv is absent — https://docs.astral.sh/uv/getting-started/installation/" >&2
       exit 1
     fi
 
@@ -117,11 +117,11 @@ tasks:
   scan:
     desc: "Policy-scan manifests, charts, Dockerfiles and workflows against the baseline"
     preconditions:
-      # Either is enough: a pinned version runs through pipx, so a machine
-      # with pipx and no checkov is a working one. Which of the two applies is
+      # Either is enough: a pinned version runs through uvx, so a machine
+      # with uv and no checkov is a working one. Which of the two applies is
       # decided by _CKV_RESOLVE, whose messages name the exact case.
-      - sh: command -v checkov >/dev/null || command -v pipx >/dev/null
-        msg: "neither checkov nor pipx is installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
+      - sh: command -v checkov >/dev/null || command -v uvx >/dev/null
+        msg: "neither checkov nor uv is installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
       - sh: test -f {{._CKV_CFG | q}}
         msg: "{{._CKV_CFG}} not found — set CHECKOV_CONFIG"
       # A missing baseline that the config NAMES is not "no findings accepted
@@ -181,8 +181,8 @@ tasks:
     desc: "Every checkov finding, baselined ones included — a triage view, never a gate"
     preconditions:
       # Either is enough — see _CKV_RESOLVE.
-      - sh: command -v checkov >/dev/null || command -v pipx >/dev/null
-        msg: "neither checkov nor pipx is installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
+      - sh: command -v checkov >/dev/null || command -v uvx >/dev/null
+        msg: "neither checkov nor uv is installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
       # checkov reports a directory it cannot open on stderr — "Directory X
       # does not exist; skipping it" — and then exits 0. A wrong target is
       # therefore a scan of NOTHING wearing a green exit code, which is the
@@ -214,8 +214,8 @@ tasks:
       _CKV_LOG_TAIL: '20'
     preconditions:
       # Either is enough — see _CKV_RESOLVE.
-      - sh: command -v checkov >/dev/null || command -v pipx >/dev/null
-        msg: "neither checkov nor pipx is installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
+      - sh: command -v checkov >/dev/null || command -v uvx >/dev/null
+        msg: "neither checkov nor uv is installed — https://www.checkov.io/2.Basics/Installing%20Checkov.html"
     prompt: |
       Regenerating the baseline accepts every CURRENT finding as permitted,
       including any regression introduced since the last run. Do this after
