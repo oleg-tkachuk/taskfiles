@@ -108,4 +108,18 @@ expect_inert pwned-chart "doctor: CHART_DIR is not run as shell"
 expect_inert pwned-doctor-registry "doctor: REGISTRY is not run as shell"
 expect_output "chart $p → oci://$r/charts/app" "doctor: CHART_DIR and REGISTRY are printed as text"
 
+# "no git history" comes from HEAD naming no commit, never from the sha's
+# value: a real commit can abbreviate to 00000000, the placeholder an empty
+# history is versioned with.
+consumer release release "{ PROJECT_NAME: app }"
+run_task release:doctor
+expect_output "no git history" "doctor: a tree with no commit has no git history"
+real_git=$(command -v git)
+git -C "$CONSUMER" init -q
+git -C "$CONSUMER" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m seed
+shim git "case \"\$*\" in \"rev-parse --short=8 HEAD\") echo 00000000 ;; *) exec $real_git \"\$@\" ;; esac"
+run_task release:doctor
+refute_output "no git history" "doctor: a commit whose short sha is 00000000 still has history"
+rm -f "$BIN/git"
+
 finish

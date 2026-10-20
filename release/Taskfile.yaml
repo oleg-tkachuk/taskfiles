@@ -137,8 +137,14 @@ vars:
   # short sha with a leading zero is an invalid SemVer numeric identifier
   # ("MUST NOT include leading zeroes") and Helm rejects the chart version.
   #
-  _REL_SHA:
-    sh: git rev-parse --short=8 HEAD 2>/dev/null || printf '%s' 00000000
+  # Empty when HEAD names no commit — no git history — and that emptiness is
+  # what doctor checks. _REL_SHA fills the gap with _REL_NO_SHA so the version
+  # stays well-formed; it was the sentinel itself once, and a real commit
+  # whose short sha is 00000000 then read as "no git history".
+  _REL_SHA_RAW:
+    sh: git rev-parse --short=8 HEAD 2>/dev/null || true
+  _REL_NO_SHA: '00000000'
+  _REL_SHA: '{{._REL_SHA_RAW | default ._REL_NO_SHA}}'
   _REL_CTS:
     sh: git show -s --format=%ct HEAD 2>/dev/null || printf '%s' 0
   # VERSION_TAG_EXCLUDE keeps a tag namespace out of the version: a repo that
@@ -236,7 +242,7 @@ tasks:
 
           svc={{._REL_SVC | q}}
           version={{._REL_VERSION | q}}
-          sha={{._REL_SHA | q}}
+          sha_raw={{._REL_SHA_RAW | q}}
           dirty={{._REL_DIRTY | q}}
           chart_dir={{._REL_CHART_DIR | q}}
           chart={{._REL_CHART | q}}
@@ -259,7 +265,7 @@ tasks:
           # ─── version ──────────────────────────────────────────────────────
           if [ -z "$version" ]; then
             bad "no version could be derived — is this a git repository?"
-          elif [ "$sha" = "00000000" ]; then
+          elif [ -z "$sha_raw" ]; then
             bad "no git history — every build would publish the same version"
           else
             say '{{._REL_OK}}' "version $version"
