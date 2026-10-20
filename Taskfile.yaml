@@ -61,6 +61,7 @@ tasks:
       - task: check:readme
       - task: check:surface
       - task: check:runtime
+      - task: check:python
       - task: check:quoting
       - task: check:behaviour
       - task: check:ci-scripts
@@ -335,6 +336,35 @@ tasks:
             fi
           done
           [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every runtime/* variant matches outside its own cluster handling"
+          exit "$fail"
+
+  check:python:
+    desc: "Refuse a python/* variant whose tool-neutral tasks have drifted from the other's"
+    # poetry and uv cannot share a file — every task that installs, locks or
+    # reports calls its own manager — but the tasks that only run a tool inside
+    # the environment are the same task twice. python/poetry's test, lint and
+    # fmt once went a release without the `deps: [install]` python/uv had, and
+    # check:surface caught the deps: half of that only. These are compared
+    # whole, once the three things that may differ are made the same: the var
+    # prefix, the manager's `run`, and the label in the log line.
+    vars:
+      # Tasks that call nothing of the manager's but `run`.
+      _PYTHON_SHARED: test lint fmt typecheck
+      _PYTHON_NORMALISE: 's/_(PY|UV)_/_X_/g; s/(poetry|uv) run/RUN/g; s/ · (py|uv) · / · X · /g'
+    cmds:
+      - cmd: |-
+          set -eu
+          fail=0
+          for t in {{._PYTHON_SHARED}}; do
+            a=$(yq ".tasks[\"$t\"] | ... comments=\"\"" python/poetry/Taskfile.yaml | sed -E {{._PYTHON_NORMALISE | q}})
+            b=$(yq ".tasks[\"$t\"] | ... comments=\"\"" python/uv/Taskfile.yaml | sed -E {{._PYTHON_NORMALISE | q}})
+            if [ "$a" != "$b" ]; then
+              printf '%s\n' "{{._LIB_ERR}} taskfiles · python/uv's $t has drifted from python/poetry's:" >&2
+              diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | sed 's/^/    /' >&2
+              fail=1
+            fi
+          done
+          [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · python/* variants agree on their tool-neutral tasks"
           exit "$fail"
 
   # ─── docs ───────────────────────────────────────────────────────────────────
