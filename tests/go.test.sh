@@ -53,4 +53,15 @@ run_task go:bench "BENCH=Foo|$payload"
 if [ -e "$pwned" ]; then fail "bench: a \$( ) in BENCH ran"; else pass "bench: a \$( ) in BENCH does not run"; fi
 expect_call "go|test|-tags=integration|-run=^\$|-bench=Foo|$payload|-benchtime=1x|./...|" "bench: the pattern reaches go as one argument"
 
+# GOWORK: off by default, and "auto" is the explicit opt-in to the workspace —
+# an empty value cannot be one, `default` reads it as unset.
+shim go 'printf "go GOWORK=[%s]\n" "${GOWORK-unset}" >> "$CALLS"'
+for case in "default|off|" "auto|auto|GOWORK=auto" "empty|off|GOWORK=" "path|/w/go.work|GOWORK=/w/go.work"; do
+  IFS="|" read -r label expected arg <<< "$case"
+  expected=${expected/auto/}
+  reset_calls
+  run_task --force go:compile ${arg:+"$arg"}
+  expect_call "go GOWORK=[$expected]" "gowork: $label reaches go as [$expected]"
+done
+
 finish

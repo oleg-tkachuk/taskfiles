@@ -48,7 +48,7 @@ component's directory.
 | `MOCKS_PATHSPEC` | `internal` | git pathspec the mock gate watches |
 | `PROTO_PATHSPEC` | derived from the templates' `out:` | git pathspec the proto gate watches |
 | `SQLC_DIR` | — | directory the sqlc gate watches; required by `sqlc:check` |
-| `GOWORK` | `off` | set to `""` to generate through a go.work workspace |
+| `GOWORK` | `off` | `auto` to generate through a go.work workspace (an empty value keeps `off`) |
 
 ## Examples
 

@@ -50,7 +50,7 @@ workspace — tasks then read `go:<task>`.
 | `GO_BENCH_PKG` | `GO_PKG` | packages to benchmark, space-separated like `GO_PKG` |
 | `GO_BENCH_FLAGS` | `-benchtime=1x` | flags for the benchmark run |
 | `GO_TEST_TAGS` | `integration` | for the tagged suites |
-| `GOWORK` | `off` | set to `""` to build through the workspace |
+| `GOWORK` | `off` | `auto` to build through the workspace (an empty value keeps `off`) |
 
 The `*_FLAGS` inputs are shell: they are word-split and parsed as written.
 Every other value reaches the tool as data.
