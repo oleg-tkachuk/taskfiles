@@ -32,7 +32,7 @@
       "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.yml$/", "/^lefthook\\.yml$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+?)(?: extractVersion=(?<extractVersion>\\S+?))?\\s+[A-Z0-9_]+_VERSION:\\s*(?<currentValue>\\S+)",
-        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+?)\\s+run: pipx run \\S+?==(?<currentValue>\\S+)"
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+?)\\s+run: uvx \\S+?@(?<currentValue>\\S+)"
       ]
     }
   ],

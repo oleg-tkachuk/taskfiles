@@ -23,8 +23,8 @@ ANNOTATION='# renovate:'
 # The job-level condition that keeps an issue event from anyone but the
 # dashboard's real author from starting a run holding the token.
 AUTHOR_CHECK='github.event.issue.user.login == github.repository_owner'
-# A pin no built-in manager sees: a *_VERSION key, or a `pipx run tool==x`.
-PIN_RE='^[[:space:]]*[A-Z0-9_]+_VERSION:[[:space:]]*[0-9]|pipx run [^[:space:]]+=='
+# A pin no built-in manager sees: a *_VERSION key, or a `uvx tool@x`.
+PIN_RE='^[[:space:]]*[A-Z0-9_]+_VERSION:[[:space:]]*[0-9]|uvx [^[:space:]]+@'
 
 found=0
 report() { printf '%s\n' "$*"; found=1; }

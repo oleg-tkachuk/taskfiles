@@ -41,7 +41,7 @@ expect reported root-config-shadows 'printf "{}\n" > renovate.json'
 expect reported pin-not-annotated \
   'perl -0pi -e "s/  # renovate: datasource=github-releases[^\n]*\n//" .github/workflows/ci.yml'
 expect reported annotation-not-matched \
-  'perl -0pi -e "s/run: pipx run zizmor==/run: pipx run --spec zizmor==/" lefthook.yml'
+  'perl -0pi -e "s/run: uvx zizmor@/run: uvx --from zizmor@/" lefthook.yml'
 expect reported new-pin-not-annotated \
   'printf "env:\n  HELM_VERSION: 3.19.0\n" > .github/workflows/extra.yml'
 expect reported author-check-dropped \
