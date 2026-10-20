@@ -72,10 +72,11 @@ jobs:
         run: |
           printf 'dispatched by CI run %s for commit %s\n' "${CI_RUN:-unknown}" "${SHA:-unknown}"
 
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-          cache: npm
+      # Node at the CI scripts' pin, which the last step needs anyway, and no
+      # dependency cache: this job holds a write token, and a cache another
+      # run wrote is not something to restore into it.
+      - name: 'Setup: the CI scripts'
+        uses: ./.github/actions/setup-ci
 
       # package.json/package-lock.json already pin semantic-release and its
       # conventionalcommits preset, so this installs the exact versions
@@ -109,4 +110,4 @@ jobs:
       - name: Release the tag it just pushed
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash .github/scripts/release-dispatch-ci.sh
+        run: node .github/ci/release-dispatch-ci.ts

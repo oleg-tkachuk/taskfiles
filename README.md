@@ -145,9 +145,11 @@ the pre-commit hook, in its `auditor` persona. Actions are pinned to commit
 SHAs with the version in a trailing comment, and Renovate moves the pins —
 a tag is mutable, and a pin nobody updates is its own problem.
 
-A step longer than one command runs a script from `.github/scripts/` rather
-than carrying it in the YAML, so the script is shellchecked and can be run on
-a laptop. `task lint` refuses a multi-line `run:` and a script no step runs.
+A step longer than one command runs a TypeScript command from `.github/ci/`
+rather than carrying it in the YAML, so it is type-checked, unit-tested and
+can be run on a laptop. Node runs the files as they are; the
+`setup-ci` action pins Node and installs the locked dependencies. `task lint`
+refuses a multi-line `run:` and a command no step runs.
 
 #### How a module is written
 

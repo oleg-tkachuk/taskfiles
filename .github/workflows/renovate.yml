@@ -71,6 +71,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: 'Setup: the CI scripts'
+        uses: ./.github/actions/setup-ci
+
       - name: 'Decide: a dashboard checkbox was newly ticked'
         id: tick
         if: github.event_name == 'issues'
@@ -79,13 +82,13 @@ jobs:
         env:
           BODY_BEFORE: ${{ github.event.changes.body.from }}
           BODY_AFTER: ${{ github.event.issue.body }}
-        run: bash .github/scripts/renovate-tick.sh
+        run: node .github/ci/renovate-tick.ts
 
       - name: 'Guard: RENOVATE_TOKEN is set'
         if: github.event_name != 'issues' || steps.tick.outputs.proceed == 'true'
         env:
           RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
-        run: bash .github/scripts/renovate-require-token.sh
+        run: node .github/ci/renovate-require-token.ts
 
       - name: 'Run: Renovate'
         if: github.event_name != 'issues' || steps.tick.outputs.proceed == 'true'
