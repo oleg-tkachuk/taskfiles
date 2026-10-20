@@ -32,6 +32,9 @@ silent: true
 
 vars:
   _RT_SVC: '{{.PROJECT_NAME | default "service"}}'
+  # The release name, which the chart's Deployment takes: the name k8s finds
+  # it by, so the two modules read the same input for it.
+  _RT_RELEASE: '{{.K8S_DEPLOYMENT_NAME | default ._RT_SVC}}'
   _RT_CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
   _RT_K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
   # The profile the image is loaded into and the context helm installs to are
@@ -80,7 +83,7 @@ tasks:
       - task: image:load
       - printf '%s %s · local · helm upgrade --install into %s/%s\n' "{{._RT_RUN}}" {{._RT_SVC | q}} {{._RT_CTX | q}} {{._RT_K8S_NS | q}}
       - >-
-        helm upgrade --install {{._RT_SVC | q}} {{._RT_CHART_DIR | q}}
+        helm upgrade --install {{._RT_RELEASE | q}} {{._RT_CHART_DIR | q}}
         --kube-context {{._RT_CTX | q}}
         --namespace {{._RT_K8S_NS | q}} --create-namespace
         --set image.tag={{._REL_VERSION | q}}

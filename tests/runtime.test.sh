@@ -81,6 +81,16 @@ run_task local:install
 expect_status fail "k3d: a cluster that does not exist is refused"
 refute_call "k3d image import" "k3d: nothing is imported into a cluster that does not exist"
 
+# The release is the name k8s addresses: K8S_DEPLOYMENT_NAME, else PROJECT_NAME.
+include_runtime kind '{}'
+reset_calls
+run_task local:install
+expect_call "helm upgrade --install app " "release: named after PROJECT_NAME by default"
+include_runtime kind '{ K8S_DEPLOYMENT_NAME: app-api }'
+reset_calls
+run_task local:install
+expect_call "helm upgrade --install app-api " "release: named after K8S_DEPLOYMENT_NAME when set"
+
 include_runtime minikube '{}'
 reset_calls
 run_task local:install
