@@ -22,4 +22,17 @@ expect_status fail "vuln: a GO_MODULES entry that does not exist fails"
 expect_output "GO_MODULES names apii, which does not exist" "vuln: the missing entry is named"
 if [ -e "$CONSUMER/apii" ]; then fail "vuln: the missing directory was created"; else pass "vuln: the missing directory is not created"; fi
 
+# trivy: one --skip-dirs per listed directory, each a single argument.
+shim trivy 'printf "[%s]" "$@" >> "$CALLS"; printf "\n" >> "$CALLS"'
+consumer security security
+reset_calls
+run_task security:trivy
+expect_status ok "trivy: runs with the default skip list"
+expect_call "[--skip-dirs][.claude][.]" "trivy: skips .claude by default"
+consumer security security "{ TRIVY_SKIP_DIRS: [.claude, 'third party'] }"
+reset_calls
+run_task security:trivy
+expect_call "[--skip-dirs][.claude][--skip-dirs][third party][.]" "trivy: each listed directory is one --skip-dirs argument"
+expect_call "[config][--exit-code][0][--quiet][--skip-dirs][.claude][--skip-dirs][third party]" "trivy: config skips the same directories"
+
 finish

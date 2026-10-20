@@ -40,7 +40,7 @@ workspace — tasks then read `sec:<task>`.
 | `TRIVY_SUBCOMMAND` | `fs` | `image` to scan a built image instead |
 | `TRIVY_SCANNERS` | `--scanners vuln,secret` | which scanners run; `--scanners misconfig` for IaC |
 | `TRIVY_TARGET` | `.` | what to scan |
-| `TRIVY_SKIP_DIRS` | `--skip-dirs .claude` | trivy's skip flags, verbatim — `--skip-dirs .claude --skip-dirs vendor`; a value replaces the default |
+| `TRIVY_SKIP_DIRS` | `[".claude"]` | list of directories trivy walks past — `[.claude, vendor]`; a list replaces the default |
 | `TRIVY_FLAGS` | — | extra flags for the `trivy fs` call |
 | `TRIVY_CONFIG_FLAGS` | `TRIVY_FLAGS` | extra flags for the `trivy config` call |
 | `BUF_BREAKING_FLAGS` | — | extra buf breaking flags |

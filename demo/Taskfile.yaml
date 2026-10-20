@@ -59,7 +59,7 @@ vars:
   # run as) — not something this repo ships. Same reasoning TRIVY_SKIP_DIRS's
   # own default excludes .claude for: it is not code the security step exists
   # to judge.
-  TRIVY_SKIP_DIRS: '--skip-dirs .claude --skip-dirs deploy/registry'
+  TRIVY_SKIP_DIRS: [.claude, deploy/registry]
 
   # The in-cluster registry's Helm release and chart.
   REGISTRY_RELEASE: registry
