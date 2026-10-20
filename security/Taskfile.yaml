@@ -211,12 +211,18 @@ tasks:
   # a Go one, or not one here, and failing would make `all` unusable for every
   # consumer that ships another language. The skip is printed rather than done
   # through `status:`, which is silent: a GO_MODULES typo must be visible.
+  # No `dir:`: Task creates a dir that is not there, so a typo in GO_MODULES
+  # left an empty directory in the consumer's tree and a green "skipped".
   _in-module:
     internal: true
-    dir: "{{.MODULE}}"
     cmds:
       - cmd: |-
           set -eu
+          if [ ! -d {{.MODULE | q}} ]; then
+            printf '%s sec · %s · GO_MODULES names %s, which does not exist\n' "{{._SEC_ERR}}" {{.LABEL | q}} {{.MODULE | q}} >&2
+            exit 1
+          fi
+          cd {{.MODULE | q}}
           if [ ! -f go.mod ]; then
             printf '%s sec · %s · %s is not a Go module — skipped\n' "{{._SEC_SKIP}}" {{.LABEL | q}} {{.MODULE | q}}
             exit 0
