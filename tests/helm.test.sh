@@ -77,4 +77,9 @@ refute_output "nothing left in scope" "all: a release past helm's page is not re
 expect_output "1 release(s) still in scope" "all: the releases left are counted"
 unset FAKE_PAGED
 
+# helm:list skips without a reachable cluster, and the probe is bounded.
+reset_calls
+run_task helm:list
+expect_call "kubectl version --request-timeout=3s" "list: probes the cluster with a bounded wait"
+
 finish
