@@ -3,10 +3,23 @@
 # while PM, E2E_SETUP and LINT_FIX_FLAGS still run as shell fragments.
 source "$(dirname "$0")/lib.sh"
 
-shim pnpm 'echo "pnpm argc=$#" >> "$CALLS"'
+shim pnpm 'echo "pnpm argc=$#" >> "$CALLS"; [ "$1" = install ] && mkdir -p node_modules && : > node_modules/.modules.yaml; true'
+shim npm '[ "$1" = ci ] && mkdir -p node_modules && : > node_modules/.package-lock.json; true'
 shim corepack ''
 
 consumer node node
+
+# install skips while the manifests are unchanged, whichever PM wrote node_modules.
+for pm in pnpm npm; do
+  rm -rf "$CONSUMER/node_modules" "$CONSUMER/.task"
+  printf '{}\n' > "$CONSUMER/package.json"
+  run_task node:install "PM=$pm"
+  reset_calls
+  run_task node:install "PM=$pm"
+  expect_status ok "install: a second $pm install runs"
+  refute_call "$pm " "install: a second $pm install with unchanged manifests is skipped"
+done
+rm -f "$CONSUMER/package.json"
 
 reset_calls
 run_task node:build
