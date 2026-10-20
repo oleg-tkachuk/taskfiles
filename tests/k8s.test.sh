@@ -5,7 +5,7 @@ source "$(dirname "$0")/lib.sh"
 # The deployment exists unless FAKE_NO_DEPLOY is set; its selector is app=web.
 shim kubectl '
 case "$*" in
-  *"-o go-template="*) printf "app=web," ;;
+  *"-o go-template="*) [ -n "${FAKE_NO_LABELS:-}" ] || printf "app=web," ;;
   *" get deploy/"*) [ -z "${FAKE_NO_DEPLOY:-}" ] ;;
   *) exit 0 ;;
 esac'
@@ -74,6 +74,16 @@ reset_calls
 run_task k8s:restart
 expect_not_pwned "restart: a hostile deployment name is not run as shell"
 expect_call "rollout restart deploy/dep$INJECT" "restart: a hostile deployment name reaches kubectl verbatim"
+
+# ─── status: a selector with no matchLabels lists no one else's pods ────────
+reset_calls
+run_task k8s:status
+expect_call "get pods -l app=web -o wide" "status: lists the pods the deployment selects"
+reset_calls
+FAKE_NO_LABELS=1 run_task k8s:status
+expect_status ok "status: a matchExpressions-only selector still reports"
+refute_call "get pods" "status: no pod list from an empty selector"
+expect_output "selects by matchExpressions only" "status: says why the pods are not listed"
 
 # ─── logs: LOG_TAIL, and the old TAIL refused ───────────────────────────────
 consumer k8s k8s '{ PROJECT_NAME: web, K8S_NAMESPACE: apps, K8S_CONTEXT: dev }'
