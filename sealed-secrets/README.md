@@ -14,7 +14,7 @@ includes:
 |---|---|
 | `seal` | Seal one key/value into a SealedSecret manifest |
 | `seal:file` | Seal every key in an env file into one SealedSecret manifest |
-| `seal:literals` | Seal several key/value pairs into one manifest — `literals="k1=v1 k2=v2"` |
+| `seal:literals` | Seal several key/value pairs into one manifest — `SECRET_LITERALS="k1=v1 k2=v2"` |
 | `seal:merge` | Rotate one key inside an existing manifest, leaving the others |
 | `pubkey` | Print the controller's public certificate |
 
@@ -27,8 +27,9 @@ includes:
 | `SEALED_SECRETS_CONTROLLER` | `sealed-secrets-controller` | controller name |
 | `K8S_CONTEXT` | current | pin a cluster — both kubectl and kubeseal use it, so the value is sealed to that cluster's controller key |
 
-Per call: `namespace`, `name`, `output` for both sealing tasks; `key` and
-`value` for `seal`; `file` for `seal:file`.
+Per call: `SECRET_NAMESPACE`, `SECRET_NAME`, `SECRET_OUTPUT` for every sealing
+task; `SECRET_KEY` and `SECRET_VALUE` for `seal` and `seal:merge`;
+`SECRET_FILE` for `seal:file`; `SECRET_LITERALS` for `seal:literals`.
 
 ## Examples
 
@@ -41,13 +42,13 @@ includes:
 ```
 
 ```console
-$ task sealed-secrets:seal namespace=billing name=api-keys \
-    key=STRIPE_KEY value=sk_test_123 \
-    output=deploy/secrets/billing-api-keys.yaml
+$ task sealed-secrets:seal SECRET_NAMESPACE=billing SECRET_NAME=api-keys \
+    SECRET_KEY=STRIPE_KEY SECRET_VALUE=sk_test_123 \
+    SECRET_OUTPUT=deploy/secrets/billing-api-keys.yaml
 ✔ sealed-secrets · billing/api-keys → deploy/secrets/billing-api-keys.yaml
 
-$ task sealed-secrets:seal:file namespace=billing name=api-env \
-    file=.env.production output=deploy/secrets/billing-env.yaml
+$ task sealed-secrets:seal:file SECRET_NAMESPACE=billing SECRET_NAME=api-env \
+    SECRET_FILE=.env.production SECRET_OUTPUT=deploy/secrets/billing-env.yaml
 
 $ task sealed-secrets:pubkey > deploy/secrets/controller.pem
 ```
@@ -56,7 +57,7 @@ $ task sealed-secrets:pubkey > deploy/secrets/controller.pem
 
 Nowhere off this machine. Both tasks build the Secret locally with
 `--dry-run=client` and pipe it straight into `kubeseal`, which encrypts to a key
-only the controller holds. The manifest that lands in `output` is safe to
+only the controller holds. The manifest that lands in `SECRET_OUTPUT` is safe to
 commit; the cluster decrypts it on apply.
 
 One caveat worth knowing: `seal` takes the value as a variable, so it sits in
