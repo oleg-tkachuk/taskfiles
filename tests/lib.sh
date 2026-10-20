@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Helpers for the module behaviour tests. Sourced, not run.
 #
 # Each test builds a throwaway consumer that includes one module from this
