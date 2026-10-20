@@ -46,4 +46,14 @@ expect_status ok "pinned: the version on PATH runs"
 expect_call "checkov --compact" "pinned: runs the checkov on PATH"
 refute_call "uvx" "pinned: does not reach for uvx when PATH already has the version"
 
+# Each framework reaches checkov as one argument, never parsed by a shell.
+shim checkov '
+case "$*" in --version) echo 3.2.0 ;; *) printf "[%s]" "$@" >> "$CALLS"; printf "\n" >> "$CALLS" ;; esac'
+pwned="$WORK/pwned"
+consumer checkov checkov "{ CHECKOV_FRAMEWORKS: ['a b', '\$(touch $pwned)'] }"
+reset_calls
+run_task checkov:triage
+expect_call "[--framework][a b][--framework][\$(touch $pwned)]" "triage: each framework is one argument"
+if [ -e "$pwned" ]; then fail "triage: a \$( ) in a framework ran"; else pass "triage: a \$( ) in a framework does not run"; fi
+
 finish
