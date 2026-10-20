@@ -560,8 +560,6 @@ tasks:
     preconditions:
       - sh: test -f {{._REL_CHART_DIR | q}}/Chart.yaml
         msg: "{{._REL_CHART_DIR}}/Chart.yaml not found — set CHART_DIR"
-    generates:
-      - "{{._REL_CHART}}-{{._REL_VERSION}}.tgz"
     cmds:
       - >-
         helm package {{._REL_HELM_PKG_FLAGS}} {{._REL_CHART_DIR | q}} --version {{._REL_VERSION | q}}
