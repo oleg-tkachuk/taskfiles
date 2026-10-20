@@ -21,7 +21,7 @@ version: "3"
 #   COMPOSE_FILE   default docker-compose.yaml
 #   PROJECT_NAME   the label in every log line
 #   SERVICE        narrow `logs` to one service
-#   TAIL           backlog for `logs`                     (default 200)
+#   LOG_TAIL       backlog for `logs`                     (default 200)
 #   COMPOSE_ENGINE    default "docker compose"; e.g. "podman compose"
 # ─────────────────────────────────────────────────────────────────────────────
 # shell-verbatim: _CMP_CMD COMPOSE_ENGINE
@@ -95,7 +95,11 @@ tasks:
     desc: "Tail the stack's logs (SERVICE=... for one of them)"
     interactive: true
     preconditions:
+      # Renamed from TAIL to match argocd's server:logs; refused rather than
+      # ignored, so an old call does not quietly get the default backlog.
+      - sh: '{{if .TAIL}}false{{else}}true{{end}}'
+        msg: "TAIL is now LOG_TAIL — task compose:logs LOG_TAIL={{.TAIL}}"
       - sh: test -f {{._CMP_FILE | q}}
         msg: "{{._CMP_FILE}} not found (set COMPOSE_FILE)"
     cmds:
-      - "{{._CMP_CMD}} logs -f --tail={{.TAIL | default \"200\" | q}} {{if .SERVICE}}{{.SERVICE | q}}{{end}}"
+      - "{{._CMP_CMD}} logs -f --tail={{.LOG_TAIL | default \"200\" | q}} {{if .SERVICE}}{{.SERVICE | q}}{{end}}"
