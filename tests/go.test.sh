@@ -53,6 +53,10 @@ run_task go:bench "BENCH=Foo|$payload"
 if [ -e "$pwned" ]; then fail "bench: a \$( ) in BENCH ran"; else pass "bench: a \$( ) in BENCH does not run"; fi
 expect_call "go|test|-tags=integration|-run=^\$|-bench=Foo|$payload|-benchtime=1x|./...|" "bench: the pattern reaches go as one argument"
 
+reset_calls
+run_task go:test:coverage "GO_TEST_FLAGS=-p 1"
+expect_call "go|test|-p|1|-coverprofile=coverage/cover.out|./...|" "coverage: the unit run's GO_TEST_FLAGS apply"
+
 # GOWORK: off by default, and "auto" is the explicit opt-in to the workspace —
 # an empty value cannot be one, `default` reads it as unset.
 shim go 'printf "go GOWORK=[%s]\n" "${GOWORK-unset}" >> "$CALLS"'
