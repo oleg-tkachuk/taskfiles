@@ -182,8 +182,8 @@ tasks:
     # A script inside a workflow is checked by nothing and runs nowhere but CI.
     # Steps run `node .github/ci/<command>.ts` instead; one-command steps stay
     # inline. Node runs the TypeScript as it is, so tsc only checks it.
-    # shellcheck is best-effort the way check:surface's yq half is: it warns
-    # rather than fails where it is not installed.
+    # shellcheck is best-effort: it warns rather than fails where it is not
+    # installed.
     deps: [ci:install]
     cmds:
       - '{{print ._CI_DIR "/node_modules/.bin/tsc" | q}} -p {{._CI_DIR | q}}'
@@ -258,9 +258,7 @@ tasks:
     # against whatever venv happened to exist and the other always synced
     # first. That drift is invisible to a name-only diff, so shared tasks are
     # also compared on whether they declare `deps:` at all — not on the exact
-    # list, which legitimately differs per tool. This half is best-effort: it
-    # needs `yq` and warns rather than fails when that is missing, the same
-    # tradeoff `release:chart:render` makes for its own optional parse gate.
+    # list, which legitimately differs per tool.
     vars:
       # <family>:<task> that only one variant is expected to have.
       SURFACE_EXCEPT: "python:deps:update:latest"
@@ -274,13 +272,10 @@ tasks:
       - cmd: |-
           set -eu
           fail=0
-          have_yq=0
-          command -v yq >/dev/null 2>&1 && have_yq=1
           for fam in {{.FAMILIES}}; do
             first=""; base=""; basedeps=""
             for v in $(ls -d "$fam"/*/Taskfile.yaml 2>/dev/null | sed "s|/Taskfile.yaml||"); do
-              got=$(task -t "$v/Taskfile.yaml" --list-all 2>/dev/null \
-                    | grep -oE '^\* [a-z0-9:_-]+' | sed 's/^\* //; s/:$//' | sort)
+              got=$(task -t "$v/Taskfile.yaml" --list-all --json | yq -p json -r '.tasks[].name' | sort)
               # Drop the tasks this family is allowed to differ on.
               for e in {{.SURFACE_EXCEPT}}; do
                 case "$e" in
@@ -288,15 +283,12 @@ tasks:
                 esac
               done
 
-              deps=""
-              if [ "$have_yq" = 1 ]; then
-                deps=$(yq e '.tasks | to_entries | .[] | select(.value.deps != null) | .key' "$v/Taskfile.yaml" 2>/dev/null | sort)
-                for e in {{.DEPS_EXCEPT}}; do
-                  case "$e" in
-                    "$fam":*) deps=$(printf '%s\n' "$deps" | grep -vxF "${e#*:}" || true) ;;
-                  esac
-                done
-              fi
+              deps=$(yq e '.tasks | to_entries | .[] | select(.value.deps != null) | .key' "$v/Taskfile.yaml" | sort)
+              for e in {{.DEPS_EXCEPT}}; do
+                case "$e" in
+                  "$fam":*) deps=$(printf '%s\n' "$deps" | grep -vxF "${e#*:}" || true) ;;
+                esac
+              done
 
               if [ -z "$first" ]; then first="$v"; base="$got"; basedeps="$deps"; continue; fi
               if [ "$got" != "$base" ]; then
@@ -304,14 +296,13 @@ tasks:
                 diff <(printf '%s\n' "$base") <(printf '%s\n' "$got") | sed 's/^/    /' >&2
                 fail=1
               fi
-              if [ "$have_yq" = 1 ] && [ "$deps" != "$basedeps" ]; then
+              if [ "$deps" != "$basedeps" ]; then
                 printf '%s\n' "{{._LIB_ERR}} taskfiles · $v and $first disagree on which shared tasks declare deps::" >&2
                 diff <(printf '%s\n' "$basedeps") <(printf '%s\n' "$deps") | sed 's/^/    /' >&2
                 fail=1
               fi
             done
           done
-          [ "$have_yq" = 1 ] || printf '%s\n' "{{._LIB_WARN}} taskfiles · yq absent, deps: parity within families not checked" >&2
           [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every family's variants expose the same tasks and agree on deps:"
           exit "$fail"
 
