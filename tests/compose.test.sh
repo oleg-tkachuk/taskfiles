@@ -22,10 +22,16 @@ expect_call "[compose][-f][docker-compose.yaml][down][-v]" "reset: drops the vol
 touch "$CONSUMER/my stack.yaml"
 consumer cmp compose "{ COMPOSE_ENGINE: 'podman compose', COMPOSE_FILE: 'my stack.yaml' }"
 reset_calls
-run_task cmp:logs SERVICE=web TAIL=50
+run_task cmp:logs SERVICE=web LOG_TAIL=50
 expect_status ok "logs: runs with another engine and file"
 expect_call "[compose][-f][my stack.yaml][logs][-f][--tail=50][web]" "logs: the engine splits, the file and service stay whole"
 refute_call "docker " "logs: the default engine is not used"
+
+reset_calls
+run_task cmp:logs TAIL=50
+expect_status fail "logs: the old TAIL is refused"
+expect_output "TAIL is now LOG_TAIL" "logs: the refusal names the new input"
+refute_call "[logs]" "logs: nothing runs on the old TAIL"
 
 consumer cmp compose "{ COMPOSE_FILE: missing.yaml }"
 reset_calls
