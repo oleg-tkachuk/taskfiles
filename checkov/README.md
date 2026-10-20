@@ -123,7 +123,7 @@ includes:
 ```
 
 It uses the checkov on `PATH` when that is already the right version, and
-`pipx run checkov==<version>` otherwise — checkov is a Python tool, and that
+`uvx checkov@<version>` otherwise — checkov is a Python tool, and that
 is how one version is run without disturbing what else the machine has. It
 says which it used. With no version named, nothing changes: whatever is on
 `PATH`, and the install page when there is nothing there.

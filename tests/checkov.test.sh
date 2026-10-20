@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# checkov: a baseline run that crashed is a failure, not "N → N".
+# checkov: a baseline run that crashed is a failure, not "N → N"; a pinned
+# version absent from PATH runs through uvx.
 source "$(dirname "$0")/lib.sh"
 
 # A run that finds anything exits 1 whether or not it crashed, as checkov does.
@@ -27,5 +28,22 @@ unset FAKE_CRASH
 run_task checkov:baseline
 expect_status ok "baseline: a run that wrote the baseline passes, findings or not"
 expect_output "baselined findings: 1 → 2" "baseline: reports the count before and after"
+
+# Pinned and absent: the shimmed checkov is 3.2.0, so 3.3.18 goes through uvx.
+shim uvx 'exit 0'
+consumer checkov checkov '{ CHECKOV_VERSION: 3.3.18 }'
+reset_calls
+run_task checkov:triage
+expect_status ok "pinned: a version not on PATH runs"
+expect_call "uvx checkov@3.3.18 --compact" "pinned: runs the pinned version through uvx"
+expect_output "3.3.18 through uvx, not the 3.2.0 on PATH" "pinned: says which checkov it used"
+
+# Pinned and present: the checkov on PATH, and no uvx.
+consumer checkov checkov '{ CHECKOV_VERSION: 3.2.0 }'
+reset_calls
+run_task checkov:triage
+expect_status ok "pinned: the version on PATH runs"
+expect_call "checkov --compact" "pinned: runs the checkov on PATH"
+refute_call "uvx" "pinned: does not reach for uvx when PATH already has the version"
 
 finish
