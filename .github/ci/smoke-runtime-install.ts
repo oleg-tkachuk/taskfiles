@@ -3,7 +3,7 @@
 // Usage: RUNNER_TEMP=… GITHUB_WORKSPACE=… node smoke-runtime-install.ts
 //
 // kind as the representative: the runtime variants share this shape, and
-// check:runtime-install holds them to it. The namespace and values path carry
+// check:runtime holds them to it. The namespace and values path carry
 // spaces, the service name a command substitution that used to run, and
 // HELM_UPGRADE_FLAGS is shell by contract and must arrive as flags.
 

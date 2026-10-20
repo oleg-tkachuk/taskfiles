@@ -60,7 +60,7 @@ tasks:
       - task: check:silent
       - task: check:readme
       - task: check:surface
-      - task: check:runtime-install
+      - task: check:runtime
       - task: check:quoting
       - task: check:behaviour
       - task: check:ci-scripts
@@ -341,30 +341,35 @@ tasks:
           [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every family's variants expose the same tasks and agree on deps:"
           exit "$fail"
 
-  check:runtime-install:
-    desc: "Refuse a runtime/* variant whose install: task has drifted from the others"
-    # install: is deliberately duplicated byte-for-byte across every runtime/*
-    # variant rather than factored into a shared include: a nested include
-    # resolves its `dir: .` against the FILE that declares it, not against
-    # wherever the outermost include eventually runs — confirmed by hand, a
-    # shared install: reads CHART_DIR against this checkout instead of the
-    # consumer's, silently. Duplication is the safer choice here; this gate is
-    # what keeps the five copies from quietly drifting apart instead.
+  check:runtime:
+    desc: "Refuse a runtime/* variant that has drifted from the others outside its own cluster handling"
+    # Every runtime/* file is duplicated byte-for-byte except the parts that
+    # are the runtime itself, rather than factored into a shared include: a
+    # nested include resolves its `dir: .` against the FILE that declares it,
+    # not against wherever the outermost include eventually runs — confirmed
+    # by hand, a shared install: reads CHART_DIR against this checkout instead
+    # of the consumer's, silently. Duplication is the safer choice; this gate
+    # is what keeps the five copies from quietly drifting apart. It compared
+    # install: alone once, and the vars every task reads could drift unseen.
+    vars:
+      # What a variant owns: how it checks its cluster, how it loads an image,
+      # and the vars that name the cluster and the context. Comments go too.
+      _RUNTIME_SHARED: 'del(.tasks.check, .tasks["image:load"], .vars._RT_CTX, .vars._RT_CLUSTER, .vars._RT_PROFILE) | ... comments=""'
     cmds:
       - cmd: |-
           set -eu
           fail=0
           first=""; base=""
           for f in runtime/*/Taskfile.yaml; do
-            block=$(sed -n '/^  install:/,$p' "$f")
-            if [ -z "$first" ]; then first="$f"; base="$block"; continue; fi
-            if [ "$block" != "$base" ]; then
-              printf '%s\n' "{{._LIB_ERR}} taskfiles · $f's install: has drifted from $first's:" >&2
-              diff <(printf '%s\n' "$base") <(printf '%s\n' "$block") | sed 's/^/    /' >&2
+            shared=$(yq {{._RUNTIME_SHARED | q}} "$f")
+            if [ -z "$first" ]; then first="$f"; base="$shared"; continue; fi
+            if [ "$shared" != "$base" ]; then
+              printf '%s\n' "{{._LIB_ERR}} taskfiles · $f has drifted from $first outside its own cluster handling:" >&2
+              diff <(printf '%s\n' "$base") <(printf '%s\n' "$shared") | sed 's/^/    /' >&2
               fail=1
             fi
           done
-          [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every runtime/* install: task matches"
+          [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every runtime/* variant matches outside its own cluster handling"
           exit "$fail"
 
   # ─── docs ───────────────────────────────────────────────────────────────────
