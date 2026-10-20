@@ -83,9 +83,11 @@ tasks:
       - package.json
       - pnpm-lock.yaml
       - package-lock.json
+    # One marker, the one this PM writes: Task reads a generates glob that
+    # matches nothing as out of date, so listing pnpm's and npm's both meant
+    # the install never skipped.
     generates:
-      - node_modules/.modules.yaml
-      - node_modules/.package-lock.json
+      - '{{if eq ._NODE_PM "npm"}}node_modules/.package-lock.json{{else if eq ._NODE_PM "pnpm"}}node_modules/.modules.yaml{{else}}node_modules{{end}}'
     cmds:
       - printf '%s %s · node · %s install\n' "{{._NODE_RUN}}" {{._NODE_NAME | q}} {{._NODE_PM | q}}
       - >-
