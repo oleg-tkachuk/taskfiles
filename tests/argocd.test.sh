@@ -22,6 +22,7 @@ expect_call "kubectl -n argocd patch application.argoproj.io svc-api --type merg
 expect_call "kubectl -n argocd patch application.argoproj.io svc-web --type merge" "refresh: patches every matching application"
 refute_call "patch application.argoproj.io infra-db" "refresh: leaves an application outside the prefix alone"
 expect_output "✔ argocd · hard-refreshed svc-api" "refresh: reports each application"
+expect_call "kubectl version --request-timeout=3s" "refresh: probes the cluster with a bounded wait"
 
 reset_calls
 run_task argocd:refresh APP_PREFIX=svc.
