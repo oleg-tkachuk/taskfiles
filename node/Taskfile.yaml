@@ -43,7 +43,7 @@ version: "3"
 # whole developer surface visible in `task --list-all` instead of split across
 # two tools.
 # ─────────────────────────────────────────────────────────────────────────────
-# shell-verbatim: _NODE_PM PM _NODE_EXEC PM_EXEC PM_INSTALL _NODE_E2E_SETUP E2E_SETUP _NODE_FIX LINT_FIX_FLAGS
+# shell-verbatim: _NODE_PM PM _NODE_ARGS_SEP _NODE_EXEC PM_EXEC PM_INSTALL _NODE_E2E_SETUP E2E_SETUP _NODE_FIX LINT_FIX_FLAGS
 
 silent: true
 
@@ -57,7 +57,12 @@ vars:
   _NODE_TEST: '{{.SCRIPT_TEST | default "test"}}'
   _NODE_TYPECHECK: '{{.SCRIPT_TYPECHECK | default "typecheck"}}'
   _NODE_E2E: '{{.SCRIPT_E2E | default "test:e2e"}}'
-  _NODE_E2E_SETUP: '{{.E2E_SETUP | default "exec playwright install --with-deps chromium"}}'
+  # npm reads a flag before `--` as its own config and drops it, so for npm
+  # the default and lint:fix put one in: `npm exec playwright install
+  # --with-deps` installed no system deps, `npm run lint --fix` fixed nothing.
+  # pnpm passes everything after the name through.
+  _NODE_ARGS_SEP: '{{if eq ._NODE_PM "npm"}}-- {{end}}'
+  _NODE_E2E_SETUP: '{{.E2E_SETUP | default (printf "exec %splaywright install --with-deps chromium" ._NODE_ARGS_SEP)}}'
   _NODE_GEN: '{{.SCRIPT_GENERATE | default "generate"}}'
   _NODE_FIX: '{{.LINT_FIX_FLAGS | default "--fix"}}'
   # Status markers. The shape carries the meaning, so a line still reads in
@@ -118,7 +123,7 @@ tasks:
   lint:fix:
     desc: "Run the lint script with --fix"
     cmds:
-      - "{{._NODE_PM}} run {{._NODE_LINT | q}} {{._NODE_FIX}}"
+      - "{{._NODE_PM}} run {{._NODE_LINT | q}} {{._NODE_ARGS_SEP}}{{._NODE_FIX}}"
       - printf '%s %s · node · lint fixed\n' "{{._NODE_OK}}" {{._NODE_NAME | q}}
 
   typecheck:
