@@ -9,9 +9,9 @@ version: "3"
 #       dir: .
 #
 # Include it alongside `release` and chain it after: the release publishes, this
-# signs what was published. It asks `release:version` for the version rather
-# than deriving a second one, so the consumer must include the release module
-# under the `release` name.
+# signs what was published. It reads the version and image the release module
+# derived (_REL_VERSION, _REL_IMAGE — every include shares one var namespace)
+# rather than deriving a second one, so the release module must be included too.
 #
 #   tasks:
 #     deploy:
