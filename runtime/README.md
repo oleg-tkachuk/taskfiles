@@ -22,7 +22,7 @@ when that internal include carries `dir: .`: `dir: .` on a nested include
 resolves against the file declaring it, not against wherever the outermost
 include eventually runs. A shared `install` would read `CHART_DIR` against
 this checkout instead of the consumer's, silently. `task lint`'s
-`check:runtime-install` is what keeps the five copies from drifting apart
+`check:runtime` is what keeps the five copies from drifting apart
 instead of a shared file — edit one, then check the diff shows the same
 change in the other four.
 
