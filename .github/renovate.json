@@ -49,7 +49,7 @@
       "automerge": true
     },
     {
-      "description": "A step input such as setup-node's `node-version:`. The one there is release.yml's, which no pull request runs.",
+      "description": "A step input such as setup-node's `node-version:`. None is in use: Node is pinned in .github/ci/.node-version, which the rule below covers.",
       "matchManagers": ["github-actions"],
       "matchDepTypes": ["uses-with"],
       "semanticCommitType": "ci",
@@ -73,6 +73,13 @@
       "groupName": "release tooling",
       "semanticCommitType": "build",
       "semanticCommitScope": "release"
+    },
+    {
+      "description": "The CI scripts' dependencies and the Node they run on. Not release tooling: Lint type-checks and tests them and Consumer smoke runs them on the pull request itself.",
+      "matchFileNames": [".github/ci/**"],
+      "groupName": "ci scripts",
+      "semanticCommitType": "ci",
+      "semanticCommitScope": "ci"
     },
     {
       "description": "The demo is a consumer of the library, not part of it. Its build image and its go directive are one toolchain: an image older than the directive cannot build the module, so the two move in one pull request.",

@@ -1,0 +1,9 @@
+# zizmor configuration. Each relaxed audit states why; everything else runs.
+rules:
+  self-repository:
+    # It asks for `$/…` in place of `./…` for this repository's own action,
+    # .github/actions/setup-ci. `./…` runs the action from the checkout the
+    # job just made — the commit under test — and a job that checks out into
+    # a subdirectory names that directory in the path, which is the same
+    # commit again.
+    disable: true

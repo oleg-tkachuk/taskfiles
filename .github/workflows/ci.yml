@@ -84,7 +84,7 @@ jobs:
         # Pinned like everything else, and --persona=auditor so this is the
         # strict run rather than the default one.
         # renovate: datasource=pypi depName=zizmor
-        run: uvx zizmor@1.31.1 --persona=auditor --format=plain .github/workflows/
+        run: uvx zizmor@1.31.1 --persona=auditor --format=plain .github/workflows/ .github/actions/
 
   # Feeds consumer-smoke's `if:` below. That job proves the Task modules work
   # for a real consumer; it never reads a README and never runs a workflow
@@ -110,13 +110,16 @@ jobs:
           ref: ${{ env.CHECKOUT_REF }}
           fetch-depth: 0
 
+      - name: 'Setup: the CI scripts'
+        uses: ./.github/actions/setup-ci
+
       - name: 'Decide: does this change touch anything outside docs and workflows'
         id: diff
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-        run: bash .github/scripts/changes-detect.sh
+        run: node .github/ci/changes-detect.ts
 
   lint:
     name: Lint
@@ -146,6 +149,9 @@ jobs:
         with:
           version: ${{ env.TASK_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 'Setup: the CI scripts'
+        uses: ./.github/actions/setup-ci
 
       - name: 'Guard: every module lints'
         run: task lint
@@ -201,9 +207,15 @@ jobs:
           # path from a pull request into a release build.
           cache: false
 
+      - name: 'Setup: the CI scripts'
+        if: needs.changes.outputs.smoke_skippable != 'true'
+        uses: ./taskfiles/.github/actions/setup-ci
+        with:
+          path: taskfiles
+
       - name: 'Setup: a consumer that includes the library'
         if: needs.changes.outputs.smoke_skippable != 'true'
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-setup-consumer.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-setup-consumer.ts"
 
       - name: 'Verify: every module loads side by side'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -221,7 +233,7 @@ jobs:
         # break quietly. COSIGN_SIGN=0 exercises every task's status guard
         # without needing cosign or syft installed, which a real sign/attest
         # run would.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-cosign-noop.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-cosign-noop.ts"
 
       - name: 'Verify: helm no-ops cleanly with no cluster'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -229,14 +241,14 @@ jobs:
         # helm:list's own status guard skips it when kubectl cannot reach a
         # cluster, which is always true here — this proves that guard, not the
         # Helm listing itself.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-helm-noop.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-helm-noop.ts"
 
       - name: 'Verify: pnpm:pin:check catches a pnpm shadowing the shim'
         if: needs.changes.outputs.smoke_skippable != 'true'
         # The shadowing pnpm here is the pinned version itself, so a check that
         # only compares versions passes - which is the blind spot this closes.
         # The same PATH with the shim first must still pass.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-pnpm-pin-check.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-pnpm-pin-check.ts"
 
       - name: 'Verify: codegen actually generates'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -245,7 +257,7 @@ jobs:
         # tool, so it is the one the library can prove end to end. It also
         # exercises the module's GOWORK=off, which is what made generation fail
         # for a real consumer before it was set.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-codegen-generate.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-codegen-generate.ts"
 
       - name: 'Verify: proto:check derives what it watches, and refuses when it cannot'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -254,7 +266,7 @@ jobs:
         # gate's own behaviours be exercised: the derivation, drift, a
         # regenerated change that is not committed yet, an unparseable
         # template, and a target with nothing committed under it.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-codegen-proto-check.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-codegen-proto-check.ts"
 
       - name: 'Verify: the secrets gate asks gitleaks to say where, with values redacted'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -263,7 +275,7 @@ jobs:
         # flags: -v so a finding names its rule, file, line and commit, --redact so
         # neither the secret nor the surrounding match reaches the log. Dropping
         # either one is the regression this guards.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-security-secrets.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-security-secrets.ts"
 
       - name: 'Verify: checkov passes its flags through and treats the version as data'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -271,7 +283,7 @@ jobs:
         # the scan's argv. CHECKOV_FLAGS is shell by contract and must arrive
         # as flags; CHECKOV_VERSION is data — a command substitution in it used
         # to run.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-checkov.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-checkov.ts"
 
       - name: 'Verify: helm passes the context and namespace as single arguments'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -279,7 +291,7 @@ jobs:
         # context and namespace are data: one argument each, never parsed —
         # a command substitution in the context used to run, and a namespace
         # with a space used to split.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-helm-args.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-helm-args.ts"
 
       - name: 'Verify: runtime install passes every value as one argument'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -288,14 +300,14 @@ jobs:
         # the namespace and values path carry spaces, the service name a
         # command substitution that used to run, and HELM_UPGRADE_FLAGS is
         # shell by contract and must arrive as flags.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-runtime-install.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-runtime-install.ts"
 
       - name: 'Verify: compose splits the engine and keeps the file whole'
         if: needs.changes.outputs.smoke_skippable != 'true'
         # COMPOSE_ENGINE is shell by contract — "podman compose" is a command
         # and its first argument — while COMPOSE_FILE is data and must arrive
         # as one argument even with a space in it. A shim stands in for podman.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-compose.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-compose.ts"
 
       - name: 'Verify: sealed-secrets passes the context and paths as data'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -303,7 +315,7 @@ jobs:
         # it through). The context carries a command substitution that used to
         # run; the output sits in a directory with a space; literals split into
         # one --from-literal each.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-sealed-secrets.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-sealed-secrets.ts"
 
       - name: 'Verify: python passes each source dir and the typecheck module as data'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -311,7 +323,7 @@ jobs:
         # call. PY_SRC lists two directories that must arrive as two arguments,
         # PY carries a command substitution that used to run in doctor, and
         # TYPECHECK_MODULE must reach Python as an argument rather than as code.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-python.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-python.ts"
 
       - name: 'Verify: auth passes its flags through and refuses a TTL that is not a number'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -320,7 +332,7 @@ jobs:
         # $(( )), which evaluates text as an expression, so anything but digits
         # must be refused before it gets there — a command substitution in it
         # used to run.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-auth.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-auth.ts"
 
       - name: 'Verify: gosec runs the module''s own tool before one on PATH'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -330,7 +342,7 @@ jobs:
         # gosec on PATH; a module without one falls back to PATH; and with
         # neither the task fails naming `go get -tool`. The tool here is a local
         # stand-in that records its argv, so nothing is fetched.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-security-gosec.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-security-gosec.ts"
 
       - name: 'Verify: pnpm:pin:update survives a postinstall that calls pnpm'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -341,7 +353,7 @@ jobs:
         # builds that PATH, then asserts the pin moved AND the postinstall ran
         # on the new version - skipping the script outright would pass the
         # first half and fail the second.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-pnpm-pin-update.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-pnpm-pin-update.ts"
 
       - name: 'Verify: the go module compiles, tests and builds'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -350,7 +362,7 @@ jobs:
         # deliberately: GO_MAIN defaults to ./cmd/..., which this fixture does
         # not have, and a package with no main is the shape most consumers of
         # the other three tasks actually are.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-go-build.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-go-build.ts"
 
       - name: 'Verify: go:fmt:check catches what go:fmt would rewrite'
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -360,7 +372,7 @@ jobs:
         # file" would pass on dirty code every time. Un-formatting a file and
         # asserting the non-zero exit is the only way to prove the wrapper's
         # own pass/fail logic, not just that gofmt runs.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-go-fmt-check.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-go-fmt-check.ts"
 
       - name: "Verify: the consumer's vars reach the modules"
         if: needs.changes.outputs.smoke_skippable != 'true'
@@ -368,7 +380,7 @@ jobs:
         # The scoping rule the whole library is built around: a var declared in
         # a module would shadow this. VERSION_BASE is the cheapest observable
         # proof that it does not.
-        run: bash "$GITHUB_WORKSPACE/taskfiles/.github/scripts/smoke-consumer-vars.sh"
+        run: node "$GITHUB_WORKSPACE/taskfiles/.github/ci/smoke-consumer-vars.ts"
 
   # Dispatches the release; the release itself is
   # .github/workflows/release.yml, which computes the version and creates the
@@ -400,20 +412,27 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: 'Setup: check out the CI scripts'
-        # Only .github/scripts, under ci/: this job needs nothing
-        # else from the tree.
+        # Only the CI scripts and the action that sets them up, under ci/:
+        # this job needs nothing else from the tree.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ env.CHECKOUT_REF }}
           path: ci
-          sparse-checkout: .github/scripts
+          sparse-checkout: |
+            .github/ci
+            .github/actions
           sparse-checkout-cone-mode: false
+
+      - name: 'Setup: the CI scripts'
+        uses: ./ci/.github/actions/setup-ci
+        with:
+          path: ci
 
       - name: Dispatch the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash "$GITHUB_WORKSPACE/ci/.github/scripts/release-dispatch.sh"
+        run: node "$GITHUB_WORKSPACE/ci/.github/ci/release-dispatch.ts"
 
   # Cutting a tag is the only thing consumers actually see: they pin
   # `?ref=vX.Y.Z`, so a tag is a promise that this exact tree can be included
@@ -450,6 +469,9 @@ jobs:
           ref: ${{ env.CHECKOUT_REF }}
           fetch-depth: 0
 
+      - name: 'Setup: the CI scripts'
+        uses: ./.github/actions/setup-ci
+
       - name: 'Guard: releases only from main'
         # github.ref here is refs/tags/vX.Y.Z, never a branch — comparing it to
         # refs/heads/main would refuse every release. The invariant that
@@ -462,7 +484,7 @@ jobs:
         # tagged commit, under a tag push and a workflow_dispatch alike.
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
-        run: bash .github/scripts/gate-main-only.sh
+        run: node .github/ci/gate-main-only.ts
 
       - name: 'Guard: the tag is SemVer'
         # Helm and OCI both reject a chart version that is not SemVer-2, and
@@ -470,7 +492,7 @@ jobs:
         # a chart version is a tag no consumer can use.
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
-        run: bash .github/scripts/gate-semver.sh
+        run: node .github/ci/gate-semver.ts
 
   consumable:
     name: Consumable over git
@@ -479,15 +501,23 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: 'Setup: check out the CI scripts'
-        # Only .github/scripts, under ci/: the modules themselves
-        # must still arrive over the git include below, not from a checkout.
+        # Only the CI scripts and the action that sets them up, under ci/:
+        # the modules themselves must still arrive over the git include
+        # below, not from a checkout.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ env.CHECKOUT_REF }}
           path: ci
-          sparse-checkout: .github/scripts
+          sparse-checkout: |
+            .github/ci
+            .github/actions
           sparse-checkout-cone-mode: false
+
+      - name: 'Setup: the CI scripts'
+        uses: ./ci/.github/actions/setup-ci
+        with:
+          path: ci
 
       - name: 'Setup: Task'
         uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
@@ -512,7 +542,7 @@ jobs:
         # Deliberately NOT the local checkout: this is the only step that proves
         # the published tag can be fetched, that every module resolves through
         # the git include path, and that the trust prompt does not block CI.
-        run: bash "$GITHUB_WORKSPACE/ci/.github/scripts/consumable-include.sh"
+        run: node "$GITHUB_WORKSPACE/ci/.github/ci/consumable-include.ts"
 
   publish:
     name: Publish
@@ -533,10 +563,13 @@ jobs:
           ref: ${{ env.CHECKOUT_REF }}
           fetch-depth: 0
 
+      - name: 'Setup: the CI scripts'
+        uses: ./.github/actions/setup-ci
+
       - name: 'Publish: the GitHub release'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
         # Notes come from merged PRs since the previous tag, which is why
         # opening one carries a label — see .github/release.yml.
-        run: bash .github/scripts/publish-release.sh
+        run: node .github/ci/publish-release.ts

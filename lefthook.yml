@@ -61,16 +61,16 @@ pre-commit:
     #    Same audit CI runs, so a finding shows up here rather than on a PR.
     - name: zizmor
       tags: [ci, security]
-      glob: ".github/workflows/*.yml"
+      glob: "{.github/workflows/*.yml,.github/actions/*/action.yml,.github/zizmor.yml}"
       # renovate: datasource=pypi depName=zizmor
-      run: uvx zizmor@1.31.1 --persona=auditor --format=plain .github/workflows/
+      run: uvx zizmor@1.31.1 --persona=auditor --format=plain .github/workflows/ .github/actions/
 
     # 4) The library's own gates: every module parses through Task, declares no
     #    var that would shadow a consumer's, runs quiet, and appears in the
     #    README table. See Taskfile.yaml for what each one is guarding against.
     - name: lint
       tags: [task, lint]
-      glob: "{*/*.yaml,*/*/*.yaml,Taskfile.yaml,README.md,tests/*,scripts/*,.github/workflows/*,.github/scripts/*,.github/renovate.json,.github/release.yml,lefthook.yml}"
+      glob: "{*/*.yaml,*/*/*.yaml,Taskfile.yaml,README.md,tests/*,scripts/*,.github/workflows/*,.github/actions/*/*,.github/ci/*,.github/ci/lib/*,.github/zizmor.yml,.github/renovate.json,.github/release.yml,lefthook.yml}"
       run: task lint
 
 # Last gate before the change leaves the machine.

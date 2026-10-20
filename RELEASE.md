@@ -37,7 +37,7 @@ gh workflow run ci.yml --ref vX.Y.Z -f tag=vX.Y.Z
 ```
 
 `--ref` matters: every job checks out the tag, and a workflow taken from
-`main` calls scripts in `.github/scripts/` that a tag older than them does not
+`main` calls commands in `.github/ci/` that a tag older than them does not
 have. Publishing an older tag after a newer one makes it `Latest`; move that
 back with `gh release edit <newest tag> --latest`.
 

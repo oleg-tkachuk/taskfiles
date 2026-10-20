@@ -37,6 +37,8 @@ vars:
   # runtime, python — the directories that hold variants rather than a module.
   FAMILIES:
     sh: ls -d */*/Taskfile.yaml 2>/dev/null | grep -v '^demo/' | cut -d/ -f1 | sort -u | tr '\n' ' '
+  # The CI scripts: one TypeScript command per workflow step, and their tests.
+  _CI_DIR: .github/ci
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _LIB_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
@@ -220,26 +222,35 @@ tasks:
         sh: ls tests/*.test.sh 2>/dev/null | sort | tr '\n' ' '
 
   check:ci-scripts:
-    desc: "Refuse a workflow script kept in the YAML, a script nothing runs, or one shellcheck rejects"
-    # A script inside a workflow is linted by nothing and runs nowhere but CI.
-    # Steps call .github/scripts/<name>.sh instead; one-command steps stay
-    # inline. shellcheck is best-effort the way check:surface's yq half is:
-    # it warns rather than fails where it is not installed.
+    desc: "Refuse a workflow script kept in the YAML, a CI command nothing runs, or one that fails its types or tests"
+    # A script inside a workflow is checked by nothing and runs nowhere but CI.
+    # Steps run `node .github/ci/<command>.ts` instead; one-command steps stay
+    # inline. Node runs the TypeScript as it is, so tsc only checks it.
+    # shellcheck is best-effort the way check:surface's yq half is: it warns
+    # rather than fails where it is not installed.
+    deps: [ci:install]
     cmds:
-      - bash scripts/check-ci-scripts.test.sh >/dev/null
-      - bash scripts/check-ci-scripts.sh .github/workflows .github/scripts
-      - for: { var: _CI_SCRIPT_TESTS }
-        cmd: bash {{.ITEM | q}} >/dev/null
+      - '{{print ._CI_DIR "/node_modules/.bin/tsc" | q}} -p {{._CI_DIR | q}}'
+      - node --test --test-reporter=dot {{print ._CI_DIR "/**/*.test.ts" | q}}
+      # Spelt out rather than built from _CI_DIR: check-workflows finds the
+      # commands a task runs by their path, itself included.
+      - node .github/ci/check-workflows.ts .
       - cmd: |-
           if command -v shellcheck >/dev/null 2>&1; then
-            shellcheck -S warning .github/scripts/*.sh scripts/*.sh
+            shellcheck -S warning scripts/*.sh
           else
-            printf '%s\n' "{{._LIB_WARN}} taskfiles · shellcheck absent, .github/scripts not linted" >&2
+            printf '%s\n' "{{._LIB_WARN}} taskfiles · shellcheck absent, scripts/ not linted" >&2
           fi
-      - printf '%s\n' "{{._LIB_OK}} taskfiles · every workflow script lives in .github/scripts and is run"
-    vars:
-      _CI_SCRIPT_TESTS:
-        sh: ls .github/scripts/*.test.sh 2>/dev/null | sort | tr '\n' ' '
+      - printf '%s\n' "{{._LIB_OK}} taskfiles · every workflow script lives in .github/ci, is run, and passes its types and tests"
+
+  ci:install:
+    desc: "Install the CI scripts' locked dependencies"
+    # Skipped while node_modules is newer than the lockfile: npm ci rewrites
+    # it whole, and a lockfile change is the only thing that makes it stale.
+    sources: ['{{._CI_DIR}}/package-lock.json']
+    generates: ['{{._CI_DIR}}/node_modules/.package-lock.json']
+    cmds:
+      - node {{._CI_DIR | q}}/install.ts {{._CI_DIR | q}}
 
   check:renovate:
     desc: "Refuse a Renovate pin, allow-list or guard that has stopped working"
