@@ -131,6 +131,9 @@ tasks:
 
   server:port-forward:
     desc: "Port-forward the Argo server to localhost (Ctrl-C to stop)"
+    # Streams until Ctrl-C: under `output: group` a non-interactive task shows
+    # nothing until it ends, which this one never does on its own.
+    interactive: true
     status:
       - "! {{._ARGO_KUBECTL}} version --request-timeout={{._ARGO_PROBE_TIMEOUT | q}} >/dev/null 2>&1"
     cmds:
@@ -210,6 +213,9 @@ tasks:
 
   server:logs:
     desc: "Tail the Argo server logs (Ctrl-C to stop)"
+    # Streams until Ctrl-C: under `output: group` a non-interactive task shows
+    # nothing until it ends, which this one never does on its own.
+    interactive: true
     status:
       - "! {{._ARGO_KUBECTL}} version --request-timeout={{._ARGO_PROBE_TIMEOUT | q}} >/dev/null 2>&1"
     cmds:
