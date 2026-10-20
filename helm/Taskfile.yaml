@@ -166,7 +166,15 @@ tasks:
                 done
                 exit "$failed"
               }
+      # Checked, not assumed: helm list returns one page of releases (256 by
+      # default, and --max 0 means the server's default, not "all"), so a
+      # cluster holding more keeps the rest after a pass that went cleanly.
       - cmd: |-
           if [ {{.RELEASE | q}} = all ]; then
+            left=$(helm list{{._HELM_CTX}} {{._HELM_SCOPE}} {{._HELM_EVERY_STATE}} -q | grep -c . || true)
+            if [ "$left" -ne 0 ]; then
+              printf '%s helm · %s release(s) still in scope — helm lists one page at a time; run it again\n' "{{._HELM_ERR}}" "$left" >&2
+              exit 1
+            fi
             printf '%s\n' "{{._HELM_OK}} helm · nothing left in scope"
           fi
