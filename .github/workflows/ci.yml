@@ -74,12 +74,17 @@ jobs:
           persist-credentials: false
           ref: ${{ env.CHECKOUT_REF }}
 
+      - name: 'Setup: install uv'
+        # The runner image ships no uv; zizmor runs through uvx below.
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+
       - name: 'Guard: the workflows pass the auditor'
-        # pipx rather than uvx: pipx ships on the runner image, uv does not.
         # Pinned like everything else, and --persona=auditor so this is the
         # strict run rather than the default one.
         # renovate: datasource=pypi depName=zizmor
-        run: pipx run zizmor==1.31.1 --persona=auditor --format=plain .github/workflows/
+        run: uvx zizmor@1.31.1 --persona=auditor --format=plain .github/workflows/
 
   # Feeds consumer-smoke's `if:` below. That job proves the Task modules work
   # for a real consumer; it never reads a README and never runs a workflow
