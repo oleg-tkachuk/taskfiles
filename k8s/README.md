@@ -42,7 +42,7 @@ workspace — tasks then read `k8s:<task>`.
 | `HELM_UPGRADE_FLAGS` | — | extra flags for `upgrade` |
 | `PORT` | `8080` | local port for `port-forward` |
 | `TARGET_PORT` | `PORT` | pod-side port for `port-forward`, when it differs |
-| `TAIL` | `100` | line count for `logs` |
+| `LOG_TAIL` | `100` | line count for `logs` |
 
 ## Examples
 
@@ -66,7 +66,7 @@ $ task k8s:restart
 
 $ task k8s:port-forward PORT=8080
 $ task k8s:port-forward PORT=8081 TARGET_PORT=80    # container listens on :80
-$ task k8s:logs TAIL=500
+$ task k8s:logs LOG_TAIL=500
 ```
 
 ## doctor — what this component points at

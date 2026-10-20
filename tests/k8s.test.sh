@@ -75,4 +75,16 @@ run_task k8s:restart
 expect_not_pwned "restart: a hostile deployment name is not run as shell"
 expect_call "rollout restart deploy/dep$INJECT" "restart: a hostile deployment name reaches kubectl verbatim"
 
+# ─── logs: LOG_TAIL, and the old TAIL refused ───────────────────────────────
+consumer k8s k8s '{ PROJECT_NAME: web, K8S_NAMESPACE: apps, K8S_CONTEXT: dev }'
+reset_calls
+run_task k8s:logs LOG_TAIL=500
+expect_status ok "logs: runs with LOG_TAIL"
+expect_call "logs deploy/web -f --tail=500" "logs: LOG_TAIL sets the backlog"
+reset_calls
+run_task k8s:logs TAIL=500
+expect_status fail "logs: the old TAIL is refused"
+expect_output "TAIL is now LOG_TAIL" "logs: the refusal names the new input"
+refute_call "logs deploy/" "logs: nothing runs on the old TAIL"
+
 finish

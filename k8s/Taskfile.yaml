@@ -186,8 +186,13 @@ tasks:
   logs:
     desc: "Tail the deployment's logs (Ctrl-C to stop)"
     interactive: true
+    preconditions:
+      # Renamed from TAIL to match argocd's server:logs; refused rather than
+      # ignored, so an old call does not quietly get the default backlog.
+      - sh: '{{if .TAIL}}false{{else}}true{{end}}'
+        msg: "TAIL is now LOG_TAIL — task k8s:logs LOG_TAIL={{.TAIL}}"
     cmds:
-      - "{{._K8S_KUBECTL}} -n {{._K8S_NS | q}} logs deploy/{{._K8S_DEPLOY | q}} -f --tail={{.TAIL | default \"100\" | q}}"
+      - "{{._K8S_KUBECTL}} -n {{._K8S_NS | q}} logs deploy/{{._K8S_DEPLOY | q}} -f --tail={{.LOG_TAIL | default \"100\" | q}}"
 
   status:
     desc: "Show the deployment and its pods"
