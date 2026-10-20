@@ -97,33 +97,15 @@ tasks:
     # every declared var this module's own prefix — `_REL_`, `_GO_`, `_CS_`.
     # A cross-module read (runtime and cosign read `_REL_VERSION`) is a read:
     # the module must not declare it.
+    #
+    # A task's own vars too, unless the var is the input itself — see
+    # scripts/check-vars.sh.
     cmds:
+      - bash scripts/check-vars.test.sh >/dev/null
       - cmd: |-
           set -eu
-          fail=0
-          for f in {{.MODULE_FILES}}; do
-            vars=$(awk '
-              /^vars:/      { inv = 1; next }
-              /^[^[:space:]]/ { inv = 0 }
-              inv && /^  [A-Za-z_][A-Za-z0-9_]*:/ { k = $1; sub(/:$/, "", k); print k }
-            ' "$f")
-            [ -n "$vars" ] || continue
-
-            bare=$(printf '%s\n' "$vars" | grep -vE '^_[A-Z0-9]+_' || true)
-            if [ -n "$bare" ]; then
-              printf '%s\n' "{{._LIB_ERR}} taskfiles · $f declares vars that are not <_PREFIX_>-scoped:" >&2
-              printf '    %s\n' $bare >&2
-              fail=1
-            fi
-
-            prefixes=$(printf '%s\n' "$vars" | sed -nE 's/^(_[A-Z0-9]+_).*/\1/p' | sort -u)
-            if [ "$(printf '%s\n' "$prefixes" | grep -c .)" -gt 1 ]; then
-              printf '%s\n' "{{._LIB_ERR}} taskfiles · $f mixes prefixes: $(printf '%s ' $prefixes)" >&2
-              fail=1
-            fi
-          done
-          [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every module var is scoped to its own module"
-          exit "$fail"
+          bash scripts/check-vars.sh {{.MODULE_FILES}}
+          printf '%s\n' "{{._LIB_OK}} taskfiles · every module var is scoped to its own module"
 
   check:scope:
     desc: "Refuse a module var that resolves an input the caller passes on the task call"
