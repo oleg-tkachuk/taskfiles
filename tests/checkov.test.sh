@@ -9,7 +9,8 @@ case "$*" in
   --version) echo 3.2.0 ;;
   *--create-baseline*)
     if [ -n "${FAKE_CRASH:-}" ]; then echo "Traceback: boom" >&2; exit 1; fi
-    printf "{\n    \"CKV_K8S_1\",\n    \"CKV_K8S_2\"\n}\n" > .checkov.baseline
+    dir=${FAKE_BASE_DIR:-.}; mkdir -p "$dir"
+    printf "{\n    \"CKV_K8S_1\",\n    \"CKV_K8S_2\"\n}\n" > "$dir/.checkov.baseline"
     exit 1 ;;
 esac'
 
@@ -28,6 +29,14 @@ unset FAKE_CRASH
 run_task checkov:baseline
 expect_status ok "baseline: a run that wrote the baseline passes, findings or not"
 expect_output "baselined findings: 1 → 2" "baseline: reports the count before and after"
+
+# A config scanning another directory writes the baseline there: named.
+consumer checkov checkov
+reset_calls
+FAKE_BASE_DIR=deploy run_task checkov:baseline
+expect_status fail "baseline: one written to another directory fails"
+expect_output "it wrote deploy/.checkov.baseline instead" "baseline: names where checkov did write it"
+rm -rf "$CONSUMER/deploy"
 
 # A baseline under another name is one checkov never writes: refused up front.
 consumer checkov checkov "{ CHECKOV_BASELINE: security/accepted.json }"
