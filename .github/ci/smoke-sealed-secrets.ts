@@ -24,7 +24,7 @@ async function main(): Promise<void> {
   writeTaskfile(dir, { ss: { taskfile: modulePath("sealed-secrets") } });
 
   await taskOk(
-    ["ss:seal:literals", "name=app", "namespace=prod", "literals=A=1 B=two", `output=${OUTPUT}`, `K8S_CONTEXT=dev${SUBSTITUTION}`],
+    ["ss:seal:literals", "SECRET_NAME=app", "SECRET_NAMESPACE=prod", "SECRET_LITERALS=A=1 B=two", `SECRET_OUTPUT=${OUTPUT}`, `K8S_CONTEXT=dev${SUBSTITUTION}`],
     { cwd: dir, path: [bin] },
   );
   expectNotSubstituted(dir, "K8S_CONTEXT");

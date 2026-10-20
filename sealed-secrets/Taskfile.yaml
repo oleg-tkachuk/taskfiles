@@ -20,9 +20,10 @@ version: "3"
 #   K8S_CONTEXT                pin a cluster                (default: current)
 #
 # ── Per call ─────────────────────────────────────────────────────────────────
-#   namespace name output      required by both sealing tasks
-#   key value                  seal
-#   file                       seal:file
+#   SECRET_NAMESPACE SECRET_NAME SECRET_OUTPUT   required by every sealing task
+#   SECRET_KEY SECRET_VALUE                      seal, seal:merge
+#   SECRET_FILE                                  seal:file
+#   SECRET_LITERALS                              seal:literals
 #
 # `seal` takes the value as a variable, which puts it in this process's
 # argument list for as long as kubectl runs — visible to anything that can read
@@ -57,50 +58,50 @@ tasks:
   seal:
     desc: "Seal one key/value into a SealedSecret manifest"
     requires:
-      vars: [namespace, name, key, value, output]
+      vars: [SECRET_NAMESPACE, SECRET_NAME, SECRET_KEY, SECRET_VALUE, SECRET_OUTPUT]
     cmds:
       - task: _seal
         vars:
-          namespace: '{{.namespace}}'
-          name: '{{.name}}'
-          output: '{{.output}}'
-          FROM: '--from-literal={{printf "%s=%s" .key .value | q}}'
+          SECRET_NAMESPACE: '{{.SECRET_NAMESPACE}}'
+          SECRET_NAME: '{{.SECRET_NAME}}'
+          SECRET_OUTPUT: '{{.SECRET_OUTPUT}}'
+          FROM: '--from-literal={{printf "%s=%s" .SECRET_KEY .SECRET_VALUE | q}}'
 
   seal:file:
     desc: "Seal every key in an env file into one SealedSecret manifest"
     requires:
-      vars: [namespace, name, file, output]
+      vars: [SECRET_NAMESPACE, SECRET_NAME, SECRET_FILE, SECRET_OUTPUT]
     preconditions:
-      - sh: test -f {{.file | q}}
-        msg: "{{.file}} not found"
+      - sh: test -f {{.SECRET_FILE | q}}
+        msg: "{{.SECRET_FILE}} not found"
     cmds:
       - task: _seal
         vars:
-          namespace: '{{.namespace}}'
-          name: '{{.name}}'
-          output: '{{.output}}'
-          FROM: '--from-env-file={{.file | q}}'
+          SECRET_NAMESPACE: '{{.SECRET_NAMESPACE}}'
+          SECRET_NAME: '{{.SECRET_NAME}}'
+          SECRET_OUTPUT: '{{.SECRET_OUTPUT}}'
+          FROM: '--from-env-file={{.SECRET_FILE | q}}'
 
   seal:literals:
     desc: "Seal several key/value pairs into one SealedSecret manifest"
     requires:
-      vars: [namespace, name, literals, output]
-    # `literals` is split on whitespace, which is what makes the list a list —
+      vars: [SECRET_NAMESPACE, SECRET_NAME, SECRET_LITERALS, SECRET_OUTPUT]
+    # `SECRET_LITERALS` is split on whitespace, which is what makes the list a list —
     # a value containing a space belongs in seal:file. Each pair is quoted on
     # its way into the script, so a quote, a semicolon, a $( ) or a glob in a
     # value reaches kubectl as data; spliced in bare, it ran as shell.
     cmds:
       - task: _seal
         vars:
-          namespace: '{{.namespace}}'
-          name: '{{.name}}'
-          output: '{{.output}}'
-          FROM: '{{range (regexSplit "\\s+" (trim .literals) -1)}}--from-literal={{q .}} {{end}}'
+          SECRET_NAMESPACE: '{{.SECRET_NAMESPACE}}'
+          SECRET_NAME: '{{.SECRET_NAME}}'
+          SECRET_OUTPUT: '{{.SECRET_OUTPUT}}'
+          FROM: '{{range (regexSplit "\\s+" (trim .SECRET_LITERALS) -1)}}--from-literal={{q .}} {{end}}'
 
   _seal:
     internal: true
     requires:
-      vars: [namespace, name, output, FROM]
+      vars: [SECRET_NAMESPACE, SECRET_NAME, SECRET_OUTPUT, FROM]
     preconditions:
       - sh: command -v kubeseal >/dev/null
         msg: "kubeseal is not installed — https://github.com/bitnami-labs/sealed-secrets#installation"
@@ -108,38 +109,38 @@ tasks:
     # kubectl and kubeseal have succeeded. Redirected straight to the output,
     # a failure in either one truncated a manifest that was already committed.
     cmds:
-      - mkdir -p {{dir .output | q}}
+      - mkdir -p {{dir .SECRET_OUTPUT | q}}
       - cmd: |-
           set -euo pipefail
-          tmp=$(mktemp {{printf "%s.XXXXXX" .output | q}})
+          tmp=$(mktemp {{printf "%s.XXXXXX" .SECRET_OUTPUT | q}})
           trap 'rm -f "$tmp"' EXIT
-          {{._SS_KUBECTL}} create secret generic {{.name | q}} \
-            --namespace {{.namespace | q}} {{.FROM}} --dry-run=client -o yaml \
+          {{._SS_KUBECTL}} create secret generic {{.SECRET_NAME | q}} \
+            --namespace {{.SECRET_NAMESPACE | q}} {{.FROM}} --dry-run=client -o yaml \
             | {{._SS_SEAL}} --format yaml {{.KUBESEAL_FLAGS | default ""}} > "$tmp"
-          mv "$tmp" {{.output | q}}
-      - printf '%s sealed-secrets · %s/%s → %s\n' "{{._SS_OK}}" {{.namespace | q}} {{.name | q}} {{.output | q}}
+          mv "$tmp" {{.SECRET_OUTPUT | q}}
+      - printf '%s sealed-secrets · %s/%s → %s\n' "{{._SS_OK}}" {{.SECRET_NAMESPACE | q}} {{.SECRET_NAME | q}} {{.SECRET_OUTPUT | q}}
 
   seal:merge:
     desc: "Seal one key and merge it into an existing SealedSecret, leaving the rest"
     requires:
-      vars: [namespace, name, key, value, output]
+      vars: [SECRET_NAMESPACE, SECRET_NAME, SECRET_KEY, SECRET_VALUE, SECRET_OUTPUT]
     preconditions:
       - sh: command -v kubeseal >/dev/null
         msg: "kubeseal is not installed — https://github.com/bitnami-labs/sealed-secrets#installation"
-      - sh: test -f {{.output | q}}
-        msg: "{{.output}} does not exist — seal the whole manifest first, then merge into it"
+      - sh: test -f {{.SECRET_OUTPUT | q}}
+        msg: "{{.SECRET_OUTPUT}} does not exist — seal the whole manifest first, then merge into it"
     # Rotating one credential in a manifest that holds several: --merge-into
     # rewrites that key's ciphertext and leaves every other key, and the file's
     # structure, as they were. The plaintext only ever reaches kubeseal's stdin.
     cmds:
       - cmd: |-
           set -euo pipefail
-          {{._SS_KUBECTL}} create secret generic {{.name | q}} \
-            --namespace {{.namespace | q}} \
-            --from-literal={{printf "%s=%s" .key .value | q}} \
+          {{._SS_KUBECTL}} create secret generic {{.SECRET_NAME | q}} \
+            --namespace {{.SECRET_NAMESPACE | q}} \
+            --from-literal={{printf "%s=%s" .SECRET_KEY .SECRET_VALUE | q}} \
             --dry-run=client -o yaml \
-            | {{._SS_SEAL}} --format yaml {{.KUBESEAL_FLAGS | default ""}} --merge-into {{.output | q}}
-      - printf '%s sealed-secrets · %s/%s · %s merged → %s\n' "{{._SS_OK}}" {{.namespace | q}} {{.name | q}} {{.key | q}} {{.output | q}}
+            | {{._SS_SEAL}} --format yaml {{.KUBESEAL_FLAGS | default ""}} --merge-into {{.SECRET_OUTPUT | q}}
+      - printf '%s sealed-secrets · %s/%s · %s merged → %s\n' "{{._SS_OK}}" {{.SECRET_NAMESPACE | q}} {{.SECRET_NAME | q}} {{.SECRET_KEY | q}} {{.SECRET_OUTPUT | q}}
 
   pubkey:
     desc: "Print the controller's public certificate, for sealing without a cluster"
