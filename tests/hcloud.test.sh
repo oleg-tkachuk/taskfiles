@@ -3,12 +3,15 @@
 # reach hcloud as data, and a prompt names the selector it acts on honestly.
 source "$(dirname "$0")/lib.sh"
 
+# FAKE_NO_MATCH makes the selector match nothing; FAKE_REFUSE names a server
+# whose power action fails.
 shim hcloud '
 case "$*" in
   "server list -l "*" -o noheader -o columns=name")
     echo "token=${HCLOUD_TOKEN:-} selector=$4" >> "$CALLS"
-    printf "web-1\nweb-2\n" ;;
+    [ -n "${FAKE_NO_MATCH:-}" ] || printf "web-1\nweb-2\n" ;;
   "server list -l "*" -o columns="*) ;;
+  "server "*" ${FAKE_REFUSE:-none}") exit 1 ;;
   "server "*) ;;
   *) exit 1 ;;
 esac'
@@ -58,5 +61,25 @@ expect_status fail "ssh: refuses a server the selector does not match"
 reset_calls
 run_task hcloud:servers HCLOUD_SELECTOR=role=web HCLOUD_STATUS=off
 expect_call "hcloud server list -l role=web -o columns=name,status,type,location,ipv4,private_net --status off" "servers: narrows by status"
+
+# ─── the fan-out: every server is tried, and the ones that refused are named ─
+reset_calls
+FAKE_REFUSE=web-1 run_task hcloud:poweron HCLOUD_SELECTOR=role=web
+expect_status fail "each: a server that refuses fails the task"
+expect_call "hcloud server poweron web-2" "each: the servers after a refusal are still tried"
+expect_output "poweron did not take on: web-1" "each: names the server that refused"
+refute_output "powered on" "each: a partial failure is not reported as done"
+
+reset_calls
+run_task hcloud:poweron
+expect_status fail "selector: an empty one is refused"
+expect_output "an empty one matches every server in the project" "selector: says why an empty one is refused"
+refute_call "hcloud server poweron" "selector: nothing is powered on without one"
+
+reset_calls
+FAKE_NO_MATCH=1 run_task hcloud:poweron HCLOUD_SELECTOR=role=none
+expect_status fail "selector: one that matches nothing fails"
+expect_output "no server matches role=none" "selector: says it matched nothing"
+refute_call "hcloud server poweron" "selector: nothing is powered on when nothing matches"
 
 finish
