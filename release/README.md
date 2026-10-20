@@ -49,7 +49,7 @@ workspace — tasks then read `release:<task>`.
 | `DOCKERFILE` | `./Dockerfile` | resolved from the component directory, **not** from `DOCKER_CONTEXT` |
 | `DOCKER_CONTEXT` | `.` | build context, when it is not the component directory |
 | `DOCKER_BUILD_FLAGS` | — | verbatim extra buildx flags |
-| `IMAGE_LATEST` | `0` | set to `1` to push a floating `:latest` beside the version tag |
+| `IMAGE_LATEST` | `0` | set to `1` to push a floating `:latest` beside the version tag; any other value than `0` or `1` is refused |
 | `BUILDX_BUILDER` | active builder | which buildx builder `image:gc` prunes |
 | `BUILDX_KEEP_STORAGE` | `8GB` | cache floor `image:gc` trims down to |
 | `CHART_DIR` | `./deploy/chart` | the chart every chart task reads |
