@@ -123,42 +123,16 @@ tasks:
     #
     # An input a task `requires:` is by definition allowed to arrive at call
     # time. Read it where it is used, not in the vars block.
+    #
+    # scripts/check-scope.sh reads `requires:` in every form it takes — a flow
+    # list, a block list, {name:, enum:} — where the awk it replaced read the
+    # flow form alone.
     cmds:
+      - bash scripts/check-scope.test.sh >/dev/null
       - cmd: |-
           set -eu
-          fail=0
-          for f in {{.MODULE_FILES}}; do
-            out=$(awk '
-              /^[[:space:]]*requires:[[:space:]]*$/ { req = 1; next }
-              req && /^[[:space:]]*vars:[[:space:]]*\[/ {
-                line = $0
-                sub(/^[^[]*\[/, "", line); sub(/\].*$/, "", line)
-                n = split(line, a, ",")
-                for (i = 1; i <= n; i++) {
-                  gsub(/[[:space:]]/, "", a[i])
-                  if (a[i] != "") required[a[i]] = 1
-                }
-                req = 0; next
-              }
-              req && /^[[:space:]]*[^[:space:]#]/ { req = 0 }
-              /^vars:/        { inv = 1; next }
-              /^[^[:space:]]/ { inv = 0 }
-              inv && /^  [A-Za-z_][A-Za-z0-9_]*:/ { vline[++nv] = $0 }
-              END {
-                for (i = 1; i <= nv; i++)
-                  for (name in required)
-                    if (vline[i] ~ ("[{][{][[:space:]]*[.]" name "[^A-Za-z0-9_]"))
-                      printf "    %s\n      resolves %s, which a caller may pass on the call\n", vline[i], name
-              }
-            ' "$f")
-            if [ -n "$out" ]; then
-              printf '%s\n' "{{._LIB_ERR}} taskfiles · $f resolves a call-time input in its vars block:" >&2
-              printf '%s\n' "$out" >&2
-              fail=1
-            fi
-          done
-          [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · no module var resolves a call-time input"
-          exit "$fail"
+          bash scripts/check-scope.sh {{.MODULE_FILES}}
+          printf '%s\n' "{{._LIB_OK}} taskfiles · no module var resolves a call-time input"
 
   check:silent:
     desc: "Refuse a module that does not run quiet"
