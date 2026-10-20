@@ -97,6 +97,28 @@ expect_status ok "chart:package: PROJECT_NAME with a command substitution packag
 expect_inert pwned-chart-name "chart:package: PROJECT_NAME is not run as shell"
 expect_output "packaged $p-$VERSION.tgz" "chart:package: PROJECT_NAME is printed as text"
 
+# ─── image:push: IMAGE_LATEST ─────────────────────────────────────────────────
+# The image is in the local store here, so push gets past its precondition.
+shim docker "$ARGV"
+consumer release release "{ PROJECT_NAME: app, APP_VERSION: $VERSION }"
+for case in "unset|0|" "1|1|IMAGE_LATEST=1" "0|0|IMAGE_LATEST=0"; do
+  IFS="|" read -r label pushes arg <<< "$case"
+  reset_calls
+  run_task release:image:push ${arg:+"$arg"}
+  expect_status ok "image:push: IMAGE_LATEST $label pushes"
+  if [ "$pushes" = 1 ]; then
+    expect_call "docker push localhost:5000/app:latest" "image:push: IMAGE_LATEST $label pushes :latest"
+  else
+    refute_call ":latest" "image:push: IMAGE_LATEST $label keeps :latest back"
+  fi
+done
+reset_calls
+run_task release:image:push IMAGE_LATEST=false
+expect_status fail "image:push: IMAGE_LATEST=false is refused"
+refute_call "docker push" "image:push: nothing is pushed on a refused IMAGE_LATEST"
+shim docker "$ARGV"'
+case "$1 $2" in "image inspect") exit 1 ;; esac'
+
 # ─── doctor ───────────────────────────────────────────────────────────────────
 # Its exit status is not the point here: the payload registry never answers.
 p=$(payload pwned-chart)

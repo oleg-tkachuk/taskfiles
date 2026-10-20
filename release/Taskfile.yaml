@@ -414,6 +414,10 @@ tasks:
     desc: "Push the component image to the registry"
     deps: [image:build]
     preconditions:
+      # 0 or 1 and nothing else: anything but 0 used to push :latest, so
+      # IMAGE_LATEST=false published the floating tag it meant to keep back.
+      - sh: '{{if or (eq ._REL_LATEST "0") (eq ._REL_LATEST "1")}}true{{else}}false{{end}}'
+        msg: "IMAGE_LATEST is {{._REL_LATEST}} — set it to 1 to push :latest, or 0 (the default) not to"
       - sh: docker image inspect {{._REL_IMAGE | q}}:{{._REL_VERSION | q}} >/dev/null 2>&1
         msg: "{{._REL_IMAGE}}:{{._REL_VERSION}} is not in the local image store — run image:build first"
     cmds:
@@ -425,7 +429,7 @@ tasks:
       # resolved to yesterday is gone — and because the charts here read their
       # tag from appVersion, so nothing in this library needs it. Repositories
       # whose consumers pull by name still do.
-      - if: '{{ne ._REL_LATEST "0"}}'
+      - if: '{{eq ._REL_LATEST "1"}}'
         cmd: |-
           set -eu
           docker tag {{._REL_IMAGE | q}}:{{._REL_VERSION | q}} {{._REL_IMAGE | q}}:latest
