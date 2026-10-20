@@ -29,7 +29,8 @@ version: "3"
 #   TRIVY_SCANNERS     default "--scanners vuln,secret"
 #   TRIVY_SUBCOMMAND   default "fs"; "image" to scan a built image instead
 #   TRIVY_TARGET       what to scan              (default ".")
-#   TRIVY_SKIP_DIRS    directories trivy walks past       (default ".claude")
+#   TRIVY_SKIP_DIRS    trivy's skip flags, verbatim  (default "--skip-dirs .claude");
+#                      replaces the default, so keep .claude in a value of your own
 #   TRIVY_FLAGS        extra trivy flags
 #   BUF_BREAKING_FLAGS extra buf breaking flags
 #   HADOLINT_FLAGS     hadolint flags (default "--failure-threshold error")
