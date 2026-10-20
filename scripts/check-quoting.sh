@@ -52,6 +52,15 @@ for file in "$@"; do
         # Quoted on the way out.
         if (action ~ /(^q |\| *q$|\| *shellQuote$|^shellQuote )/) continue
         # The variable the action reads first.
+        # Binding a variable (`$x := ...`) prints nothing; its uses are checked.
+        if (action ~ /^\$[A-Za-z_][A-Za-z0-9_]* *:?= /) continue
+        # A template variable — a range element, a $x bound earlier — or the
+        # dot itself is data from a list, and nothing exempts it.
+        if (action ~ /^(\$[A-Za-z_][A-Za-z0-9_]*|\.)( |$)/) {
+          printf "%s: {{%s}}\n", file, action
+          bad++
+          continue
+        }
         if (!match(action, /\.[A-Za-z_][A-Za-z0-9_]*/)) continue
         name = substr(action, RSTART, RLENGTH)
         if (name ~ glyph || (name in allowed)) continue

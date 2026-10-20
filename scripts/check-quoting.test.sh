@@ -41,6 +41,30 @@ tasks:
     cmds:
       - echo {{range .LIST}}{{q .}} {{end}}'
 
+expect reported unquoted-range-variable 'version: "3"
+tasks:
+  t:
+    cmds:
+      - echo {{range $f := .LIST}}--framework {{$f}} {{end}}'
+
+expect reported unquoted-dot-in-range 'version: "3"
+tasks:
+  t:
+    cmds:
+      - echo {{range .LIST}}{{.}} {{end}}'
+
+expect clean quoted-range-variable 'version: "3"
+tasks:
+  t:
+    cmds:
+      - echo {{range $f := .LIST}}--framework {{$f | q}} {{end}}'
+
+expect clean variable-binding 'version: "3"
+tasks:
+  t:
+    cmds:
+      - echo {{$w := .X | default "off"}}{{$w | q}}'
+
 expect clean glyph-constant 'version: "3"
 tasks:
   t:
