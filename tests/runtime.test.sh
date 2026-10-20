@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# runtime/kind and runtime/k3d: the image is loaded into the cluster the chart
+# runtime/kind, runtime/k3d and runtime/minikube: the image is loaded into the cluster the chart
 # is installed to.
 source "$(dirname "$0")/lib.sh"
 
@@ -15,6 +15,14 @@ case "$*" in
   "cluster get k3s-default"|"cluster get dev") ;;
   "cluster get "*) exit 1 ;;
   "image import "*) ;;
+  *) exit 1 ;;
+esac'
+# Profiles that run: "minikube" and "dev".
+shim minikube '
+case "$*" in
+  "status -p minikube "*|"status -p dev "*) echo Running ;;
+  "status "*) exit 7 ;;
+  "image load "*) ;;
   *) exit 1 ;;
 esac'
 shim helm 'exit 0'
@@ -72,5 +80,25 @@ reset_calls
 run_task local:install
 expect_status fail "k3d: a cluster that does not exist is refused"
 refute_call "k3d image import" "k3d: nothing is imported into a cluster that does not exist"
+
+include_runtime minikube '{}'
+reset_calls
+run_task local:install
+expect_status ok "minikube: installs on the default profile"
+expect_call "minikube image load -p minikube localhost:5000/app:1.2.3" "minikube: loads into the default profile"
+expect_call "--kube-context minikube" "minikube: installs to the default profile's context"
+
+include_runtime minikube '{ MINIKUBE_PROFILE: dev }'
+reset_calls
+run_task local:install
+expect_status ok "minikube: installs on a named profile"
+expect_call "minikube image load -p dev " "minikube: loads into the named profile"
+expect_call "--kube-context dev" "minikube: installs to the named profile's context"
+
+include_runtime minikube '{ MINIKUBE_PROFILE: missing }'
+reset_calls
+run_task local:install
+expect_status fail "minikube: a profile that is not running is refused"
+refute_call "minikube image load" "minikube: nothing is loaded into a profile that is not running"
 
 finish

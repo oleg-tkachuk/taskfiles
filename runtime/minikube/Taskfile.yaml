@@ -34,7 +34,12 @@ vars:
   _RT_SVC: '{{.PROJECT_NAME | default "service"}}'
   _RT_CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
   _RT_K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
-  _RT_CTX: '{{.K8S_CONTEXT | default "minikube"}}'
+  # The profile the image is loaded into and the context helm installs to are
+  # one choice, not two: minikube names a profile's context after it. With
+  # no -p, a K8S_CONTEXT naming another profile put the chart there and the
+  # image into the default one. "minikube" is minikube's own default.
+  _RT_PROFILE: '{{.MINIKUBE_PROFILE | default "minikube"}}'
+  _RT_CTX: '{{.K8S_CONTEXT | default ._RT_PROFILE}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _RT_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -47,8 +52,8 @@ tasks:
     preconditions:
       - sh: command -v minikube >/dev/null
         msg: "minikube is not installed — https://minikube.sigs.k8s.io/docs/start/"
-      - sh: minikube status --format '{{"{{"}}.Host{{"}}"}}' 2>/dev/null | grep -qx Running
-        msg: "the minikube cluster is not running — `minikube start`"
+      - sh: minikube status -p {{._RT_PROFILE | q}} --format '{{"{{"}}.Host{{"}}"}}' 2>/dev/null | grep -qx Running
+        msg: "minikube profile {{._RT_PROFILE}} is not running — `minikube start -p {{._RT_PROFILE}}`, or set MINIKUBE_PROFILE"
     cmds:
       - printf '%s %s · local · minikube running\n' "{{._RT_OK}}" {{._RT_SVC | q}}
 
@@ -60,7 +65,7 @@ tasks:
     deps: [check]
     cmds:
       - printf '%s %s · local · minikube image load %s:%s\n' "{{._RT_RUN}}" {{._RT_SVC | q}} {{._REL_IMAGE | q}} {{._REL_VERSION | q}}
-      - minikube image load {{._REL_IMAGE | q}}:{{._REL_VERSION | q}}
+      - minikube image load -p {{._RT_PROFILE | q}} {{._REL_IMAGE | q}}:{{._REL_VERSION | q}}
       - printf '%s %s · local · image inside minikube\n' "{{._RT_OK}}" {{._RT_SVC | q}}
 
   install:
