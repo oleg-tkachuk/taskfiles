@@ -34,6 +34,9 @@ vars:
   # Flag fragments, spliced into commands as shell: the values inside them are
   # quoted here, where they are built.
   _HELM_CTX: '{{if .K8S_CONTEXT}} --kube-context {{.K8S_CONTEXT | q}}{{end}}'
+  # How long a reachability probe waits before calling the cluster gone: the
+  # skip guards below would otherwise hang on a dead context.
+  _HELM_PROBE_TIMEOUT: 3s
   _HELM_KCTX: '{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT | q}}{{end}}'
   _HELM_SCOPE: '{{if .HELM_NS}}--namespace {{.HELM_NS | q}}{{else}}--all-namespaces{{end}}'
   _HELM_UNINSTALL_FLAGS: '{{.HELM_UNINSTALL_FLAGS | default ""}}'
@@ -58,7 +61,7 @@ tasks:
     # laptop with no cluster running would otherwise still demand helm be
     # installed just to decide there was nothing to list.
     status:
-      - "! kubectl{{._HELM_KCTX}} version --request-timeout=3s >/dev/null 2>&1"
+      - "! kubectl{{._HELM_KCTX}} version --request-timeout={{._HELM_PROBE_TIMEOUT | q}} >/dev/null 2>&1"
     cmds:
       - task: _list
 
