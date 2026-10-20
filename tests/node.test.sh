@@ -21,6 +21,18 @@ for pm in pnpm npm; do
 done
 rm -f "$CONSUMER/package.json"
 
+# npm keeps a flag before `--` for itself; pnpm passes it to the script.
+for case in "pnpm|pnpm run lint --fix|pnpm exec playwright install --with-deps chromium" \
+            "npm|npm run lint -- --fix|npm exec -- playwright install --with-deps chromium"; do
+  IFS="|" read -r pm lintfix e2e <<< "$case"
+  reset_calls
+  run_task node:lint:fix "PM=$pm"
+  expect_call "$lintfix" "lint:fix: $pm passes --fix to the script"
+  reset_calls
+  run_task node:test:e2e "PM=$pm"
+  expect_call "$e2e" "e2e: $pm passes --with-deps to playwright"
+done
+
 reset_calls
 run_task node:build
 expect_status ok "build: runs"
