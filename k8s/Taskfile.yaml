@@ -213,7 +213,7 @@ tasks:
       # Defaults to PORT (already resolved above, never empty by the time
       # this reads it), so a service listening on the same number needs no
       # second knob; TEI-style containers on :80 set TARGET_PORT.
-      TARGET: '{{.TARGET_PORT | default .PORT}}'
+      _K8S_TARGET: '{{.TARGET_PORT | default .PORT}}'
     cmds:
-      - printf '%s %s · k8s · localhost:%s → deploy/%s:%s\n' "{{._K8S_RUN}}" {{._K8S_SVC | q}} {{.PORT | q}} {{._K8S_DEPLOY | q}} {{.TARGET | q}}
-      - "{{._K8S_KUBECTL}} -n {{._K8S_NS | q}} port-forward deploy/{{._K8S_DEPLOY | q}} {{.PORT | q}}:{{.TARGET | q}}"
+      - printf '%s %s · k8s · localhost:%s → deploy/%s:%s\n' "{{._K8S_RUN}}" {{._K8S_SVC | q}} {{.PORT | q}} {{._K8S_DEPLOY | q}} {{._K8S_TARGET | q}}
+      - "{{._K8S_KUBECTL}} -n {{._K8S_NS | q}} port-forward deploy/{{._K8S_DEPLOY | q}} {{.PORT | q}}:{{._K8S_TARGET | q}}"

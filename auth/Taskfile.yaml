@@ -34,13 +34,13 @@ tasks:
     desc: "Mint a JWT for local development (override any JWT_* var)"
     aliases: [mint]
     vars:
-      ALG: '{{.JWT_ALG | default "HS256"}}'
-      SECRET: '{{.JWT_SECRET | default "dev-secret-change-me-32-bytes-min"}}'
-      ISS: '{{.JWT_ISS | default "local-dev"}}'
-      AUD: '{{.JWT_AUD | default "local-api"}}'
-      SUB: '{{.JWT_SUB | default "dev-user"}}'
-      TTL: '{{.JWT_TTL_SECONDS | default "86400"}}'
-      CLAIMS: '{{.JWT_CLAIMS | default "{}"}}'
+      _AUTH_ALG: '{{.JWT_ALG | default "HS256"}}'
+      _AUTH_SECRET: '{{.JWT_SECRET | default "dev-secret-change-me-32-bytes-min"}}'
+      _AUTH_ISS: '{{.JWT_ISS | default "local-dev"}}'
+      _AUTH_AUD: '{{.JWT_AUD | default "local-api"}}'
+      _AUTH_SUB: '{{.JWT_SUB | default "dev-user"}}'
+      _AUTH_TTL: '{{.JWT_TTL_SECONDS | default "86400"}}'
+      _AUTH_CLAIMS: '{{.JWT_CLAIMS | default "{}"}}'
       STEP_FLAGS: '{{.STEP_FLAGS | default ""}}'
     preconditions:
       - sh: command -v step >/dev/null
@@ -52,13 +52,13 @@ tasks:
           set -eu
           # Checked before arithmetic: $(( )) evaluates a variable's text as an
           # expression, so anything but digits could run a command.
-          ttl={{.TTL | q}}
+          ttl={{._AUTH_TTL | q}}
           case "$ttl" in
             '' | *[!0-9]*) printf '%s\n' "auth · JWT_TTL_SECONDS must be a whole number of seconds, got: $ttl" >&2; exit 1 ;;
           esac
-          printf '%s' {{.CLAIMS | q}} |
-          step crypto jwt sign {{.STEP_FLAGS}} --alg {{.ALG | q}} \
-            --key <(printf '%s' {{.SECRET | q}}) \
-            --iss {{.ISS | q}} --aud {{.AUD | q}} --sub {{.SUB | q}} \
+          printf '%s' {{._AUTH_CLAIMS | q}} |
+          step crypto jwt sign {{.STEP_FLAGS}} --alg {{._AUTH_ALG | q}} \
+            --key <(printf '%s' {{._AUTH_SECRET | q}}) \
+            --iss {{._AUTH_ISS | q}} --aud {{._AUTH_AUD | q}} --sub {{._AUTH_SUB | q}} \
             --exp $(($(date +%s) + ttl)) \
             --subtle

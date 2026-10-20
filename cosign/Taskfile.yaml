@@ -209,9 +209,9 @@ tasks:
     vars:
       # A literal `for:` list is taken verbatim — templates in its items are
       # not expanded — so the refs are built here and split on whitespace.
-      REFS: "{{._REL_IMAGE}}:{{._CS_VERSION}} {{._CS_CHART_REF}}:{{._CS_VERSION}}"
+      _CS_REFS: "{{._REL_IMAGE}}:{{._CS_VERSION}} {{._CS_CHART_REF}}:{{._CS_VERSION}}"
     cmds:
-      - for: { var: REFS }
+      - for: { var: _CS_REFS }
         cmd: >-
           cosign verify {{._CS_VERIFY_FLAGS}} --key {{._CS_PUB | q}} {{.ITEM | q}} >/dev/null 2>&1
           && printf '%s %s · cosign · verified %s\n' "{{._CS_OK}}" {{._CS_NAME | q}} {{.ITEM | q}}

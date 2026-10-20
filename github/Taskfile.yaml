@@ -53,10 +53,10 @@ tasks:
 
       REF defaults to HEAD. The flag is restored even when the push fails.
     vars:
-      REPO:
+      _GH_REPO:
         sh: '{{if .GH_REPO}}echo {{.GH_REPO | q}}{{else}}gh repo view --json nameWithOwner -q .nameWithOwner{{end}}'
-      BRANCH: '{{.GH_BRANCH | default "main"}}'
-      REMOTE: '{{.GH_REMOTE | default "origin"}}'
+      _GH_BRANCH: '{{.GH_BRANCH | default "main"}}'
+      _GH_REMOTE: '{{.GH_REMOTE | default "origin"}}'
       REF: '{{.REF | default "HEAD"}}'
     preconditions:
       - sh: command -v gh >/dev/null
@@ -66,7 +66,7 @@ tasks:
     cmds:
       - cmd: |-
           set -eu
-          repo={{.REPO | q}}; branch={{.BRANCH | q}}; remote={{.REMOTE | q}}
+          repo={{._GH_REPO | q}}; branch={{._GH_BRANCH | q}}; remote={{._GH_REMOTE | q}}
           api="repos/$repo/branches/$branch/protection/enforce_admins"
 
           # Protection comes down on $repo, so the push has to land there.
