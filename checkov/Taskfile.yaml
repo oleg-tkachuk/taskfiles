@@ -205,7 +205,7 @@ tasks:
           {{._CKV_RESOLVE}}
           run_checkov --compact {{._CKV_FLAGS}} \
             {{range $d := ._CKV_TARGET}}-d {{$d | q}} {{end}}\
-            {{range $f := ._CKV_FW}}--framework {{$f}} {{end}}
+            {{range $f := ._CKV_FW}}--framework {{$f | q}} {{end}}
 
   baseline:
     desc: "Regenerate the checkov baseline — only after deliberately fixing findings"
