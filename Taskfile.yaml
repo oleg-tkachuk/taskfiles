@@ -193,9 +193,9 @@ tasks:
       - node .github/ci/check-workflows.ts .
       - cmd: |-
           if command -v shellcheck >/dev/null 2>&1; then
-            shellcheck -S warning scripts/*.sh
+            shellcheck -S warning scripts/*.sh tests/*.sh
           else
-            printf '%s\n' "{{._LIB_WARN}} taskfiles · shellcheck absent, scripts/ not linted" >&2
+            printf '%s\n' "{{._LIB_WARN}} taskfiles · shellcheck absent, scripts/ and tests/ not linted" >&2
           fi
       - printf '%s\n' "{{._LIB_OK}} taskfiles · every workflow script lives in .github/ci, is run, and passes its types and tests"
 
