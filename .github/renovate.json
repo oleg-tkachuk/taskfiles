@@ -39,9 +39,10 @@
 
   "packageRules": [
     {
-      "description": "Actions are pinned to commit shas with a version comment; Renovate maintains both. Scoped to depType `action` — the `uses:` reference — because the same manager also reports a step's inputs (`node-version:`) as dependencies, and a version input has no digest to pin.",
+      "description": "Actions are pinned to commit shas with a version comment; Renovate maintains both. Scoped to depType `action` — the `uses:` reference — because the same manager also reports a step's inputs (`node-version:`) as dependencies, and a version input has no digest to pin. A release waits three days before it merges itself: the same actions run in release.yml holding a write token, which no pull request check exercises, and a compromised tag is usually caught and pulled within that time.",
       "matchManagers": ["github-actions"],
       "matchDepTypes": ["action"],
+      "minimumReleaseAge": "3 days",
       "pinDigests": true,
       "groupName": "github actions",
       "semanticCommitType": "ci",
