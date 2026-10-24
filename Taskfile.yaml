@@ -251,7 +251,9 @@ tasks:
     # python/poetry and python/uv are sold as interchangeable — a consumer
     # swaps one include line and every task name it calls still resolves. That
     # promise is only true while the two agree, and nothing else would notice
-    # them drifting. Documented exceptions go in the allowlist below.
+    # them drifting. Documented exceptions go in the allowlist below. Aliases
+    # count as names: a renamed task keeps its old name as one for a major
+    # (RELEASE.md), and a consumer calls it on whichever variant it includes.
     #
     # Task NAMES are not the whole promise: python/poetry's test/lint/fmt went
     # a full release without `deps: [install]`, while python/uv had it from the
@@ -276,7 +278,7 @@ tasks:
           for fam in {{.FAMILIES}}; do
             first=""; base=""; basedeps=""
             for v in $(ls -d "$fam"/*/Taskfile.yaml 2>/dev/null | sed "s|/Taskfile.yaml||"); do
-              got=$(task -t "$v/Taskfile.yaml" --list-all --json | yq -p json -r '.tasks[].name' | sort)
+              got=$(task -t "$v/Taskfile.yaml" --list-all --json | yq -p json -r '.tasks[] | [.name] + (.aliases // []) | .[]' | sort)
               # Drop the tasks this family is allowed to differ on.
               for e in {{.SURFACE_EXCEPT}}; do
                 case "$e" in
