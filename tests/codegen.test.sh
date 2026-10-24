@@ -19,4 +19,21 @@ for case in "default|off|" "auto||GOWORK=auto" "empty|off|GOWORK="; do
   expect_call "go GOWORK=[$expected]" "gowork: $label reaches go as [$expected]"
 done
 
+# ─── proto ────────────────────────────────────────────────────────────────────
+# PROTO_PATH is shell by contract: a plugin out of a pnpm tree is named with
+# the command that finds it.
+shim buf 'printf "buf PATH=[%s]\n" "$PATH" >> "$CALLS"'
+printf 'version: v2\n' > "$CONSUMER/buf.gen.yaml"
+
+consumer codegen codegen "{ PROTO_PATH: '\$(printf %s /from-shell)' }"
+reset_calls
+run_task codegen:proto
+expect_status ok "proto: runs with a PROTO_PATH that is a command substitution"
+expect_call "buf PATH=[/from-shell:" "proto: PROTO_PATH is evaluated by the shell"
+
+consumer codegen codegen "{ PROTO_PATH: '/a dir/bin' }"
+reset_calls
+run_task codegen:proto
+expect_call "buf PATH=[/a dir/bin:" "proto: a PROTO_PATH with a space stays one entry"
+
 finish
