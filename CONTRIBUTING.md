@@ -32,9 +32,9 @@ task lint
 ```
 
 One command, run by the hooks and by CI alike: every module parses, declares
-no var that would shadow a consumer's, runs quiet, and appears in the
-README's Tasks table. Run it before opening a PR — nothing here passes review
-that this does not pass first.
+no var that would shadow a consumer's, runs quiet, and has a README of its own
+that README.md links from its Modules table. Run it before opening a PR —
+nothing here passes review that this does not pass first.
 
 ## How a module is written
 
