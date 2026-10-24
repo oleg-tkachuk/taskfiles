@@ -39,8 +39,11 @@ esac
 exit 0'
 shim curl '[ -z "${FAKE_REGISTRY_DOWN:-}" ]'
 # The local image store holds an image once something has built it.
+# Asked for a pushed image's repo digests, it answers with one for the
+# repository the image is named after, as docker does after a push.
 shim docker '
 case "$*" in
+  "image inspect"*--format*) [ -f "$CALLS.built" ] && printf "%s@sha256:%064d\n" "${3%:*}" 0 ;;
   "image inspect"*) [ -f "$CALLS.built" ] ;;
   *build*) touch "$CALLS.built" ;;
 esac'

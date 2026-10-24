@@ -70,7 +70,7 @@ version: "3"
 # rename of one of these breaks those modules, so check:vars refuses a read of
 # any other.
 # ─────────────────────────────────────────────────────────────────────────────
-# exports: _REL_VERSION _REL_IMAGE
+# exports: _REL_VERSION _REL_IMAGE _REL_DIGEST_FILE
 # shell-verbatim: _REL_BUILD_FLAGS DOCKER_BUILD_FLAGS _REL_HELM_FLAGS HELM_FLAGS _REL_HELM_LINT_FLAGS HELM_LINT_FLAGS _REL_HELM_TPL_FLAGS HELM_TEMPLATE_FLAGS _REL_HELM_PKG_FLAGS HELM_PACKAGE_FLAGS _REL_KUBECONFORM_FLAGS KUBECONFORM_FLAGS _REL_TAG_MATCH
 
 silent: true
@@ -253,6 +253,11 @@ vars:
     {{- else if ._REL_ON_TAG -}}{{._REL_KIND_RELEASE}}
     {{- else -}}{{._REL_KIND_DEV}}
     {{- end -}}
+  # Where image:push records the digest it pushed, one file per version so a
+  # file left by an earlier push is never read for this one. Under .task/,
+  # which Task owns and repositories ignore. Exported: cosign signs it.
+  _REL_DIGEST_DIR: .task/release
+  _REL_DIGEST_FILE: '{{._REL_DIGEST_DIR}}/{{._REL_VERSION}}.digest'
   _REL_BUILD_TIME:
     sh: TZ={{.TIMEZONE | default "UTC" | q}} date +%Y-%m-%dT%H:%M:%S%z
   # Status markers. The shape carries the meaning, so a line still reads in
@@ -487,6 +492,31 @@ tasks:
     cmds:
       - printf '%s %s · image · push %s:%s\n' "{{._REL_RUN}}" {{._REL_SVC | q}} {{._REL_IMAGE | q}} {{._REL_VERSION | q}}
       - docker push {{._REL_IMAGE | q}}:{{._REL_VERSION | q}}
+      # The digest that push sent, for cosign to sign and verify instead of the
+      # tag, which can be moved between the push and the signature. Read from
+      # docker's own record of the push, not the registry: asking the registry
+      # what the tag points at now is the same race. A module var cannot carry
+      # it — vars are fixed when the include loads, before this push — so it
+      # goes to a file per version, whose path is exported.
+      #
+      # One repo digest per repository the image was pushed to; this one's is
+      # the line naming it. Docker Hub names are recorded without docker.io/
+      # and library/, so those are matched too.
+      - cmd: |-
+          set -eu
+          image={{._REL_IMAGE | q}}
+          short=${image#docker.io/}; short=${short#index.docker.io/}; short=${short#library/}
+          digest=$(docker image inspect "$image:"{{._REL_VERSION | q}} --format '{{"{{"}}range .RepoDigests{{"}}"}}{{"{{"}}println .{{"}}"}}{{"{{"}}end{{"}}"}}' \
+            | awk -v a="$image@" -v b="$short@" 'index($0, a) == 1 || index($0, b) == 1 { print; exit }')
+          if [ -z "$digest" ]; then
+            printf '%s %s · image · pushed, but docker recorded no digest for %s\n' "{{._REL_ERR}}" {{._REL_SVC | q}} "$image" >&2
+            exit 1
+          fi
+          out={{._REL_DIGEST_FILE | q}}
+          mkdir -p "$(dirname "$out")"
+          tmp=$(mktemp "$out.XXXXXX")
+          printf '%s\n' "$digest" > "$tmp"
+          mv "$tmp" "$out"
       - printf '%s %s · image · pushed %s\n' "{{._REL_OK}}" {{._REL_SVC | q}} {{._REL_VERSION | q}}
       # A floating tag, only when a repository asks for one. It is off by
       # default because :latest makes a deployment unreproducible — what it
