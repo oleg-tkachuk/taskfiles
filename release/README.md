@@ -26,7 +26,7 @@ workspace — tasks then read `release:<task>`.
 | `metadata` | Write APP_VERSION / BUILD_KIND / GIT_COMMIT_HASH / BUILD_TIME into the deploy info file — alias `info` |
 | `version` | Print the version this working tree publishes as |
 | `image:build` | Build the component image (skipped when the tree is clean and it is already built) |
-| `image:push` | Push the component image to the registry |
+| `image:push` | Push the component image to the registry, and record the digest it pushed in `.task/release/<version>.digest` |
 | `image:gc` | Trim the BuildKit cache to the keep floor and drop dangling images |
 | `chart:verify` | Lint the chart and render it through the multi-doc separator gate |
 | `chart:lint` | helm lint the chart |
