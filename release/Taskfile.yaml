@@ -414,6 +414,27 @@ tasks:
             say '{{._REL_WARN}}' "registry $reg did not answer over https or http (got $code) — a push would fail"
           fi
 
+          # ─── remote lock ──────────────────────────────────────────────────
+          # Task's checksum of each module fetched over git, beside the root
+          # Taskfile: the only thing between a moved tag and this build. It
+          # protects another checkout only once it is committed, and the usual
+          # `.task/` ignore rule throws it away — as does `.task/` followed by
+          # `!.task/remote/`, since git re-includes nothing under an excluded
+          # directory. No lock is a library included from a checkout: silent.
+          lockdir={{.TASK_TEMP_DIR | default ".task" | q}}/remote
+          root={{.ROOT_DIR | q}}
+          case "$lockdir" in /*) at=$lockdir ;; *) at=$root/$lockdir ;; esac
+          lock=$(ls "$at"/*.checksum 2>/dev/null | head -1 || true)
+          if [ -n "$lock" ] && git -C "$root" rev-parse --git-dir >/dev/null 2>&1; then
+            if git -C "$root" check-ignore -q "$lock"; then
+              say '{{._REL_WARN}}' "remote lock $lockdir is ignored by git — ignore .task/* rather than .task/, then add !$lockdir/ and commit it"
+            elif ! git -C "$root" ls-files --error-unmatch "$lock" >/dev/null 2>&1; then
+              say '{{._REL_WARN}}' "remote lock $lockdir is not committed — commit it, or a moved tag goes unnoticed in every other checkout"
+            else
+              say '{{._REL_OK}}' "remote lock $lockdir is committed"
+            fi
+          fi
+
           if [ "$fail" = 0 ]; then
             say '{{._REL_OK}}' "ready to publish"
           fi

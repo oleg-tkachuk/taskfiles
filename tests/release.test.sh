@@ -189,6 +189,25 @@ run_task release:doctor
 refute_output "no git history" "doctor: a commit whose short sha is 00000000 still has history"
 rm -f "$BIN/git"
 
+# The remote lock: Task's checksum of every module fetched over git, and the
+# only thing between a moved tag and the build. Ignored with the rest of
+# .task/, it protects nobody else's checkout.
+run_task release:doctor
+refute_output "remote lock" "doctor: no remote lock, nothing to say about one"
+mkdir -p "$CONSUMER/.task/remote"
+printf 'abc\n' > "$CONSUMER/.task/remote/git.github.com.release.0123.checksum"
+printf '.task/\n' > "$CONSUMER/.gitignore"
+run_task release:doctor
+expect_output "remote lock .task/remote is ignored by git" "doctor: an ignored remote lock is reported"
+printf '.task/*\n!.task/remote/\n' > "$CONSUMER/.gitignore"
+run_task release:doctor
+expect_output "remote lock .task/remote is not committed" "doctor: an uncommitted remote lock is reported"
+git -C "$CONSUMER" add .gitignore .task/remote
+git -C "$CONSUMER" -c user.name=t -c user.email=t@example.invalid commit -q -m lock
+run_task release:doctor
+expect_output "remote lock .task/remote is committed" "doctor: a committed remote lock is reported as such"
+rm -rf "$CONSUMER/.git" "$CONSUMER/.gitignore" "$CONSUMER/.task/remote"
+
 # ─── image:gc ─────────────────────────────────────────────────────────────────
 # A prune that could not run is not a trimmed cache.
 consumer release release "{ PROJECT_NAME: app, APP_VERSION: $VERSION }"
