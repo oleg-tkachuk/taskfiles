@@ -53,4 +53,10 @@ repo tag release-5
 commit fifth
 expect_version '1.3.1-dev.*.g*' "a tag that is not a version is passed over"
 
+repo tag stable
+expect_version '1.3.1-dev.*.g*' "a tag on HEAD that is not a version does not become one"
+
+repo tag v1.4.0
+expect_version '1.4.0' "a version tag beside a tag that is not one is still the version"
+
 finish

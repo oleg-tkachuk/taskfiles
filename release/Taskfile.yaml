@@ -65,7 +65,7 @@ version: "3"
 # The *_FLAGS inputs are shell by contract: spliced in verbatim and word-split.
 # Every other value goes through `q` where it reaches a shell.
 # ─────────────────────────────────────────────────────────────────────────────
-# shell-verbatim: _REL_BUILD_FLAGS DOCKER_BUILD_FLAGS _REL_HELM_FLAGS HELM_FLAGS _REL_HELM_LINT_FLAGS HELM_LINT_FLAGS _REL_HELM_TPL_FLAGS HELM_TEMPLATE_FLAGS _REL_HELM_PKG_FLAGS HELM_PACKAGE_FLAGS _REL_KUBECONFORM_FLAGS KUBECONFORM_FLAGS
+# shell-verbatim: _REL_BUILD_FLAGS DOCKER_BUILD_FLAGS _REL_HELM_FLAGS HELM_FLAGS _REL_HELM_LINT_FLAGS HELM_LINT_FLAGS _REL_HELM_TPL_FLAGS HELM_TEMPLATE_FLAGS _REL_HELM_PKG_FLAGS HELM_PACKAGE_FLAGS _REL_KUBECONFORM_FLAGS KUBECONFORM_FLAGS _REL_TAG_MATCH
 
 silent: true
 
@@ -157,9 +157,13 @@ vars:
   # The `v` comes off in the template, not through `sed`: one process instead
   # of two, and the rule is legible as data rather than buried in a regex
   # inside a folded scalar.
+  # Only a tag that starts with a version is one: `stable` or `latest` on HEAD
+  # would otherwise become the version itself, and git picks between two tags
+  # on one commit by name, not by which is the release.
+  _REL_TAG_MATCH: "--match 'v[0-9]*' --match '[0-9]*'"
   _REL_TAG_RAW:
     sh: >-
-      git describe --tags --exact-match
+      git describe --tags --exact-match {{._REL_TAG_MATCH}}
       {{if .VERSION_TAG_EXCLUDE}}--exclude {{.VERSION_TAG_EXCLUDE | q}}{{end}}
       HEAD 2>/dev/null || true
   _REL_TAG: '{{._REL_TAG_RAW | trimPrefix "v"}}'
@@ -172,7 +176,7 @@ vars:
   # passed over; VERSION_BASE still sets the base outright.
   _REL_LAST_TAG:
     sh: >-
-      git describe --tags --abbrev=0 --match 'v[0-9]*' --match '[0-9]*'
+      git describe --tags --abbrev=0 {{._REL_TAG_MATCH}}
       {{if .VERSION_TAG_EXCLUDE}}--exclude {{.VERSION_TAG_EXCLUDE | q}}{{end}}
       HEAD 2>/dev/null || true
   _REL_LAST_CORE: '{{regexFind "^[0-9]+\\.[0-9]+\\.[0-9]+" (._REL_LAST_TAG | trimPrefix "v")}}'
