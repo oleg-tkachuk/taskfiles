@@ -65,7 +65,7 @@ version: "3"
 # was just generated — the gate failing against its own generator. Normalising
 # here is what makes generation idempotent.
 # ─────────────────────────────────────────────────────────────────────────────
-# shell-verbatim: _CG_GEN_CMD GENERATE_CMD _CG_BUF_FLAGS BUF_FLAGS _CG_SQLC_FLAGS SQLC_FLAGS _CG_GOIMPORTS_FLAGS GOIMPORTS_FLAGS _CG_PATHS_Q
+# shell-verbatim: _CG_GEN_CMD GENERATE_CMD _CG_BUF_PATH PROTO_PATH _CG_BUF_FLAGS BUF_FLAGS _CG_SQLC_FLAGS SQLC_FLAGS _CG_GOIMPORTS_FLAGS GOIMPORTS_FLAGS _CG_PATHS_Q
 
 silent: true
 
@@ -179,7 +179,7 @@ tasks:
           export PATH="$GOBIN:$PATH"
           go install {{range (splitList " " ._CG_PLUGINS | compact)}}{{q .}} {{end}}
           {{end}}
-          {{if ._CG_BUF_PATH}}export PATH={{._CG_BUF_PATH | q}}:"$PATH"{{end}}
+          {{if ._CG_BUF_PATH}}export PATH="{{._CG_BUF_PATH}}:$PATH"{{end}}
           buf generate {{._CG_BUF_FLAGS}} {{if ._CG_BUF_IN}}{{._CG_BUF_IN | q}}{{end}} --template {{.ITEM | q}}
       - task: _normalise
 
