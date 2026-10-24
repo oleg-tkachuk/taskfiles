@@ -64,7 +64,13 @@ version: "3"
 #
 # The *_FLAGS inputs are shell by contract: spliced in verbatim and word-split.
 # Every other value goes through `q` where it reaches a shell.
+#
+# Exported: the derived values another module reads, because it acts on what
+# this one published — cosign signs it, runtime/* loads and installs it. A
+# rename of one of these breaks those modules, so check:vars refuses a read of
+# any other.
 # ─────────────────────────────────────────────────────────────────────────────
+# exports: _REL_VERSION _REL_IMAGE
 # shell-verbatim: _REL_BUILD_FLAGS DOCKER_BUILD_FLAGS _REL_HELM_FLAGS HELM_FLAGS _REL_HELM_LINT_FLAGS HELM_LINT_FLAGS _REL_HELM_TPL_FLAGS HELM_TEMPLATE_FLAGS _REL_HELM_PKG_FLAGS HELM_PACKAGE_FLAGS _REL_KUBECONFORM_FLAGS KUBECONFORM_FLAGS _REL_TAG_MATCH
 
 silent: true
