@@ -22,7 +22,12 @@ export async function publish(github: GitHub, tag: string): Promise<void> {
   if (!(await github.tagExists(tag))) {
     throw new Error(`tag ${tag} is not in the repository; a release for it would create it on the default branch`);
   }
-  await github.createRelease(tag);
+  // A tag-push run and a dispatched run can both reach this point; the one
+  // that loses finds the release there, as a second run of the check would.
+  if (!(await github.createRelease(tag))) {
+    info(`✔ release ${tag} already exists`);
+    return;
+  }
   info(`✔ released ${tag}`);
 }
 

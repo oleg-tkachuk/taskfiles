@@ -8,6 +8,12 @@ import { Octokit, RequestError } from "octokit";
 // NOT_FOUND is the status GitHub answers for a release or ref that is not
 // there.
 const NOT_FOUND = 404;
+// UNPROCESSABLE is the status GitHub answers for a request it validated and
+// refused.
+const UNPROCESSABLE = 422;
+// ALREADY_EXISTS is the validation code GitHub gives a second release for one
+// tag.
+const ALREADY_EXISTS = "already_exists";
 
 // GitHub is what a command asks of the repository it runs for.
 export interface GitHub {
@@ -20,7 +26,8 @@ export interface GitHub {
   // releaseExists reports whether a release is published for tag.
   releaseExists(tag: string): Promise<boolean>;
   // createRelease publishes a release for tag, with notes GitHub generates.
-  createRelease(tag: string): Promise<void>;
+  // It is false when tag already has a release.
+  createRelease(tag: string): Promise<boolean>;
 }
 
 // splitRepository is owner and name of an owner/name repository.
@@ -45,6 +52,16 @@ async function found(request: Promise<unknown>): Promise<boolean> {
   }
 }
 
+// alreadyExists reports whether err is GitHub refusing to create something
+// that is already there.
+export function alreadyExists(err: unknown): boolean {
+  if (!(err instanceof RequestError) || err.status !== UNPROCESSABLE) {
+    return false;
+  }
+  const data = err.response?.data as { errors?: { code?: string }[] } | undefined;
+  return data?.errors?.some((e) => e.code === ALREADY_EXISTS) ?? false;
+}
+
 // gitHubFor is the real API for repository, authenticated with token.
 export function gitHubFor(token: string, repository: string): GitHub {
   const octokit = new Octokit({ auth: token });
@@ -59,7 +76,15 @@ export function gitHubFor(token: string, repository: string): GitHub {
     tagExists: (tag) => found(octokit.rest.git.getRef({ ...where, ref: `tags/${tag}` })),
     releaseExists: (tag) => found(octokit.rest.repos.getReleaseByTag({ ...where, tag })),
     async createRelease(tag) {
-      await octokit.rest.repos.createRelease({ ...where, tag_name: tag, name: tag, generate_release_notes: true });
+      try {
+        await octokit.rest.repos.createRelease({ ...where, tag_name: tag, name: tag, generate_release_notes: true });
+        return true;
+      } catch (err) {
+        if (alreadyExists(err)) {
+          return false;
+        }
+        throw err;
+      }
     },
   };
 }
