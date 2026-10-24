@@ -125,15 +125,19 @@ tasks:
     # means for the same kind of endpoint. --max-time bounds it for the same
     # reason: this runs before a fan-out across every component, and an
     # unreachable host must cost seconds, not a hang.
+    # https first, then plain http: a local registry such as the default
+    # localhost:5000 speaks only http, and docker pushes to it that way.
     preconditions:
-      - sh: >-
-          reg={{._MONO_REG | q}};
-          case "$(curl -sk --max-time 10 -o /dev/null -w '%{http_code}'
-          "https://$reg/v2/" 2>/dev/null || printf '%s' 000)" in
-            200|401|403) true ;; *) false ;;
-          esac
+      - sh: |-
+          reg={{._MONO_REG | q}}
+          for scheme in https http; do
+            case "$(curl -sk --max-time 10 -o /dev/null -w '%{http_code}' "$scheme://$reg/v2/" 2>/dev/null || printf '%s' 000)" in
+              200|401|403) exit 0 ;;
+            esac
+          done
+          exit 1
         msg: |-
-          {{._MONO_REG}} is not answering on :443.
+          {{._MONO_REG}} is not answering over https or http.
           Bring the OCI registry up, or point the run somewhere else with
           GLOBAL_REGISTRY=<host> task ...
     cmds:

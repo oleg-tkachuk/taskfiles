@@ -349,11 +349,18 @@ tasks:
           # ─── registry ─────────────────────────────────────────────────────
           # --max-time bounds the check: doctor is a report someone runs while
           # waiting, and an unreachable registry must cost seconds, not a hang.
-          code=$(curl -sk --max-time 10 -o /dev/null -w '%{http_code}' "https://$reg/v2/" 2>/dev/null || printf '%s' 000)
-          case "$code" in
-            200|401|403) say '{{._REL_OK}}' "registry $reg answers" ;;
-            *) say '{{._REL_WARN}}' "registry $reg did not answer (got $code) — a push would fail" ;;
-          esac
+          # https first, then plain http: a local registry such as the default
+          # localhost:5000 speaks only http, and docker pushes to it that way.
+          answered=0
+          for scheme in https http; do
+            code=$(curl -sk --max-time 10 -o /dev/null -w '%{http_code}' "$scheme://$reg/v2/" 2>/dev/null || printf '%s' 000)
+            case "$code" in 200|401|403) answered=1; break ;; esac
+          done
+          if [ "$answered" = 1 ]; then
+            say '{{._REL_OK}}' "registry $reg answers"
+          else
+            say '{{._REL_WARN}}' "registry $reg did not answer over https or http (got $code) — a push would fail"
+          fi
 
           if [ "$fail" = 0 ]; then
             say '{{._REL_OK}}' "ready to publish"
