@@ -27,7 +27,12 @@ export function fakeGitHub(data: FakeData): GitHub {
     tagExists: async (tag) => data.tags.has(tag),
     releaseExists: async (tag) => data.releases.has(tag),
     async createRelease(tag) {
+      // As GitHub does: a second release for one tag is refused.
+      if (data.releases.has(tag)) {
+        return false;
+      }
       data.releases.add(tag);
+      return true;
     },
   };
 }

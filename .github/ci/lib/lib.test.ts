@@ -7,7 +7,9 @@ import { escapeData, setOutput } from "./actions.ts";
 import { optionalEnv, requireEnv } from "./env.ts";
 import { capture, execute } from "./exec.ts";
 import { changedPaths, commitAll, hasCommit, initRepo, lines } from "./git.ts";
-import { splitRepository } from "./github.ts";
+import { RequestError } from "octokit";
+
+import { alreadyExists, splitRepository } from "./github.ts";
 import { tempDir } from "./temp-dir.ts";
 
 // withEnv runs fn with name set to value, restoring it after.
@@ -77,6 +79,19 @@ test("changedPaths lists a rename by both paths; hasCommit tells a commit from g
   } finally {
     tmp.cleanup();
   }
+});
+
+test("alreadyExists is GitHub's 422 already_exists and nothing else", () => {
+  const refused = (status: number, data: unknown) =>
+    new RequestError("refused", status, {
+      request: { method: "POST", url: "https://api.github.com/x", headers: {} },
+      response: { status, url: "https://api.github.com/x", headers: {}, data },
+    });
+  assert.equal(alreadyExists(refused(422, { errors: [{ resource: "Release", code: "already_exists", field: "tag_name" }] })), true);
+  assert.equal(alreadyExists(refused(422, { errors: [{ code: "invalid", field: "tag_name" }] })), false);
+  assert.equal(alreadyExists(refused(422, { message: "Validation Failed" })), false);
+  assert.equal(alreadyExists(refused(500, { errors: [{ code: "already_exists" }] })), false);
+  assert.equal(alreadyExists(new Error("boom")), false);
 });
 
 test("splitRepository takes owner/name and nothing else", () => {
