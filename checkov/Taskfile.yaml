@@ -87,8 +87,16 @@ vars:
     # died with "`fi` can only be used to end an `if`", naming neither the
     # input nor the quote. Balanced quotes survive it, which is why the same
     # shape elsewhere has not been caught.
+    #
+    # A command that prints nothing has lost the pin — a renamed file, a moved
+    # key — and a pipeline's exit status is its last stage's, so set -e does
+    # not see it. Read as "unpinned", it ran whatever was on PATH in silence.
     {{if .CHECKOV_VERSION_CMD -}}
     checkov_version="$({{.CHECKOV_VERSION_CMD}})"
+    if [ -z "$checkov_version" ]; then
+      printf '%s CHECKOV_VERSION_CMD printed no version: %s\n' "{{._CKV_ERR}}" {{.CHECKOV_VERSION_CMD | q}} >&2
+      exit 1
+    fi
     {{- else -}}
     checkov_version={{.CHECKOV_VERSION | default "" | q}}
     {{- end}}

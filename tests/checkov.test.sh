@@ -77,6 +77,15 @@ run_task checkov:triage
 expect_call "[--framework][a b][--framework][\$(touch $pwned)]" "triage: each framework is one argument"
 if [ -e "$pwned" ]; then fail "triage: a \$( ) in a framework ran"; else pass "triage: a \$( ) in a framework does not run"; fi
 
+# A version command that prints nothing has lost the pin; running whatever is
+# on PATH instead would be the irreproducible result the pin exists to stop.
+consumer checkov checkov "{ CHECKOV_VERSION_CMD: 'grep -s nothing missing.yaml | cat' }"
+reset_calls
+run_task checkov:triage
+expect_status fail "pinned: a version command that prints nothing fails"
+expect_output "CHECKOV_VERSION_CMD printed no version" "pinned: names the command that lost the pin"
+refute_call "--compact" "pinned: checkov does not run unpinned"
+
 # Findings make checkov exit 1 unless it is told to soft-fail, as checkov does.
 shim checkov '
 case "$*" in --version) echo 3.2.0 ;; *--soft-fail*) echo "Check: CKV_K8S_1 FAILED" ;; *) echo "Check: CKV_K8S_1 FAILED"; exit 1 ;; esac'
