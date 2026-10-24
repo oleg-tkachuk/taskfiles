@@ -47,6 +47,13 @@ it needs those tools, and trivy fetches its checks over the network. CI runs
 it on every pull request at the versions pinned in `ci.yml`. A change to how a
 gate reads a tool's exit code or output comes with a case there.
 
+`k8s:restart` is held there too, against a real API server: an absent
+deployment or namespace is skipped, a lookup the server forbids fails. It
+needs a cluster it may create a namespace in, named by
+`CONTRACTS_KUBE_CONTEXT` — CI makes a kind cluster for it — and is skipped
+without one. It works on a copy of your kubeconfig and deletes the namespace
+it made.
+
 ## How a module is written
 
 Guards are `preconditions` (with an explanatory `msg`), skips are `status`,
