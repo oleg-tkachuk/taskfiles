@@ -91,6 +91,16 @@ expect_status fail "image: a missing signing config is refused"
 expect_output "signing-config.json not found" "image: names the missing signing config"
 refute_call "cosign sign" "image: cosign is not called without its signing config"
 
+# COSIGN_SIGN=0 turns every task off, verify included.
+touch "$CONSUMER/deploy/sigstore/signing-config.json"
+reset_calls
+run_task cosign:sign COSIGN_SIGN=0
+expect_status ok "off: sign passes with signing off"
+refute_call "cosign " "off: sign calls no cosign"
+run_task cosign:verify COSIGN_SIGN=0
+expect_status ok "off: verify passes with signing off"
+refute_call "cosign " "off: verify calls no cosign"
+
 # keygen writes the pair where COSIGN_KEY and COSIGN_PUB say — the paths sign
 # and verify read — and the guard checks those same paths.
 reset_calls
