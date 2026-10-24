@@ -227,6 +227,12 @@ It checks the mistakes that have actually happened here:
   three, BuildKit reads it as an image and pulls `docker.io/library/NAME:latest`
   — which surfaces as a registry permission error pointing nowhere near the
   cause.
+- **a remote lock git does not keep.** Task writes a checksum of every module
+  it fetched over git to `.task/remote/`, and refuses a module whose tag has
+  moved — but only in a checkout that has the lock. Ignored with the rest of
+  `.task/`, or never committed, it protects nobody else's. A warning, since
+  the build itself is unaffected; silent when the library is included from a
+  checkout and there is no lock.
 - **a version that cannot be derived**, an unreachable registry, and missing
   tools.
 
