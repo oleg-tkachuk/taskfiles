@@ -23,7 +23,7 @@ workspace — tasks then read `release:<task>`.
 | `deploy` | Verify the chart, then publish image + chart to the registry |
 | `deploy:chart-only` | Publish the chart alone — for components running an upstream image |
 | `doctor` | Check that everything this component declares actually resolves |
-| `metadata` | Write APP_VERSION / GIT_COMMIT_HASH / BUILD_TIME into the deploy info file — alias `info` |
+| `metadata` | Write APP_VERSION / BUILD_KIND / GIT_COMMIT_HASH / BUILD_TIME into the deploy info file — alias `info` |
 | `version` | Print the version this working tree publishes as |
 | `image:build` | Build the component image (skipped when the tree is clean and it is already built) |
 | `image:push` | Push the component image to the registry |
@@ -153,8 +153,17 @@ after X.Y.Z-rc.N, dirty tree  →  X.Y.Z-rc.N.dev.<committer-ts>.dirty.<now>.g<s
 
 That sorts above `rc.N`, below `rc.N+1`, and below `X.Y.Z` — so once the
 release ships, a `>=0.0.0-0` resolver moves to it. One patch up would sort
-above the release the candidate was for. Anything that recognises a dev build
-by `-dev.` must also accept `.dev.`.
+above the release the candidate was for.
+
+To tell what kind of build a version is, read `BUILD_KIND` from the info file
+`metadata` writes, not the version's shape — the shape is a sort key and can
+change, as `-dev.` did here:
+
+| `BUILD_KIND` | When |
+| --- | --- |
+| `release` | the tree is exactly a version tag, clean |
+| `dev` | anything else git derived: untagged, or dirty |
+| `pinned` | `APP_VERSION` set by hand — your claim, not git's |
 
 The **committer** timestamp, not the wall clock: a clean tree then produces the
 same version on every run, which is what makes `deploy` idempotent. A dirty tree

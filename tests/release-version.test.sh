@@ -113,4 +113,23 @@ dirty=$(version)
 repo checkout -q -- log
 expect_before "$dirty" "$clean" "after v1.2.0: the clean build of a commit outranks its dirty one"
 
+# ─── BUILD_KIND ──────────────────────────────────────────────────────────────
+# What kind of build a version is, said outright in the info file, so nothing
+# downstream has to recognise it from the version's shape. Written under
+# .task/, which the fixture ignores, so writing it dirties nothing.
+# expect_kind <kind> <case name> [task args...]
+expect_kind() {
+  want=$1 name=$2; shift 2
+  run_task release:metadata INFO_ENV_FILE=.task/info.env "$@"
+  if grep -qx "BUILD_KIND=$want" "$CONSUMER/.task/info.env"; then pass "$name"; else fail "$name: want BUILD_KIND=$want"; fi
+}
+
+expect_kind dev "kind: an untagged build is dev"
+repo tag v1.2.1
+expect_kind release "kind: an exact tag on a clean tree is a release"
+printf 'wip\n' >> "$CONSUMER/log"
+expect_kind dev "kind: a tagged commit with a dirty tree is dev"
+repo checkout -q -- log
+expect_kind pinned "kind: APP_VERSION is pinned, not a release git vouches for" APP_VERSION=9.9.9
+
 finish
