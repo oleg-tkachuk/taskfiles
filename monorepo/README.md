@@ -19,6 +19,7 @@ workspace — tasks then read `all:<task>`.
 |---|---|
 | `build` | Run `task build` in every component |
 | `deploy` | Run `task deploy` in every component, after checking the registry answers |
+| `doctor` | Report a top-level var some included components declare and others do not |
 | `each` | Run TARGET in every component (TARGET=test, TARGET=deploy, ...) |
 | `lint` | Run `task lint` in every component |
 | `test` | Run `task test` in every component |
@@ -74,6 +75,24 @@ merely build — include this module a second time under a second name:
 Trim each one's surface with `excludes:` so the wrong fan-out cannot be reached
 by accident — but never exclude `each`: `test`, `lint`, `build` and `deploy`
 are all defined in terms of it.
+
+## Components that share a root Taskfile
+
+`each` runs every component as its own `task` process, so they share nothing.
+A root Taskfile that *includes* its components is different: their top-level
+`vars:` land in one pool, and a name one component declares is what every
+other component's includes read — see
+[Variable scoping](../README.md#variable-scoping). `doctor` reads the root's
+local includes and names each var some of them declare and others do not:
+
+```console
+$ task monorepo:doctor
+▲ monorepo · DOCKERFILE is declared at the top level of api only — every other component reads that value; move it into the vars: of the include that reads it
+```
+
+A warning rather than a failure: a name only one component uses is harmless
+until a module in another component reads it, which this cannot see. It needs
+yq, and says so when yq is not there.
 
 ## A component that is not there
 
