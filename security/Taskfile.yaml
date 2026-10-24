@@ -194,7 +194,7 @@ tasks:
         msg: "trivy is not installed — https://github.com/aquasecurity/trivy#installation"
     cmds:
       - printf '%s sec · trivy %s %s\n' "{{._SEC_RUN}}" {{._SEC_TRIVY_SUB | q}} {{._SEC_TRIVY_TARGET | q}}
-      - trivy {{._SEC_TRIVY_SUB | q}} {{._SEC_TRIVY_SCAN}} --exit-code 1 --quiet {{range $d := ._SEC_TRIVY_SKIP}}--skip-dirs {{$d | q}} {{end}} {{._SEC_TRIVY_FLAGS}} {{._SEC_TRIVY_TARGET | q}}
+      - trivy {{._SEC_TRIVY_SUB | q}} {{._SEC_TRIVY_SCAN}} --quiet {{range $d := ._SEC_TRIVY_SKIP}}--skip-dirs {{$d | q}} {{end}} {{._SEC_TRIVY_FLAGS}} --exit-code 1 {{._SEC_TRIVY_TARGET | q}}
       # Misconfiguration findings are informational: they are dense, noisy, and
       # blocking on them would stop every release for a Kubernetes default.
       - trivy config --exit-code 0 --quiet {{range $d := ._SEC_TRIVY_SKIP}}--skip-dirs {{$d | q}} {{end}} {{._SEC_TRIVY_CONFIG_FLAGS}} .
