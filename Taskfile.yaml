@@ -60,6 +60,7 @@ tasks:
       - task: check:silent
       - task: check:readme
       - task: check:surface
+      - task: check:api
       - task: check:runtime
       - task: check:python
       - task: check:quoting
@@ -245,6 +246,34 @@ tasks:
           done
           [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every module has a README and the index links it"
           exit "$fail"
+
+  check:api:
+    desc: "Refuse a task, alias or input the latest release had and this tree has lost"
+    # A name that vanishes without a `!` on its commit reaches consumers as a
+    # minor, and breaks every Taskfile that called it. A rename keeps the old
+    # name for a major instead (RELEASE.md); a deliberate removal is named in
+    # API_REMOVED, and its commit carries the `!`. The base is the newest
+    # release this commit descends from, read with git, so no tag is fetched
+    # over the network and nothing about a consumer is assumed.
+    vars:
+      # <module>:<name> removed on purpose, each with its reason in a comment
+      # above it, or <module>:* for a whole module. Empty again once the major
+      # that removes them has shipped — check-api.sh reports a stale entry.
+      API_REMOVED: ""
+    cmds:
+      - bash scripts/check-api.test.sh >/dev/null
+      - cmd: |-
+          set -eu
+          base=$(git describe --tags --abbrev=0 --match 'v[0-9]*' HEAD 2>/dev/null) || {
+            printf '%s\n' "{{._LIB_ERR}} taskfiles · no release tag in this clone to compare the API against — git fetch --tags" >&2
+            exit 1
+          }
+          # Every module in this tree and in the release, so a module removed
+          # since is compared too.
+          files=$( { printf '%s\n' {{.MODULE_FILES}}; git ls-tree -r --name-only "$base" | grep -E '^[^/]+/([^/]+/)?Taskfile.yaml$' | grep -v '^demo/'; } | sort -u)
+          # shellcheck disable=SC2086 # one path per word, by construction
+          bash scripts/check-api.sh "$base" {{.API_REMOVED | q}} $files
+          printf '%s\n' "{{._LIB_OK}} taskfiles · nothing $base offered is gone without being named"
 
   check:surface:
     desc: "Refuse a family whose variants no longer expose the same tasks, or disagree on which ones need deps:"
