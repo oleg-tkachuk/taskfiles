@@ -144,4 +144,19 @@ run_task release:doctor
 refute_output "no git history" "doctor: a commit whose short sha is 00000000 still has history"
 rm -f "$BIN/git"
 
+# ─── chart:render ─────────────────────────────────────────────────────────────
+# helm template prints whatever $WORK/render.src holds.
+shim helm 'cat "$WORK/render.src"'
+export WORK
+consumer release release "{ PROJECT_NAME: app, APP_VERSION: $VERSION }"
+
+printf 'kind: ServiceAccount\nautomountServiceAccountToken: true---\nkind: Deployment\n' > "$WORK/render.src"
+run_task release:chart:render
+expect_status fail "chart:render: a separator glued to the line above is refused"
+expect_output "broken multi-doc YAML separator" "chart:render: the glued separator is named"
+
+printf 'kind: Secret\nstringData:\n  ca.crt: |\n    -----BEGIN CERTIFICATE-----\n    MIIB\n    -----END CERTIFICATE-----\n' > "$WORK/render.src"
+run_task release:chart:render
+expect_status ok "chart:render: a PEM block is not a glued separator"
+
 finish
