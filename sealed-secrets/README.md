@@ -42,13 +42,13 @@ includes:
 ```
 
 ```console
-$ task sealed-secrets:seal SECRET_NAMESPACE=billing SECRET_NAME=api-keys \
+$ task sealed-secrets:seal SECRET_NAMESPACE=orders SECRET_NAME=api-keys \
     SECRET_KEY=STRIPE_KEY SECRET_VALUE=sk_test_123 \
-    SECRET_OUTPUT=deploy/secrets/billing-api-keys.yaml
-✔ sealed-secrets · billing/api-keys → deploy/secrets/billing-api-keys.yaml
+    SECRET_OUTPUT=deploy/secrets/orders-api-keys.yaml
+✔ sealed-secrets · orders/api-keys → deploy/secrets/orders-api-keys.yaml
 
-$ task sealed-secrets:seal:file SECRET_NAMESPACE=billing SECRET_NAME=api-env \
-    SECRET_FILE=.env.production SECRET_OUTPUT=deploy/secrets/billing-env.yaml
+$ task sealed-secrets:seal:file SECRET_NAMESPACE=orders SECRET_NAME=api-env \
+    SECRET_FILE=.env.production SECRET_OUTPUT=deploy/secrets/orders-env.yaml
 
 $ task sealed-secrets:pubkey > deploy/secrets/controller.pem
 ```

@@ -76,11 +76,11 @@ resolved, so a `restart` or an `uninstall` is not the thing that discovers
 them:
 
 ```
-✔ billing-api · doctor · context prod-eu (pinned)
-✔ billing-api · doctor · chart ./deploy/chart
-✔ billing-api · doctor · namespace acme
-✔ billing-api · doctor · deployment billing-api
-✔ billing-api · doctor · ready
+✔ orders-api · doctor · context prod-eu (pinned)
+✔ orders-api · doctor · chart ./deploy/chart
+✔ orders-api · doctor · namespace acme
+✔ orders-api · doctor · deployment orders-api
+✔ orders-api · doctor · ready
 ```
 
 An unpinned context is a warning rather than a pass: without `K8S_CONTEXT`

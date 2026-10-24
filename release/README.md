@@ -202,12 +202,12 @@ and the registry. It is a report, not a gate: it prints every problem instead of
 stopping at the first, then exits non-zero if any of them is fatal.
 
 ```
-✔ billing-api · doctor · version 0.1.0-dev.1788728844.g6ec96167
-✔ billing-api · doctor · chart ./deploy/chart → oci://registry.example.com/acme/charts/billing-api
-✔ billing-api · doctor · image registry.example.com/acme/billing-api from ./deploy/Dockerfile (context .)
-✔ billing-api · doctor · build context proto is passed
-✔ billing-api · doctor · registry registry.example.com answers
-✔ billing-api · doctor · ready to publish
+✔ orders-api · doctor · version 0.1.0-dev.1788728844.g6ec96167
+✔ orders-api · doctor · chart ./deploy/chart → oci://registry.example.com/acme/charts/orders-api
+✔ orders-api · doctor · image registry.example.com/acme/orders-api from ./deploy/Dockerfile (context .)
+✔ orders-api · doctor · build context proto is passed
+✔ orders-api · doctor · registry registry.example.com answers
+✔ orders-api · doctor · ready to publish
 ```
 
 It checks the mistakes that have actually happened here:
