@@ -50,7 +50,7 @@ tasks:
     preconditions:
       - sh: docker info >/dev/null 2>&1
         msg: "the Docker daemon is not running"
-      - sh: kubectl config get-contexts -o name | grep -qx '{{._RT_CTX | q}}'
+      - sh: kubectl config get-contexts -o name | grep -qx {{._RT_CTX | q}}
         msg: "there is no '{{._RT_CTX}}' kube context — enable Kubernetes in Docker Desktop, or set K8S_CONTEXT"
     cmds:
       - printf '%s %s · local · Docker Desktop ready (%s)\n' "{{._RT_OK}}" {{._RT_SVC | q}} {{._RT_CTX | q}}
