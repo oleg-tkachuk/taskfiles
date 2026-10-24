@@ -274,8 +274,11 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
-    prompt: "Send an ACPI shutdown to every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}?"
     cmds:
+      # The matched servers first, then the question about them — see _confirm.
+      - task: _matched
+      - task: _confirm
+        vars: { QUESTION: "Send an ACPI shutdown to every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}?" }
       # Graceful at the machine level and nowhere else: Hetzner sends the ACPI
       # event and the guest acts on it, so whatever runs inside learns about it
       # by going away rather than by being told first.
@@ -295,8 +298,11 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
-    prompt: "Send an ACPI reboot to every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}?"
     cmds:
+      # The matched servers first, then the question about them — see _confirm.
+      - task: _matched
+      - task: _confirm
+        vars: { QUESTION: "Send an ACPI reboot to every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}?" }
       # The middle rung. Whatever runs inside the server has its own restart
       # and is the one to prefer — `hcloud:ssh` is how you reach it; `reset`
       # below cuts the power and is the one to fall back to. This asks the
@@ -318,8 +324,11 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
-    prompt: "Cut power to every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}} without a clean shutdown?"
     cmds:
+      # The matched servers first, then the question about them — see _confirm.
+      - task: _matched
+      - task: _confirm
+        vars: { QUESTION: "Cut power to every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}} without a clean shutdown?" }
       # The plug. Anything mid-write inside the server is mid-write when the
       # power goes, so this is the right command only when the guest has
       # stopped answering — its own shutdown is otherwise strictly better.
@@ -339,8 +348,11 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
-    prompt: "Hard reset every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}? No clean shutdown."
     cmds:
+      # The matched servers first, then the question about them — see _confirm.
+      - task: _matched
+      - task: _confirm
+        vars: { QUESTION: "Hard reset every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}? No clean shutdown." }
       # For the server that has stopped answering entirely, where the
       # alternative is poweroff followed by poweron and a wait in between.
       - cmd: |
@@ -387,8 +399,11 @@ tasks:
     preconditions:
       - sh: command -v hcloud >/dev/null
         msg: "hcloud CLI not installed — https://github.com/hetznercloud/cli"
-    prompt: "Lift {{._HC_PROTECTION}} protection on every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}?"
     cmds:
+      # The matched servers first, then the question about them — see _confirm.
+      - task: _matched
+      - task: _confirm
+        vars: { QUESTION: "Lift {{._HC_PROTECTION}} protection on every server matching {{if .HCLOUD_SELECTOR}}{{.HCLOUD_SELECTOR}}{{else}}the selector that `{{.HCLOUD_SELECTOR_CMD}}` prints{{end}}?" }
       # The only task here that makes the fleet easier to destroy, which is why
       # it is the half that prompts.
       - cmd: |
@@ -467,3 +482,30 @@ tasks:
           printf '%s\n' "{{._HC_WARN}} $svc · hcloud · the url and password below are console access, and short-lived"
           printf '\n'
           hcloud server request-console "$want"
+
+  # ─── internals ──────────────────────────────────────────────────────────────
+
+  # What a confirmed action will act on, printed before the question. Task asks
+  # a task's `prompt:` before any of its cmds run, so a prompt on the action
+  # itself was answered with only the selector in view — or, for
+  # HCLOUD_SELECTOR_CMD, the text of a command nobody had run yet. The names
+  # appeared once the answer was given, as the actions landed.
+  _matched:
+    internal: true
+    cmds:
+      - cmd: |
+          set -euo pipefail
+          {{._HC_TOKEN}}
+          {{._HC_EACH_SERVER}}
+          printf '%s %s · hcloud · %s matches:\n' "{{._HC_RUN}}" "$svc" "$selector"
+          printf '    %s\n' $servers
+
+  # The question, as its own task so that it is asked after _matched has run.
+  # A refusal stops the whole chain, so the action after it never starts.
+  _confirm:
+    internal: true
+    requires:
+      vars: [QUESTION]
+    prompt: "{{.QUESTION}}"
+    cmds:
+      - cmd: "true"

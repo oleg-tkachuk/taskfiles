@@ -44,8 +44,21 @@ run_task hcloud:protect HCLOUD_SELECTOR=role=web
 expect_status ok "protect: protects every matched server"
 expect_call "hcloud server enable-protection web-1 delete rebuild" "protect: each protection level is its own argument"
 
-run_task hcloud:shutdown "HCLOUD_SELECTOR_CMD=cat sel.txt"
-expect_output "every server matching the selector that \`cat sel.txt\` prints" "prompt: a looked-up selector is named as the command that prints it"
+# The question is asked with the matched servers already on screen: the
+# selector is the safety boundary, and its expansion is what gets acted on.
+reset_calls
+run_task hcloud:shutdown HCLOUD_SELECTOR=role=web
+expect_status ok "shutdown: shuts down every matched server"
+listed=$(grep -n "^    web-2$" "$OUT" | cut -d: -f1 | head -1 || true)
+asked=$(grep -n "Send an ACPI shutdown" "$OUT" | cut -d: -f1 | head -1 || true)
+if [ -n "$listed" ] && [ -n "$asked" ] && [ "$listed" -lt "$asked" ]; then
+  pass "prompt: the matched servers are listed before the question"
+else
+  fail "prompt: the matched servers are listed before the question"
+fi
+
+run_task hcloud:shutdown "HCLOUD_SELECTOR_CMD=cat selector.txt"
+expect_output "every server matching the selector that \`cat selector.txt\` prints" "prompt: a looked-up selector is named as the command that prints it"
 
 run_task hcloud:unprotect HCLOUD_SELECTOR=role=web HCLOUD_PROTECTION=delete
 expect_output "Lift delete protection on every server matching role=web" "prompt: unprotect names the protection it lifts"
