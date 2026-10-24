@@ -18,14 +18,19 @@ test("leaves a release that is already there", async () => {
   assert.deepEqual([...data.releases], ["v1.0.0"]);
 });
 
-test("a release another run published after the check is left as it is", async () => {
+test("a release another run published after the check is left as it is", async (t) => {
   const data = fakeData();
   data.tags.add("v1.0.0");
   data.releases.add("v1.0.0");
   // The other run published between this one's check and its create.
   const github = { ...fakeGitHub(data), releaseExists: async () => false };
+  const log = t.mock.method(console, "log", () => {});
   await publish(github, "v1.0.0");
   assert.deepEqual([...data.releases], ["v1.0.0"]);
+  assert.deepEqual(
+    log.mock.calls.map((call) => call.arguments[0]),
+    ["✔ release v1.0.0 already exists"],
+  );
 });
 
 test("refuses a tag that is not in the repository rather than creating it", async () => {
