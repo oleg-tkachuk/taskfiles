@@ -59,4 +59,42 @@ for file in "$@"; do
   fi
 done
 
+# ─── reads across modules ─────────────────────────────────────────────────────
+# Every include shares one namespace, so a module can read what another
+# declares — cosign and runtime act on the version release derived. That is a
+# contract between two modules, and the module that declares the var names it
+# on one comment line, as it does its shell-verbatim inputs:
+#   # exports: _REL_VERSION _REL_IMAGE
+# A read of another module's var it does not export is refused: renaming it is
+# then a change nothing marks as crossing a boundary. So is a read of a
+# prefixed var no module declares — it resolves to empty, without a word.
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+# "<var>\t<file>" for every var a module declares, at the top or in a task.
+for file in "$@"; do
+  yq -r '(.vars // {} | keys | .[]), (.tasks // {} | .[] | select(type == "!!map") | .vars // {} | keys | .[])' "$file" \
+    | sed "s|\$|	$file|"
+done | sort -u > "$work/declared"
+
+for file in "$@"; do
+  # Prefixed names this module's strings read: templates and ref: expressions.
+  reads=$(yq -r '.. | select(tag == "!!str")' "$file" | grep -oE '\._[A-Z0-9]+_[A-Z0-9_]*' | cut -c2- | sort -u || true)
+  for name in $reads; do
+    owners=$(awk -F'\t' -v n="$name" '$1 == n { print $2 }' "$work/declared")
+    if printf '%s\n' "$owners" | grep -qxF -- "$file"; then continue; fi
+    if [ -z "$owners" ]; then
+      printf '%s: reads %s, which no module declares\n' "$file" "$name"
+      found=1
+      continue
+    fi
+    for owner in $owners; do
+      exports=$(awk -F': ' '/^# exports: /{print $2}' "$owner" | tr '\n' ' ')
+      case " $exports " in
+        *" $name "*) ;;
+        *) printf '%s: reads %s from %s, which does not export it\n' "$file" "$name" "$owner"; found=1 ;;
+      esac
+    done
+  done
+done
+
 exit "$found"

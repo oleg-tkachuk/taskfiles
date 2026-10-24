@@ -98,7 +98,8 @@ tasks:
     # So: read inputs inline as `{{`{{`}}.NAME | default "..."{{`}}`}}`, and give
     # every declared var this module's own prefix — `_REL_`, `_GO_`, `_CS_`.
     # A cross-module read (runtime and cosign read `_REL_VERSION`) is a read:
-    # the module must not declare it.
+    # the module must not declare it, and the module that does must name it on
+    # its `# exports:` line — the contract between the two.
     #
     # A task's own vars too, unless the var is the input itself — see
     # scripts/check-vars.sh.
