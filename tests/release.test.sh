@@ -99,7 +99,14 @@ expect_output "packaged $p-$VERSION.tgz" "chart:package: PROJECT_NAME is printed
 
 # ─── image:push: IMAGE_LATEST ─────────────────────────────────────────────────
 # The image is in the local store here, so push gets past its precondition.
-shim docker "$ARGV"
+# Asked for its repo digests, it holds one per registry it was pushed to, as
+# docker does: ours, and the same image under another repository.
+readonly DIGEST=sha256:1111111111111111111111111111111111111111111111111111111111111111
+export DIGEST
+# shellcheck disable=SC2016 # the shim's own $DIGEST and $*, written literally
+readonly DIGESTS='case "$*" in *--format*) printf "%s\n" "other.example/app@sha256:2222222222222222222222222222222222222222222222222222222222222222" "${FAKE_REPO:-localhost:5000/app}@$DIGEST" ;; esac'
+shim docker "$ARGV
+$DIGESTS"
 consumer release release "{ PROJECT_NAME: app, APP_VERSION: $VERSION }"
 for case in "unset|0|" "1|1|IMAGE_LATEST=1" "0|0|IMAGE_LATEST=0"; do
   IFS="|" read -r label pushes arg <<< "$case"
@@ -116,6 +123,37 @@ reset_calls
 run_task release:image:push IMAGE_LATEST=false
 expect_status fail "image:push: IMAGE_LATEST=false is refused"
 refute_call "docker push" "image:push: nothing is pushed on a refused IMAGE_LATEST"
+
+# ─── image:push: the digest it pushed ─────────────────────────────────────────
+# Recorded per version, for cosign to sign the image by digest rather than by a
+# tag that can move between the push and the signature.
+digest_file="$CONSUMER/.task/release/$VERSION.digest"
+rm -rf "$CONSUMER/.task/release"
+run_task release:image:push
+expect_status ok "image:push: records the digest it pushed"
+if [ "$(cat "$digest_file" 2>/dev/null)" = "localhost:5000/app@$DIGEST" ]; then
+  pass "image:push: the digest file holds this repository's digest"
+else
+  fail "image:push: the digest file holds this repository's digest"
+fi
+
+# Docker Hub names are recorded short: docker.io/acme/app is acme/app there.
+consumer release release "{ PROJECT_NAME: app, APP_VERSION: $VERSION, REGISTRY: docker.io, IMAGE_NAMESPACE: acme }"
+rm -rf "$CONSUMER/.task/release"
+FAKE_REPO=acme/app run_task release:image:push
+if [ "$(cat "$digest_file" 2>/dev/null)" = "acme/app@$DIGEST" ]; then
+  pass "image:push: a Docker Hub image's digest is found under its short name"
+else
+  fail "image:push: a Docker Hub image's digest is found under its short name"
+fi
+
+# A push docker recorded no digest for is not something to sign later.
+consumer release release "{ PROJECT_NAME: app, APP_VERSION: $VERSION }"
+rm -rf "$CONSUMER/.task/release"
+FAKE_REPO=elsewhere/app run_task release:image:push
+expect_status fail "image:push: a push with no digest for this repository fails"
+expect_output "no digest" "image:push: says no digest was recorded"
+if [ -e "$digest_file" ]; then fail "image:push: a digest file was written anyway"; else pass "image:push: no digest file is written"; fi
 shim docker "$ARGV"'
 case "$1 $2" in "image inspect") exit 1 ;; esac'
 
