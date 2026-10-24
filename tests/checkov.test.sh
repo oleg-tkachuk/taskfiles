@@ -77,4 +77,13 @@ run_task checkov:triage
 expect_call "[--framework][a b][--framework][\$(touch $pwned)]" "triage: each framework is one argument"
 if [ -e "$pwned" ]; then fail "triage: a \$( ) in a framework ran"; else pass "triage: a \$( ) in a framework does not run"; fi
 
+# Findings make checkov exit 1 unless it is told to soft-fail, as checkov does.
+shim checkov '
+case "$*" in --version) echo 3.2.0 ;; *--soft-fail*) echo "Check: CKV_K8S_1 FAILED" ;; *) echo "Check: CKV_K8S_1 FAILED"; exit 1 ;; esac'
+consumer checkov checkov
+reset_calls
+run_task checkov:triage
+expect_status ok "triage: findings are listed, not a failure"
+expect_output "CKV_K8S_1 FAILED" "triage: the findings are shown"
+
 finish
