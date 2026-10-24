@@ -57,7 +57,7 @@
       "semanticCommitScope": "actions"
     },
     {
-      "description": "Task, zizmor and the tools the contracts run against: they change what the checks are, never what a consumer fetches. zizmor merges itself: Workflow audit runs the new version on the pull request. So do trivy, hadolint, gitleaks and checkov: Tool contracts runs the gates at the new version on the pull request.",
+      "description": "Task, zizmor and the tools the contracts run against: they change what the checks are, never what a consumer fetches. zizmor merges itself: Workflow audit runs the new version on the pull request. So do trivy, hadolint, gitleaks, checkov, kind and kubectl: Tool contracts runs the gates at the new version on the pull request.",
       "matchManagers": ["custom.regex"],
       "semanticCommitType": "ci",
       "semanticCommitScope": "tools",

@@ -175,6 +175,13 @@ jobs:
       GITLEAKS_VERSION: v8.30.1
       # renovate: datasource=docker depName=bridgecrew/checkov
       CHECKOV_VERSION: 3.3.30
+      # The cluster the k8s contract runs against, and the kubectl it uses.
+      # renovate: datasource=github-releases depName=kubernetes-sigs/kind
+      KIND_VERSION: v0.33.0
+      # renovate: datasource=github-releases depName=kubernetes/kubernetes
+      KUBECTL_VERSION: v1.37.1
+      # kind names the context kind-<cluster>.
+      CONTRACTS_KUBE_CONTEXT: kind-contracts
     steps:
       - name: 'Setup: check out the repository'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -195,6 +202,13 @@ jobs:
 
       - name: 'Setup: the pinned tools'
         run: node .github/ci/contract-tools.ts
+
+      - name: 'Setup: a kind cluster for the k8s contract'
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+        with:
+          version: ${{ env.KIND_VERSION }}
+          kubectl_version: ${{ env.KUBECTL_VERSION }}
+          cluster_name: contracts
 
       - name: 'Guard: every gate holds against the real tool'
         run: task contracts
