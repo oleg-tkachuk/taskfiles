@@ -181,7 +181,7 @@ tasks:
         sh: ls tests/*.test.sh 2>/dev/null | sort | tr '\n' ' '
 
   contracts:
-    desc: "Run the scanning gates against the real tools they wrap — trivy, hadolint, gitleaks, checkov"
+    desc: "Run the gates against the real tools they wrap — trivy, hadolint, gitleaks, checkov, and kubectl on a cluster"
     # The behaviour tests shim every tool, and a shim answers the way it was
     # written to: checkov's exit 1 on a finding, trivy taking the last of a
     # repeated flag, the line checkov prints for a directory it skipped — each
@@ -191,6 +191,8 @@ tasks:
     # Not part of lint: they need the tools, and trivy fetches its checks over
     # the network. CI runs them on every pull request at the versions pinned in
     # ci.yml, so a Renovate bump of a tool is proved before it merges itself.
+    # The k8s contract also needs a cluster it may make a namespace in, named
+    # by CONTRACTS_KUBE_CONTEXT; without one it is skipped, and says so.
     preconditions:
       - sh: command -v trivy >/dev/null && command -v hadolint >/dev/null && command -v gitleaks >/dev/null && command -v checkov >/dev/null
         msg: "the contracts need trivy, hadolint, gitleaks and checkov on PATH"
