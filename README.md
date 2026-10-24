@@ -63,7 +63,7 @@ silent: true
 
 vars:
   TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v11.2.1'
-  PROJECT_NAME: '{{.PROJECT_NAME | default "billing-api"}}'
+  PROJECT_NAME: '{{.PROJECT_NAME | default "orders-api"}}'
   IMAGE_NAMESPACE: '{{.IMAGE_NAMESPACE | default "acme"}}'
   K8S_NAMESPACE: '{{.K8S_NAMESPACE | default "acme"}}'
 
@@ -281,11 +281,11 @@ task's own `vars:` and nowhere else.
 
 ```yaml
 # configures the module — the include carries the value
-k8s: { taskfile: '{{printf .TASKLIB "k8s"}}', dir: ., vars: { K8S_NAMESPACE: billing } }
+k8s: { taskfile: '{{printf .TASKLIB "k8s"}}', dir: ., vars: { K8S_NAMESPACE: orders } }
 
 # does not — the module derived its namespace when it loaded
 - task: k8s:restart
-  vars: { K8S_NAMESPACE: billing }
+  vars: { K8S_NAMESPACE: orders }
 ```
 
 That is why every module here is scoped to one component. A repository that

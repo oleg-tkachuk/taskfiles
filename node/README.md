@@ -52,7 +52,7 @@ workspace — tasks then read `node:<task>`.
 
 ```yaml
 vars:
-  PROJECT_NAME: billing-api
+  PROJECT_NAME: orders-api
 
 includes:
   node: { taskfile: '{{printf .TASKLIB "node"}}', dir: . }
@@ -77,10 +77,10 @@ disk is the one that manager writes, and whether `package.json` declares the
 scripts the tasks wrap.
 
 ```
-✔ billing-api · doctor · package manager pnpm (pnpm dlx for one-off tools)
-✔ billing-api · doctor · lockfile pnpm-lock.yaml matches pnpm
-✔ billing-api · doctor · scripts build, lint, test are declared
-✔ billing-api · doctor · ready
+✔ orders-api · doctor · package manager pnpm (pnpm dlx for one-off tools)
+✔ orders-api · doctor · lockfile pnpm-lock.yaml matches pnpm
+✔ orders-api · doctor · scripts build, lint, test are declared
+✔ orders-api · doctor · ready
 ```
 
 The lockfile line is why the task exists. `PM` is an input, so the manager is
@@ -92,7 +92,7 @@ tree builder with `Cannot read properties of null (reading 'matches')`, naming
 neither the manager nor where it came from.
 
 ```
-✖ billing-api · doctor · pnpm would install here, but the lockfile is package-lock.json — one of the two is wrong
+✖ orders-api · doctor · pnpm would install here, but the lockfile is package-lock.json — one of the two is wrong
 ```
 
 A missing script is a warning, not a fault: every task here wraps one, and a
