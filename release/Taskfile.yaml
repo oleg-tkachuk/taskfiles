@@ -94,6 +94,10 @@ vars:
   _REL_CHART_DIR: '{{.CHART_DIR | default "./deploy/chart"}}'
   _REL_MIN_RES: '{{.CHART_MIN_RESOURCES | default "1"}}'
   _REL_RENDER: '{{.RENDER_OUT | default ".task/render.yaml"}}'
+  # A `---` glued onto the end of the line above it — see chart:render. A dash
+  # before it is not that bug: a PEM block's `-----BEGIN CERTIFICATE-----`
+  # ends in five of them, and any chart that renders a certificate has one.
+  _REL_GLUED_SEP: '[^[:space:]-]---[[:space:]]*$'
 
   _REL_K8S_NS: '{{.K8S_NAMESPACE | default "default"}}'
 
@@ -478,14 +482,14 @@ tasks:
     # wedged for hours before anyone found it. Seconds to check, hours to find.
     deps: [chart:render:_write]
     preconditions:
-      - sh: '! grep -qE "[^[:space:]]---" {{._REL_RENDER | q}}'
+      - sh: '! grep -qE -- {{._REL_GLUED_SEP | q}} {{._REL_RENDER | q}}'
         msg: |-
           broken multi-doc YAML separator in the rendered chart.
           A `---` is glued to the end of the previous line, so kubectl and ArgoCD
           drop every resource after the first one.
           Fix: leave a literal blank line before `---` in the offending template
           and drop the trailing whitespace-strip on the line above it.
-          Offenders: grep -nE '[^[:space:]]---' {{._REL_RENDER}}
+          Offenders: grep -nE {{._REL_GLUED_SEP | q}} {{._REL_RENDER}}
       - sh: test "$(grep -c '^kind:' {{._REL_RENDER | q}})" -ge {{._REL_MIN_RES | q}}
         msg: |-
           the chart rendered fewer than {{._REL_MIN_RES}} resources.
