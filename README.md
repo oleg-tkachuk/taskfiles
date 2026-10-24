@@ -229,10 +229,15 @@ inline as `{{.NAME | default ...}}`, and every derived value carries its module'
 prefix — `_REL_IMAGE`, `_GO_PKG`, `_CS_KEY`, `_RT_CTX`. Consumers own the plain
 names, and two modules can never mean different things by the same one.
 
-Two derived values cross a module boundary on purpose: `runtime/*` and `cosign`
-read `_REL_VERSION` and `_REL_IMAGE` from `release`, because they act on what a
-release published. They read them — they must never declare them, or they would
-shadow the very values they are supposed to act on.
+A few derived values cross a module boundary on purpose: `runtime/*` and
+`cosign` read `_REL_VERSION` and `_REL_IMAGE` from `release`, and `cosign` reads
+`_REL_DIGEST_FILE` — where `image:push` records the digest it pushed — because
+they act on what a release published. They read them — they must never declare
+them, or they would shadow the very values they are supposed to act on.
+
+That is a contract between modules, so it is written down: `release` names the
+values on an `# exports:` line in its header, and `task lint` refuses a read of
+another module's var that is not exported there.
 
 That namespace is the **repository's**, not the component's. A monorepo whose
 root Taskfile includes several component Taskfiles puts all of their top-level
