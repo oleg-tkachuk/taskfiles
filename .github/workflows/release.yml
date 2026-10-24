@@ -81,8 +81,10 @@ jobs:
       # package.json/package-lock.json already pin semantic-release and its
       # conventionalcommits preset, so this installs the exact versions
       # committed to the repository rather than trusting a marketplace
-      # action's own bundled pin.
-      - run: npm ci
+      # action's own bundled pin. No install scripts: this checkout keeps its
+      # write credentials in .git/config, and nothing in the lockfile needs
+      # one — the same rule install.ts applies to every other job.
+      - run: npm ci --ignore-scripts
 
       - run: npx semantic-release --no-ci
         env:
