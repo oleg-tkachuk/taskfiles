@@ -80,6 +80,32 @@ or removal needs to be marked as such: `!` after the type, or a `BREAKING
 CHANGE:` footer — see [Commit messages](CONTRIBUTING.md#commit-messages).
 Conventional Commits has no type of its own for it.
 
+## Deprecating instead of breaking
+
+Every major makes every consumer move their `?ref=` and their remote lock by
+hand, whichever module it was for — the library has one version. So a rename
+does not take a major on its own. The old name keeps working for one major and
+goes in the next:
+
+- **A task:** the old name stays in the renamed task's `aliases:` — in every
+  variant of a family, which `check:surface` holds them to. The rename is a
+  `feat`; dropping the alias later is the breaking change.
+- **An input:** the module reads the new name first and the old one after it,
+  `{{.NEW | default .OLD | default "d"}}`, and its header and README list the
+  old name as deprecated. The same two steps.
+- **A value a consumer reads**, such as the info file `metadata` writes: a key
+  is added, never renamed, and a consumer is told what to read instead of
+  parsing a value's shape — `BUILD_KIND` rather than `-dev.` in a version.
+
+Not everything can be bridged. A change of type — a string input that becomes
+a list, read with `ref:` — has no form that accepts both, and a removal has
+nothing to point at. Those stay breaking, and are worth collecting into one
+major rather than spending one each.
+
+`check:api` holds the surface to this: a task, alias or input present in the
+latest release and missing now is refused unless `API_REMOVED` names it, with a
+reason. That is the deliberate removal, and its commit carries the `!`.
+
 ---
 
 Part of [taskfiles](README.md).
