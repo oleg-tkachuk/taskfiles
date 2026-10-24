@@ -4,7 +4,8 @@
 source "$(dirname "$0")/lib.sh"
 
 shim syft 'exit 0'
-shim cosign 'exit 0'
+# generate-key-pair writes into the working directory, as cosign does.
+shim cosign 'case "$1" in generate-key-pair) : > cosign.key; : > cosign.pub ;; esac'
 
 # cosign acts on what release published, so the consumer includes both.
 cat > "$CONSUMER/Taskfile.yaml" <<YAML
@@ -89,5 +90,29 @@ run_task cosign:image
 expect_status fail "image: a missing signing config is refused"
 expect_output "signing-config.json not found" "image: names the missing signing config"
 refute_call "cosign sign" "image: cosign is not called without its signing config"
+
+# keygen writes the pair where COSIGN_KEY and COSIGN_PUB say — the paths sign
+# and verify read — and the guard checks those same paths.
+reset_calls
+run_task cosign:keygen COSIGN_DIR=kd COSIGN_KEY=secret/release.key COSIGN_PUB=public/release.pub
+expect_status ok "keygen: generates a pair at custom paths"
+if [ -f "$CONSUMER/secret/release.key" ] && [ -f "$CONSUMER/public/release.pub" ]; then
+  pass "keygen: the key and public key land at COSIGN_KEY and COSIGN_PUB"
+else
+  fail "keygen: the key and public key land at COSIGN_KEY and COSIGN_PUB"
+fi
+if [ -e "$CONSUMER/kd/cosign.key" ]; then fail "keygen: a second key was left in COSIGN_DIR"; else pass "keygen: no second key is left in COSIGN_DIR"; fi
+reset_calls
+run_task cosign:keygen COSIGN_DIR=kd COSIGN_KEY=secret/release.key COSIGN_PUB=public/release.pub
+expect_status ok "keygen: a second run passes"
+refute_call "generate-key-pair" "keygen: an existing key at COSIGN_KEY is never regenerated"
+
+# A public key without its private key is someone's published identity:
+# generating over it would orphan every signature made under it.
+rm -f "$CONSUMER/secret/release.key"
+reset_calls
+run_task cosign:keygen COSIGN_DIR=kd COSIGN_KEY=secret/release.key COSIGN_PUB=public/release.pub
+expect_status fail "keygen: a public key with no private key is refused"
+refute_call "generate-key-pair" "keygen: the existing public key is not overwritten"
 
 finish

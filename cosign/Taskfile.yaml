@@ -115,15 +115,33 @@ tasks:
     preconditions:
       - sh: command -v cosign >/dev/null
         msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/"
+      # A public key with no private key beside it is an identity already
+      # handed out; a new pair over it orphans every signature made under it.
+      - sh: '! test -f {{._CS_PUB | q}}'
+        msg: "{{._CS_PUB}} exists but {{._CS_KEY}} does not — restore the private key, or remove the public key to rotate on purpose"
     cmds:
       - mkdir -p {{._CS_DIR | q}}
-      - cmd: cd {{._CS_DIR | q}} && COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign generate-key-pair
+      # cosign writes cosign.key and cosign.pub into its working directory, and
+      # sign and verify read COSIGN_KEY and COSIGN_PUB. Generated in COSIGN_DIR
+      # itself, a custom path was never written and never seen by the guard
+      # above, so every run made a new pair. So: a scratch directory, and each
+      # half moved to the path that reads it.
+      - cmd: |-
+          set -eu
+          d="$(mktemp -d "${TMPDIR:-/tmp}/cosign-XXXXXX")"
+          trap 'rm -rf "$d"' EXIT
+          (cd "$d" && COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign generate-key-pair)
+          key={{._CS_KEY | q}}
+          pub={{._CS_PUB | q}}
+          mkdir -p "$(dirname "$key")" "$(dirname "$pub")"
+          mv "$d/cosign.key" "$key"
+          mv "$d/cosign.pub" "$pub"
       # No Rekor, Fulcio, TSA or OIDC: key-based signing that a private
       # registry can verify without reaching the public transparency log.
       - >-
         cosign signing-config create --no-default-rekor --no-default-fulcio
         --no-default-tsa --no-default-oidc --out {{._CS_CONFIG | q}}
-      - printf '%s %s · cosign · wrote %s/cosign.{key,pub} + signing-config.json\n' "{{._CS_OK}}" {{._CS_NAME | q}} {{._CS_DIR | q}}
+      - printf '%s %s · cosign · wrote %s, %s and %s\n' "{{._CS_OK}}" {{._CS_NAME | q}} {{._CS_KEY | q}} {{._CS_PUB | q}} {{._CS_CONFIG | q}}
       - printf '%s %s · cosign · commit cosign.pub, keep cosign.key out of the repo\n' "{{._CS_WARN}}" {{._CS_NAME | q}}
 
   # A COMPOSITE, named for the work: a fixed, ordered pipeline over sibling
