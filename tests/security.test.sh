@@ -42,4 +42,27 @@ reset_calls
 run_task security:trivy
 expect_call "[--exit-code][0][--exit-code][1][.]" "trivy: TRIVY_FLAGS cannot override the gate's exit code"
 
+# dockerfile: discovered when unset, linted exactly as named when set, and a
+# named file that does not exist is an error — a typo must not lint nothing.
+shim hadolint ''
+consumer security security
+reset_calls
+run_task security:dockerfile
+expect_status ok "dockerfile: a repository with no Dockerfile passes"
+expect_output "no Dockerfile in this repository" "dockerfile: says there was nothing to lint"
+
+mkdir -p "$CONSUMER/docker"
+printf 'FROM scratch\n' > "$CONSUMER/docker/Dockerfile"
+reset_calls
+run_task security:dockerfile
+expect_status ok "dockerfile: a discovered Dockerfile is linted"
+expect_call "hadolint --failure-threshold error ./docker/Dockerfile" "dockerfile: hadolint runs on the discovered file"
+
+consumer security security "{ DOCKERFILES: [docker/Dockerfile, docker/Dockerfil] }"
+reset_calls
+run_task security:dockerfile
+expect_status fail "dockerfile: a named Dockerfile that does not exist fails"
+expect_output "DOCKERFILES names docker/Dockerfil, which does not exist" "dockerfile: the missing file is named"
+rm -rf "$CONSUMER/docker"
+
 finish

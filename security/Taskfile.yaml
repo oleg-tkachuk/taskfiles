@@ -258,9 +258,11 @@ tasks:
       - for: { var: _SEC_DF_LIST }
         cmd: |-
           set -eu
+          # A named file that is not there is a typo, not a skip: it linted
+          # nothing and passed. The same rule as a GO_MODULES entry.
           if [ ! -f {{.ITEM | q}} ]; then
-            printf '%s sec · hadolint · %s not found — skipped\n' "{{._SEC_SKIP}}" {{.ITEM | q}}
-            exit 0
+            printf '%s sec · hadolint · DOCKERFILES names %s, which does not exist\n' "{{._SEC_ERR}}" {{.ITEM | q}} >&2
+            exit 1
           fi
           command -v hadolint >/dev/null || {
             printf '%s sec · hadolint is not installed — https://github.com/hadolint/hadolint#install\n' "{{._SEC_ERR}}" >&2
