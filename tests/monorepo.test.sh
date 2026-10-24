@@ -62,4 +62,51 @@ shim curl 'case "$*" in *https://*) printf 000 ;; *) printf 200 ;; esac'
 run_task mono:registry:check
 expect_status ok "registry:check: a registry answering over plain http is reachable"
 
+# ─── doctor: the shared vars pool ─────────────────────────────────────────────
+# A root Taskfile that includes its components puts all their top-level vars in
+# one pool: a name one declares is what the others read, and which of two
+# declarations wins is not stable. A name every component declares is safe.
+# pool_root <c's Taskfile body> — a root including this module and three
+# components; a declares DOCKERFILE and PORT, b declares PORT.
+pool_root() {
+  mkdir -p "$CONSUMER/a" "$CONSUMER/b" "$CONSUMER/c"
+  printf 'version: "3"\nvars:\n  DOCKERFILE: ./deploy/Dockerfile\n  PORT: "8080"\n' > "$CONSUMER/a/Taskfile.yaml"
+  printf 'version: "3"\nvars:\n  PORT: "8081"\n' > "$CONSUMER/b/Taskfile.yaml"
+  printf '%s\n' "$1" > "$CONSUMER/c/Taskfile.yml"
+  cat > "$CONSUMER/Taskfile.yaml" <<YAML
+version: "3"
+silent: true
+includes:
+  mono: { taskfile: '$LIB_ROOT/monorepo', dir: ., vars: { COMPONENTS: [a, b, c] } }
+  a: { taskfile: ./a, dir: ./a }
+  b: { taskfile: ./b/Taskfile.yaml, dir: ./b }
+  c: ./c
+YAML
+}
+
+pool_root 'version: "3"
+vars:
+  PORT: "8082"'
+run_task mono:doctor
+expect_status ok "doctor: a name only some components declare is a warning, not a failure"
+expect_output "DOCKERFILE is declared at the top level of a only" "doctor: names the input and who declares it"
+refute_output "PORT is declared" "doctor: a name every component declares is not reported"
+refute_output "_MONO_" "doctor: the library module's own vars are not components'"
+
+pool_root 'version: "3"
+vars:
+  DOCKERFILE: ./Dockerfile
+  PORT: "8082"'
+printf 'version: "3"\nvars:\n  DOCKERFILE: ./Dockerfile\n  PORT: "8081"\n' > "$CONSUMER/b/Taskfile.yaml"
+run_task mono:doctor
+expect_output "every top-level var is declared by every component" "doctor: a pool every component fills says so"
+
+# Without yq the check cannot read the includes, and says so.
+shim yq 'exit 1'
+run_task mono:doctor
+expect_status ok "doctor: no yq is a skipped check, not a failure"
+expect_output "yq absent" "doctor: says the shared-vars check was skipped"
+rm -f "$BIN/yq"
+rm -rf "$CONSUMER/a" "$CONSUMER/b" "$CONSUMER/c"
+
 finish
