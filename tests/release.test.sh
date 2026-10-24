@@ -151,6 +151,18 @@ run_task release:doctor
 refute_output "no git history" "doctor: a commit whose short sha is 00000000 still has history"
 rm -f "$BIN/git"
 
+# ─── image:gc ─────────────────────────────────────────────────────────────────
+# A prune that could not run is not a trimmed cache.
+consumer release release "{ PROJECT_NAME: app, APP_VERSION: $VERSION }"
+shim docker 'case "$1 $2" in "buildx prune") exit 1 ;; esac'
+run_task release:image:gc
+expect_status fail "image:gc: a build cache that could not be pruned fails"
+refute_output "build cache trimmed" "image:gc: does not report a trim that never happened"
+shim docker ''
+run_task release:image:gc
+expect_status ok "image:gc: a prune that ran passes"
+expect_output "build cache trimmed to 8GB" "image:gc: reports the floor it trimmed to"
+
 # ─── chart:render ─────────────────────────────────────────────────────────────
 # helm template prints whatever $WORK/render.src holds.
 shim helm 'cat "$WORK/render.src"'

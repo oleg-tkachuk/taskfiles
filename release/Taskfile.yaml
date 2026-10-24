@@ -458,11 +458,17 @@ tasks:
     cmds:
       # --keep-storage only reclaims ABOVE the floor, so the working set
       # survives; this just stops per-session growth from filling the disk.
-      # Falls back to the active builder when the named one is not there.
-      - >-
-        docker buildx prune {{if ._REL_BUILDER}}--builder {{._REL_BUILDER | q}} {{end}}--keep-storage={{._REL_KEEP | q}} -f >/dev/null 2>&1 ||
-        docker buildx prune --keep-storage={{._REL_KEEP | q}} -f >/dev/null 2>&1 || true
-      - docker image prune -f >/dev/null 2>&1 || true
+      # Falls back to the active builder when the named one is not there. When
+      # neither prune runs — no daemon, a flag buildx no longer takes — that is
+      # said and fails: an unconditional success line hid it while the disk
+      # kept filling.
+      - cmd: |-
+          if ! docker buildx prune {{if ._REL_BUILDER}}--builder {{._REL_BUILDER | q}} {{end}}--keep-storage={{._REL_KEEP | q}} -f >/dev/null 2>&1 \
+             && ! docker buildx prune --keep-storage={{._REL_KEEP | q}} -f >/dev/null 2>&1; then
+            printf '%s %s · image · could not prune the build cache — run `docker buildx prune --keep-storage=%s` to see why\n' "{{._REL_ERR}}" {{._REL_SVC | q}} {{._REL_KEEP | q}} >&2
+            exit 1
+          fi
+      - docker image prune -f >/dev/null 2>&1
       - printf '%s %s · image · build cache trimmed to %s\n' "{{._REL_OK}}" {{._REL_SVC | q}} {{._REL_KEEP | q}}
 
   # ═══ helm chart ═════════════════════════════════════════════════════════════
