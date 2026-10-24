@@ -122,6 +122,11 @@ tasks:
     sources:
       - pyproject.toml
       - poetry.lock
+    # And the environment is still there: unchanged manifests beside a deleted
+    # venv skipped the install. Poetry keeps it outside the project by default,
+    # so poetry is asked; `env info --path` exits 1 when there is none.
+    status:
+      - poetry env info --path >/dev/null 2>&1
     preconditions:
       - sh: command -v poetry >/dev/null
         msg: "poetry is not installed — https://python-poetry.org/docs/#installation"
