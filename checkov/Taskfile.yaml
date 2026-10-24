@@ -201,12 +201,13 @@ tasks:
       - sh: '{{range $d := ._CKV_TARGET}}test -d {{$d | q}} && {{end}}true'
         msg: 'CHECKOV_TARGET names a directory that does not exist ({{._CKV_TARGET | join ", "}}) — checkov would skip it and still exit 0'
     # Deliberately ignores the baseline and the config: this is the view for
-    # deciding what to fix next, not a pass/fail check.
+    # deciding what to fix next, not a pass/fail check. checkov exits 1 on any
+    # finding, so --soft-fail is what keeps a list of them from failing.
     cmds:
       - cmd: |
           set -eu
           {{._CKV_RESOLVE}}
-          run_checkov --compact {{._CKV_FLAGS}} \
+          run_checkov --compact --soft-fail {{._CKV_FLAGS}} \
             {{range $d := ._CKV_TARGET}}-d {{$d | q}} {{end}}\
             {{range $f := ._CKV_FW}}--framework {{$f | q}} {{end}}
 
