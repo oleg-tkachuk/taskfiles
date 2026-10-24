@@ -23,7 +23,7 @@ workspace — tasks then read `k8s:<task>`.
 | `doctor` | Check that the context, namespace and deployment this component declares resolve |
 | `logs` | Tail the deployment's logs (Ctrl-C to stop) |
 | `port-forward` | Port-forward the deployment (PORT local, TARGET_PORT in the pod) |
-| `restart` | Roll the deployment (no-op when the namespace or deployment is absent) |
+| `restart` | Roll the deployment (no-op when the cluster, namespace or deployment is absent) |
 | `status` | Show the deployment and its pods |
 | `upgrade` | helm upgrade --install the release from the local chart directory |
 | `uninstall` | helm uninstall this component's release — asks first |

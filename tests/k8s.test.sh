@@ -3,9 +3,15 @@
 source "$(dirname "$0")/lib.sh"
 
 # The deployment exists unless FAKE_NO_DEPLOY is set; its selector is app=web.
+# FAKE_UNREACHABLE takes the API server away; FAKE_FORBIDDEN answers a lookup
+# with an error other than "not found", as RBAC or an expired login does.
 shim kubectl '
 case "$*" in
+  *" version "*) [ -z "${FAKE_UNREACHABLE:-}" ] ;;
   *"-o go-template="*) [ -n "${FAKE_NO_LABELS:-}" ] || printf "app=web," ;;
+  *" get deploy/"*"--ignore-not-found"*)
+    if [ -n "${FAKE_FORBIDDEN:-}" ]; then echo "Error from server (Forbidden)" >&2; exit 1; fi
+    [ -n "${FAKE_NO_DEPLOY:-}" ] || echo deployment.apps/web ;;
   *" get deploy/"*) [ -z "${FAKE_NO_DEPLOY:-}" ] ;;
   *) exit 0 ;;
 esac'
@@ -34,6 +40,27 @@ expect_status ok "restart: an absent deployment is skipped, not failed"
 refute_call "rollout restart" "restart: nothing is rolled when the deployment is absent"
 expect_output "deploy/web not found in apps" "restart: says why it skipped"
 unset FAKE_NO_DEPLOY
+
+# No cluster at all is a skip too — this task sits in chains that stay green
+# on a laptop with nothing running — but it says that, not "not found".
+reset_calls
+export FAKE_UNREACHABLE=1
+run_task k8s:restart
+expect_status ok "restart: an unreachable cluster is skipped, not failed"
+refute_call "rollout restart" "restart: nothing is rolled when the cluster is unreachable"
+expect_output "cluster unreachable" "restart: says the cluster was unreachable"
+refute_output "not found" "restart: an unreachable cluster is not reported as an absent deployment"
+unset FAKE_UNREACHABLE
+
+# A cluster that answers with anything but "not found" is a failure: the old
+# pods would keep running behind a green step.
+reset_calls
+export FAKE_FORBIDDEN=1
+run_task k8s:restart
+expect_status fail "restart: a lookup the cluster refused fails"
+refute_call "rollout restart" "restart: nothing is rolled when the lookup failed"
+expect_output "could not look up deploy/web in apps" "restart: says the lookup failed"
+unset FAKE_FORBIDDEN
 
 reset_calls
 run_task k8s:status
