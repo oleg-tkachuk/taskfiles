@@ -128,15 +128,28 @@ tasks:
 
   typecheck:
     desc: "Run the typecheck script, skipped where the project declares none"
+    vars:
+      # Exit code the probe uses for "no such script"; distinct from node's 1
+      # for an unreadable package.json and the shell's 127 for no node.
+      _NODE_TC_ABSENT: '3'
     cmds:
       # A project without the script is not failing a gate it never opted into;
       # `pnpm run` on a missing script is an error, so ask package.json first.
+      # Only an answer of "absent" is a skip: a package.json that is missing or
+      # does not parse read the same way once, and the gate went quiet.
       - cmd: |-
           set -eu
           script={{._NODE_TYPECHECK | q}}
-          if ! node -e 'process.exit(require("./package.json").scripts?.[process.argv[1]] ? 0 : 1)' "$script" 2>/dev/null; then
+          found=0
+          node -e 'process.exit(require("./package.json").scripts?.[process.argv[1]] ? 0 : Number(process.argv[2]))' \
+            "$script" {{._NODE_TC_ABSENT | q}} || found=$?
+          if [ "$found" = {{._NODE_TC_ABSENT | q}} ]; then
             printf '%s %s · node · no %s script — skipped\n' "{{._NODE_SKIP}}" {{._NODE_NAME | q}} {{._NODE_TYPECHECK | q}}
             exit 0
+          fi
+          if [ "$found" != 0 ]; then
+            printf '%s %s · node · could not read the scripts in package.json (exit %s)\n' "{{._NODE_ERR}}" {{._NODE_NAME | q}} "$found" >&2
+            exit 1
           fi
           printf '%s %s · node · %s\n' "{{._NODE_RUN}}" {{._NODE_NAME | q}} {{._NODE_TYPECHECK | q}}
           {{._NODE_PM}} run "$script"
