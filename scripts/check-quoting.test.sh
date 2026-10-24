@@ -161,4 +161,87 @@ tasks:
     cmds:
       - "{{._RESOLVE}}"'
 
+expect reported quoted-inside-double-quotes 'version: "3"
+tasks:
+  t:
+    cmds:
+      - echo "{{.NAME | q}}"'
+
+expect reported quoted-inside-single-quotes 'version: "3"
+tasks:
+  t:
+    cmds:
+      - grep -qx '"'"'{{.NAME | q}}'"'"' file'
+
+expect clean quoted-inside-command-substitution 'version: "3"
+tasks:
+  t:
+    cmds:
+      - echo "$(cat {{.FILE | q}})"'
+
+expect clean quoted-after-a-multi-line-single-quote 'version: "3"
+tasks:
+  t:
+    cmds:
+      - |
+        awk '"'"'
+          { print }
+        '"'"' {{.FILE | q}}'
+
+expect clean apostrophe-in-a-comment 'version: "3"
+tasks:
+  t:
+    cmds:
+      - |
+        # it'"'"'s quoted below
+        echo {{.NAME | q}}'
+
+expect reported unquoted-in-a-comment 'version: "3"
+tasks:
+  t:
+    cmds:
+      - |
+        # {{.NAME}}
+        true'
+
+expect reported unquoted-in-defer 'version: "3"
+tasks:
+  t:
+    cmds:
+      - defer: rm -f {{.FILE}}
+      - echo ok'
+
+expect clean quoted-in-defer 'version: "3"
+tasks:
+  t:
+    cmds:
+      - defer: rm -f {{.FILE | q}}
+      - echo ok'
+
+expect reported unquoted-after-an-exempt-name '# shell-verbatim: FLAGS
+version: "3"
+tasks:
+  t:
+    cmds:
+      - echo {{printf "%s %s" .FLAGS .NAME}}'
+
+expect reported unquoted-after-a-glyph 'version: "3"
+tasks:
+  t:
+    cmds:
+      - echo {{default ._LIB_OK .NAME}}'
+
+expect reported unquoted-variable-as-an-argument 'version: "3"
+tasks:
+  t:
+    cmds:
+      - echo {{range $f := .LIST}}{{printf "%s" $f}}{{end}}'
+
+expect clean literal-with-escaped-quotes '# shell-verbatim: FLAGS
+version: "3"
+tasks:
+  t:
+    cmds:
+      - find . {{.FLAGS | default "-not -path \"*/.git/*\""}}'
+
 [ "$failures" = 0 ] || exit 1
