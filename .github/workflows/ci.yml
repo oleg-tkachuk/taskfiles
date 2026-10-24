@@ -156,6 +156,49 @@ jobs:
       - name: 'Guard: every module lints'
         run: task lint
 
+  contracts:
+    # The scanning gates against the real tools they wrap. The behaviour tests
+    # shim every tool, and each gate bug so far lived between a shim and the
+    # tool: checkov's exit 1 on a finding, trivy taking the last of a repeated
+    # flag. Every pull request, so a Renovate bump of one of the pins below is
+    # proved at the new version before it merges itself.
+    name: Tool contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # One official image per tool, wrapped onto PATH by contract-tools.ts.
+      # renovate: datasource=docker depName=aquasec/trivy
+      TRIVY_VERSION: 0.76.1
+      # renovate: datasource=docker depName=hadolint/hadolint
+      HADOLINT_VERSION: v2.15.1
+      # renovate: datasource=docker depName=zricethezav/gitleaks
+      GITLEAKS_VERSION: v8.30.1
+      # renovate: datasource=docker depName=bridgecrew/checkov
+      CHECKOV_VERSION: 3.3.30
+    steps:
+      - name: 'Setup: check out the repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes with the checkout credential, so it has no
+          # reason to be left behind in .git/config.
+          persist-credentials: false
+          ref: ${{ env.CHECKOUT_REF }}
+
+      - name: 'Setup: Task'
+        uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
+        with:
+          version: ${{ env.TASK_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 'Setup: the CI scripts'
+        uses: ./.github/actions/setup-ci
+
+      - name: 'Setup: the pinned tools'
+        run: node .github/ci/contract-tools.ts
+
+      - name: 'Guard: every gate holds against the real tool'
+        run: task contracts
+
   consumer-smoke:
     # A consumer is the only thing that exercises the modules the way they are
     # actually used — included, with the consumer's vars overriding the
@@ -398,13 +441,14 @@ jobs:
   # skips on a change irrelevant to it, and that skip must not read as a failure.
   dispatch-release:
     name: Dispatch release
-    needs: [changes, workflows, lint, consumer-smoke]
+    needs: [changes, workflows, lint, contracts, consumer-smoke]
     if: >-
       always() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.result == 'success' &&
       needs.workflows.result == 'success' &&
       needs.lint.result == 'success' &&
+      needs.contracts.result == 'success' &&
       (needs['consumer-smoke'].result == 'success' || needs['consumer-smoke'].result == 'skipped')
     permissions:
       contents: write # POST /repos/{owner}/{repo}/dispatches needs write
@@ -442,7 +486,7 @@ jobs:
   # only after the checks above them have already passed for this exact ref.
   gate:
     name: Gate
-    needs: [changes, workflows, lint, consumer-smoke]
+    needs: [changes, workflows, lint, contracts, consumer-smoke]
     # Only meaningful on a tag: an ordinary branch push or PR has nothing to
     # release, and this is what keeps the release jobs from running at all —
     # `consumable` and `publish` skip too, since a `needs:` on a skipped job
@@ -456,6 +500,7 @@ jobs:
       needs.changes.result == 'success' &&
       needs.workflows.result == 'success' &&
       needs.lint.result == 'success' &&
+      needs.contracts.result == 'success' &&
       (needs['consumer-smoke'].result == 'success' || needs['consumer-smoke'].result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 10
