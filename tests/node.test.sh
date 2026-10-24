@@ -65,7 +65,14 @@ if command -v node >/dev/null 2>&1; then
   if [ -e "$pwned" ]; then fail "typecheck: a \$( ) in the script name ran"; else pass "typecheck: a \$( ) in the script name does not run"; fi
   expect_status ok "typecheck: an undeclared script is skipped"
   refute_call "pnpm run" "typecheck: an undeclared script is not run"
+  printf '%s\n' '{"scripts":' > "$CONSUMER/package.json"
+  reset_calls
+  run_task node:typecheck
+  expect_status fail "typecheck: a package.json that does not parse fails"
+  refute_output "skipped" "typecheck: a package.json that does not parse is not a skip"
   rm -f "$CONSUMER/package.json"
+  run_task node:typecheck
+  expect_status fail "typecheck: a missing package.json fails"
 fi
 
 # A package-manager command of more than one word still runs as a command.
