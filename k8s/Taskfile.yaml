@@ -51,6 +51,9 @@ vars:
   # Empty = whatever kubectl's current-context is. Set it to pin a cluster.
   # A command fragment spliced in as shell: the context is quoted here.
   _K8S_KUBECTL: 'kubectl{{if .K8S_CONTEXT}} --context {{.K8S_CONTEXT | q}}{{end}}'
+  # How long restart's reachability probe waits before calling the cluster
+  # gone: a dead context would otherwise hang the chain it sits in.
+  _K8S_PROBE_TIMEOUT: 3s
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _K8S_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -129,30 +132,33 @@ tasks:
           exit "$fail"
 
   restart:
-    desc: "Roll the deployment (no-op when the namespace or deployment is absent)"
+    desc: "Roll the deployment (no-op when the cluster, namespace or deployment is absent)"
     # Skipped rather than failed when there is nothing to roll: this task sits
     # in chains that must stay green on a laptop with no cluster running — and
-    # it says which of the two happened.
+    # it says which of the two happened. Anything else the cluster answers
+    # fails: one `get` deciding both read RBAC denials and expired logins as
+    # "not found", and the old pods kept running behind a green step.
+    # --ignore-not-found turns "absent" into empty output and exit 0, so
+    # "absent" is told from an error without reading kubectl's prose.
     cmds:
-      - task: restart:_skipped
-      - task: restart:_do
-
-  restart:_skipped:
-    internal: true
-    status:
-      - "{{._K8S_KUBECTL}} -n {{._K8S_NS | q}} get deploy/{{._K8S_DEPLOY | q}} >/dev/null 2>&1"
-    cmds:
-      - printf '%s %s · k8s · deploy/%s not found in %s — skipping restart\n' "{{._K8S_SKIP}}" {{._K8S_SVC | q}} {{._K8S_DEPLOY | q}} {{._K8S_NS | q}}
-
-  restart:_do:
-    internal: true
-    status:
-      - "! {{._K8S_KUBECTL}} -n {{._K8S_NS | q}} get deploy/{{._K8S_DEPLOY | q}} >/dev/null 2>&1"
-    cmds:
-      - printf '%s %s · k8s · roll deploy/%s in %s\n' "{{._K8S_RUN}}" {{._K8S_SVC | q}} {{._K8S_DEPLOY | q}} {{._K8S_NS | q}}
-      - "{{._K8S_KUBECTL}} -n {{._K8S_NS | q}} rollout restart deploy/{{._K8S_DEPLOY | q}}"
-      - "{{._K8S_KUBECTL}} -n {{._K8S_NS | q}} rollout status deploy/{{._K8S_DEPLOY | q}} --timeout={{.ROLLOUT_TIMEOUT | default \"2m\" | q}}"
-      - printf '%s %s · k8s · rolled %s\n' "{{._K8S_OK}}" {{._K8S_SVC | q}} {{._K8S_DEPLOY | q}}
+      - cmd: |-
+          set -eu
+          if ! {{._K8S_KUBECTL}} version --request-timeout={{._K8S_PROBE_TIMEOUT | q}} >/dev/null 2>&1; then
+            printf '%s %s · k8s · cluster unreachable — skipping restart\n' "{{._K8S_SKIP}}" {{._K8S_SVC | q}}
+            exit 0
+          fi
+          if ! found=$({{._K8S_KUBECTL}} -n {{._K8S_NS | q}} get deploy/{{._K8S_DEPLOY | q}} --ignore-not-found -o name); then
+            printf '%s %s · k8s · could not look up deploy/%s in %s\n' "{{._K8S_ERR}}" {{._K8S_SVC | q}} {{._K8S_DEPLOY | q}} {{._K8S_NS | q}} >&2
+            exit 1
+          fi
+          if [ -z "$found" ]; then
+            printf '%s %s · k8s · deploy/%s not found in %s — skipping restart\n' "{{._K8S_SKIP}}" {{._K8S_SVC | q}} {{._K8S_DEPLOY | q}} {{._K8S_NS | q}}
+            exit 0
+          fi
+          printf '%s %s · k8s · roll deploy/%s in %s\n' "{{._K8S_RUN}}" {{._K8S_SVC | q}} {{._K8S_DEPLOY | q}} {{._K8S_NS | q}}
+          {{._K8S_KUBECTL}} -n {{._K8S_NS | q}} rollout restart deploy/{{._K8S_DEPLOY | q}}
+          {{._K8S_KUBECTL}} -n {{._K8S_NS | q}} rollout status deploy/{{._K8S_DEPLOY | q}} --timeout={{.ROLLOUT_TIMEOUT | default "2m" | q}}
+          printf '%s %s · k8s · rolled %s\n' "{{._K8S_OK}}" {{._K8S_SVC | q}} {{._K8S_DEPLOY | q}}
 
   upgrade:
     desc: "helm upgrade --install the release from the local chart directory"
