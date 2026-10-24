@@ -477,12 +477,16 @@ task: Taskfile "...//go?ref=v11.2.1" not trusted by user
 
 That is the only thing standing between a moved tag and your build, so commit
 those `.checksum` files. Most repositories ignore `.task/`, which throws the
-lock away — add an exception:
+lock away. Ignore what is *inside* it instead, then make the exception — git
+re-includes nothing under a directory that is itself excluded, so `.task/`
+followed by `!.task/remote/` still ignores the lock:
 
 ```gitignore
-.task/
+.task/*
 !.task/remote/
 ```
+
+`release:doctor` warns when the lock is ignored or not committed.
 
 Refresh it deliberately when you bump the pin, with `task --download`.
 
