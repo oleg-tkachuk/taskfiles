@@ -36,6 +36,17 @@ no var that would shadow a consumer's, runs quiet, and has a README of its own
 that README.md links from its Modules table. Run it before opening a PR —
 nothing here passes review that this does not pass first.
 
+```bash
+task contracts
+```
+
+The behaviour tests in `task lint` shim every tool. `task contracts` runs the
+scanning gates — `security` and `checkov` — against trivy, hadolint, gitleaks
+and checkov themselves, from `tests/contracts/`. It is not part of the lint:
+it needs those tools, and trivy fetches its checks over the network. CI runs
+it on every pull request at the versions pinned in `ci.yml`. A change to how a
+gate reads a tool's exit code or output comes with a case there.
+
 ## How a module is written
 
 Guards are `preconditions` (with an explanatory `msg`), skips are `status`,
