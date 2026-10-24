@@ -421,7 +421,9 @@ dirty tree             →  <base>-dev.<committer-ts>.dirty.<now>.g<sha>
 ```
 
 `<base>` is the latest version tag one patch up, so a build after a release
-sorts above it; `VERSION_BASE` sets it by hand.
+sorts above it; `VERSION_BASE` sets it by hand. After a pre-release tag
+`X.Y.Z-rc.N` a build is `X.Y.Z-rc.N.dev.…` instead, which sorts below the
+release the candidate is for.
 
 Committer timestamp rather than wall clock, so a clean tree produces the same
 version on every run — that is what makes the publish path idempotent.

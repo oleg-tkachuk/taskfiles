@@ -110,6 +110,11 @@ vars:
   #   otherwise, clean tree  →  <base>-dev.<committer-ts>.g<sha>
   #   dirty tree             →  <base>-dev.<committer-ts>.dirty.<now>.g<sha>
   #
+  # where <base> is the last version tag one patch up. After a pre-release tag
+  # X.Y.Z-rc.N the base is that tag itself and the dev fields extend its
+  # pre-release — X.Y.Z-rc.N.dev.<committer-ts>[.dirty.<now>].g<sha> — so a
+  # build sorts between rc.N and rc.N+1, below X.Y.Z; see _REL_AFTER_PRE.
+  #
   # The committer timestamp, not `date +%s`: a clean tree then produces the
   # SAME version on every run, which is what lets image:build and chart:push
   # skip work that is already published. A dirty tree is not reproducible by
@@ -179,16 +184,35 @@ vars:
       git describe --tags --abbrev=0 {{._REL_TAG_MATCH}}
       {{if .VERSION_TAG_EXCLUDE}}--exclude {{.VERSION_TAG_EXCLUDE | q}}{{end}}
       HEAD 2>/dev/null || true
-  _REL_LAST_CORE: '{{regexFind "^[0-9]+\\.[0-9]+\\.[0-9]+" (._REL_LAST_TAG | trimPrefix "v")}}'
+  # The last tag's version, pre-release included and build metadata dropped.
+  _REL_LAST_VER: '{{regexFind "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?" (._REL_LAST_TAG | trimPrefix "v")}}'
+  _REL_LAST_CORE: '{{regexFind "^[0-9]+\\.[0-9]+\\.[0-9]+" ._REL_LAST_VER}}'
+  # Set when the last tag is a pre-release and nothing else names the base.
+  #
+  # Then the base is that pre-release itself, extended — X.Y.Z-rc.N.dev.… —
+  # not one patch up. X.Y.(Z+1)-dev.… sorted above X.Y.Z, the release the
+  # candidate was for, so a `>=0.0.0-0` resolver kept serving the dev build
+  # after the release shipped. And X.Y.Z-dev.… cannot fix it: `dev` < `rc`, so
+  # it sorts below the candidate it follows. Extending the candidate's own
+  # pre-release puts a build above rc.N (an equal prefix, more fields —
+  # §11.4.4), below rc.N+1 (the numeric field decides first), and below X.Y.Z
+  # (any pre-release is). VERSION_TAG_EXCLUDE could not leave a candidate out
+  # instead: the same exclusion drops it from the exact match that publishes
+  # the candidate itself.
+  _REL_AFTER_PRE: '{{if and (not .VERSION_BASE) (ne ._REL_LAST_VER ._REL_LAST_CORE)}}1{{end}}'
   # The base when nothing names one and no version tag precedes this commit.
   _REL_FIRST_BASE: '0.1.0'
   _REL_BASE: >-
     {{- if .VERSION_BASE -}}{{.VERSION_BASE}}
+    {{- else if ._REL_AFTER_PRE -}}{{._REL_LAST_VER}}
     {{- else if ._REL_LAST_CORE -}}
     {{- $v := splitList "." ._REL_LAST_CORE -}}
     {{- index $v 0}}.{{index $v 1}}.{{add1 (index $v 2)}}
     {{- else -}}{{._REL_FIRST_BASE}}
     {{- end -}}
+  # How the dev fields join the base: a new pre-release after a core, one
+  # more field of the existing pre-release after a candidate.
+  _REL_DEV: '{{if ._REL_AFTER_PRE}}.dev{{else}}-dev{{end}}'
   _REL_HELM_LINT_FLAGS: '{{.HELM_LINT_FLAGS | default ""}}'
   _REL_HELM_TPL_FLAGS: '{{.HELM_TEMPLATE_FLAGS | default ""}}'
   _REL_HELM_PKG_FLAGS: '{{.HELM_PACKAGE_FLAGS | default ""}}'
@@ -203,7 +227,7 @@ vars:
     {{- if .APP_VERSION -}}{{.APP_VERSION}}
     {{- else if and ._REL_TAG (not ._REL_DIRTY) -}}{{._REL_TAG}}
     {{- else -}}
-    {{- ._REL_BASE}}-dev.{{._REL_CTS}}
+    {{- ._REL_BASE}}{{._REL_DEV}}.{{._REL_CTS}}
     {{- if ._REL_DIRTY}}.dirty.{{._REL_NOW}}{{end}}.g{{._REL_SHA}}
     {{- end -}}
   _REL_BUILD_TIME:

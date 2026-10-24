@@ -107,4 +107,46 @@ refute_call() {
 
 reset_calls() { : > "$CALLS"; }
 
+# semver_cmp <a> <b> — prints -1, 0 or 1: a's precedence against b's, by
+# SemVer 2.0.0 §11. Build metadata is ignored; the core compares numerically;
+# a pre-release sorts below its release; pre-release identifiers compare left
+# to right, numeric ones numerically and below alphanumeric ones, alphanumeric
+# ones in ASCII order; with an equal prefix, more identifiers win.
+semver_cmp() {
+  local a=${1%%+*} b=${2%%+*} ap="" bp="" i s t n m
+  [[ $a == *-* ]] && ap=${a#*-}
+  [[ $b == *-* ]] && bp=${b#*-}
+  local -a x y p r
+  IFS=. read -ra x <<< "${a%%-*}"
+  IFS=. read -ra y <<< "${b%%-*}"
+  for i in 0 1 2; do
+    if ((10#${x[i]} < 10#${y[i]})); then echo -1; return; fi
+    if ((10#${x[i]} > 10#${y[i]})); then echo 1; return; fi
+  done
+  if [[ -z $ap && -z $bp ]]; then echo 0; return; fi
+  if [[ -z $ap ]]; then echo 1; return; fi
+  if [[ -z $bp ]]; then echo -1; return; fi
+  IFS=. read -ra p <<< "$ap"
+  IFS=. read -ra r <<< "$bp"
+  n=${#p[@]} m=${#r[@]}
+  for ((i = 0; i < n && i < m; i++)); do
+    s=${p[i]} t=${r[i]}
+    [[ $s == "$t" ]] && continue
+    if [[ $s =~ ^[0-9]+$ && $t =~ ^[0-9]+$ ]]; then
+      if ((10#$s < 10#$t)); then echo -1; else echo 1; fi
+    elif [[ $s =~ ^[0-9]+$ ]]; then echo -1
+    elif [[ $t =~ ^[0-9]+$ ]]; then echo 1
+    elif [[ $(printf '%s\n%s\n' "$s" "$t" | LC_ALL=C sort | head -1) == "$s" ]]; then echo -1
+    else echo 1
+    fi
+    return
+  done
+  if ((n < m)); then echo -1; elif ((n > m)); then echo 1; else echo 0; fi
+}
+
+# expect_before <a> <b> <case name> — a has lower SemVer precedence than b.
+expect_before() {
+  if [ "$(semver_cmp "$1" "$2")" = -1 ]; then pass "$3"; else fail "$3: $1 does not sort before $2"; fi
+}
+
 finish() { [ "$failures" = 0 ]; }
