@@ -203,12 +203,10 @@ jobs:
       - name: 'Setup: the pinned tools'
         run: node .github/ci/contract-tools.ts
 
+      # The cluster is named after the context, which is kind-<cluster>, so
+      # the two cannot drift apart.
       - name: 'Setup: a kind cluster for the k8s contract'
-        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
-        with:
-          version: ${{ env.KIND_VERSION }}
-          kubectl_version: ${{ env.KUBECTL_VERSION }}
-          cluster_name: contracts
+        run: kind create cluster --name "${CONTRACTS_KUBE_CONTEXT#kind-}" --wait 120s
 
       - name: 'Guard: every gate holds against the real tool'
         run: task contracts
