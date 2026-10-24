@@ -67,10 +67,14 @@ unchanged, so this is what a reader of `git log` sees — not collapsed into
 whatever the PR was titled.
 
 `semantic-release` (see [RELEASE.md](RELEASE.md)) reads these to decide the
-next version automatically once a PR merges, so a commit that renames or
-removes a task needs `!` after the type (`feat(k8s)!: ...`) or a `BREAKING
-CHANGE:` footer — Conventional Commits has no type of its own for that case,
-and without the marker it reads as an ordinary `feat`.
+next version automatically once a PR merges, so a commit that removes a task,
+an alias or an input needs `!` after the type (`feat(k8s)!: ...`) or a
+`BREAKING CHANGE:` footer — Conventional Commits has no type of its own for
+that case, and without the marker it reads as an ordinary `feat`. A rename
+keeps the old name for a major instead, and is a plain `feat`; see
+[Deprecating instead of breaking](RELEASE.md#deprecating-instead-of-breaking).
+`check:api` refuses a name the latest release had unless `API_REMOVED` lists
+it.
 
 ## Opening a PR
 

@@ -98,10 +98,12 @@ SHA with that flag. The tag above is an example; the current one, and what
 moving to it costs, is on the
 [releases page](https://github.com/oleg-tkachuk/taskfiles/releases).
 
-A rename or a removal is a major bump — these modules are a public API, and
-`?ref=` is the only thing between a rename here and your Taskfile. Adding a
-task or an input is a minor; a fix is a patch. How a release is cut is in
-[RELEASE.md](RELEASE.md).
+A removal is a major bump — these modules are a public API, and `?ref=` is the
+only thing between a removal here and your Taskfile. A rename is not: the old
+task name stays as an alias, and an old input name is still read, for one
+major, so moving to the release that renames something costs nothing until the
+next one. Adding a task or an input is a minor; a fix is a patch. The policy,
+and how a release is cut, is in [RELEASE.md](RELEASE.md).
 
 ### Working on the library itself
 
