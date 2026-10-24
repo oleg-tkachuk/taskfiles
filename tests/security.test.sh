@@ -28,11 +28,18 @@ consumer security security
 reset_calls
 run_task security:trivy
 expect_status ok "trivy: runs with the default skip list"
-expect_call "[--skip-dirs][.claude][.]" "trivy: skips .claude by default"
+expect_call "[--skip-dirs][.claude][--exit-code][1][.]" "trivy: skips .claude by default"
 consumer security security "{ TRIVY_SKIP_DIRS: [.claude, 'third party'] }"
 reset_calls
 run_task security:trivy
-expect_call "[--skip-dirs][.claude][--skip-dirs][third party][.]" "trivy: each listed directory is one --skip-dirs argument"
+expect_call "[--skip-dirs][.claude][--skip-dirs][third party][--exit-code][1][.]" "trivy: each listed directory is one --skip-dirs argument"
 expect_call "[config][--exit-code][0][--quiet][--skip-dirs][.claude][--skip-dirs][third party]" "trivy: config skips the same directories"
+
+# The gate's --exit-code comes last, where trivy's last-flag-wins parsing
+# keeps it: a consumer's TRIVY_FLAGS cannot switch the gate off.
+consumer security security "{ TRIVY_FLAGS: '--exit-code 0' }"
+reset_calls
+run_task security:trivy
+expect_call "[--exit-code][0][--exit-code][1][.]" "trivy: TRIVY_FLAGS cannot override the gate's exit code"
 
 finish
