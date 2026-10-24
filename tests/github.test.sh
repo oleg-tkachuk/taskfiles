@@ -12,6 +12,7 @@ case "$*" in
 esac'
 shim git '
 case "$*" in
+  "remote get-url --push "*) echo "${FAKE_PUSH_URL:-${FAKE_REMOTE_URL:-git@github.com:acme/app.git}}" ;;
   "remote get-url "*) echo "${FAKE_REMOTE_URL:-git@github.com:acme/app.git}" ;;
   push*) [ -z "${FAKE_PUSH_FAIL:-}" ] ;;
   *) exit 1 ;;
@@ -39,11 +40,19 @@ for url in git@github.com:acme/other.git https://github.com/fork/app.git https:/
 done
 unset FAKE_REMOTE_URL
 
+# git pushes to a remote's pushurl when it has one: that is what is checked.
+export FAKE_PUSH_URL=git@github.com:fork/app.git
+reset_calls
+run_task github:force-push REASON=test
+expect_status fail "force-push: refuses a remote whose push URL is another repository"
+refute_call "gh api -X DELETE" "force-push: lifts nothing when the push URL is another repository"
+unset FAKE_PUSH_URL
+
 reset_calls
 consumer github github '{ GH_REPO: acme/app, GH_REMOTE: upstream }'
 run_task github:force-push REASON=test
 expect_status ok "force-push: GH_REMOTE names the remote"
-expect_call "git remote get-url upstream" "force-push: checks the remote it pushes to"
+expect_call "git remote get-url --push upstream" "force-push: checks the remote it pushes to"
 expect_call "git push --force-with-lease upstream HEAD:main" "force-push: pushes to GH_REMOTE"
 
 export FAKE_RESTORE_FAIL=1

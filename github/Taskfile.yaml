@@ -72,8 +72,9 @@ tasks:
           # Protection comes down on $repo, so the push has to land there.
           # GH_REPO and the remote are set apart, and nothing else ties them:
           # with the remote on a fork, protection was lifted on one repository
-          # and the force-push sent to another.
-          url=$(git remote get-url "$remote")
+          # and the force-push sent to another. The push URL, not the fetch
+          # URL: a remote with a pushurl sends the push there.
+          url=$(git remote get-url --push "$remote")
           path=${url%.git}; path=${path%/}
           name=${path##*/}; owner=${path%/*}; owner=${owner##*[/:]}
           lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
