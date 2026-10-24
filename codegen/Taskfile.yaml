@@ -160,8 +160,10 @@ tasks:
       # wrong one. That copy compiles, nothing imports it, and it rots in place.
       # Checked before generating, so it fires whether the stray copy arrived
       # just now or several commits ago — the point is to be loud, which is why
-      # this is a tripwire and not a .gitignore entry.
-      - sh: '{{if ._CG_FORBID}}! ls -d {{range (splitList " " ._CG_FORBID | compact)}}{{q .}} {{end}} >/dev/null 2>&1{{else}}true{{end}}'
+      # this is a tripwire and not a .gitignore entry. One test per path: a
+      # single `ls -d` over all of them fails as soon as one is missing, so a
+      # stray copy beside an absent path went unreported.
+      - sh: '{{range (splitList " " ._CG_FORBID | compact)}}! test -e {{q .}} && {{end}}true'
         msg: |-
           {{._CG_FORBID}} exists — that is a stray second copy of the generated
           stubs, written by running the generator from the wrong directory.
