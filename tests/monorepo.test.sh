@@ -55,5 +55,11 @@ done
 shim curl 'printf 000'
 run_task mono:registry:check
 expect_status fail "registry:check: no answer is unreachable"
+refute_output ":443" "registry:check: the refusal names no port the registry was never asked on"
+
+# A plain-HTTP registry, as the default localhost:5000 one is, answers too.
+shim curl 'case "$*" in *https://*) printf 000 ;; *) printf 200 ;; esac'
+run_task mono:registry:check
+expect_status ok "registry:check: a registry answering over plain http is reachable"
 
 finish

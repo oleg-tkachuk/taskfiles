@@ -136,6 +136,13 @@ expect_output "chart $p → oci://$r/charts/app" "doctor: CHART_DIR and REGISTRY
 consumer release release "{ PROJECT_NAME: app }"
 run_task release:doctor
 expect_output "no git history" "doctor: a tree with no commit has no git history"
+expect_output "did not answer" "doctor: a registry that answers neither scheme did not answer"
+
+# A plain-HTTP registry, as the default localhost:5000 one is, answers too.
+shim curl 'case "$*" in *https://*) printf 000 ;; *) printf 200 ;; esac'
+run_task release:doctor
+expect_output "registry localhost:5000 answers" "doctor: a registry answering over plain http answers"
+shim curl 'printf 000'
 real_git=$(command -v git)
 git -C "$CONSUMER" init -q
 git -C "$CONSUMER" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m seed
