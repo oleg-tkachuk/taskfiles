@@ -47,16 +47,70 @@ expect_version '1.2.1-dev.*.g*' "an excluded tag namespace is not a base" 'VERSI
 commit third
 repo tag v1.3.0-rc.1
 commit fourth
-expect_version '1.3.1-dev.*.g*' "after a pre-release tag: one patch above its core"
+expect_version '1.3.0-rc.1.dev.*.g*' "after a pre-release tag: that pre-release, extended"
 
 repo tag release-5
 commit fifth
-expect_version '1.3.1-dev.*.g*' "a tag that is not a version is passed over"
+expect_version '1.3.0-rc.1.dev.*.g*' "a tag that is not a version is passed over"
 
 repo tag stable
-expect_version '1.3.1-dev.*.g*' "a tag on HEAD that is not a version does not become one"
+expect_version '1.3.0-rc.1.dev.*.g*' "a tag on HEAD that is not a version does not become one"
 
 repo tag v1.4.0
 expect_version '1.4.0' "a version tag beside a tag that is not one is still the version"
+
+# ─── ordering, by SemVer precedence ──────────────────────────────────────────
+# A resolver such as ArgoCD's `>=0.0.0-0` serves the highest version, so what
+# matters is where a build sorts, not what it reads like.
+#
+# The comparator first, against the precedence chain SemVer §11 itself gives,
+# both ways round, and with build metadata ignored.
+chain=(1.0.0-alpha 1.0.0-alpha.1 1.0.0-alpha.beta 1.0.0-beta 1.0.0-beta.2 1.0.0-beta.11 1.0.0-rc.1 1.0.0 1.0.1 1.1.0 2.0.0)
+for ((i = 0; i < ${#chain[@]} - 1; i++)); do
+  expect_before "${chain[i]}" "${chain[i + 1]}" "semver: ${chain[i]} < ${chain[i + 1]}"
+  if [ "$(semver_cmp "${chain[i + 1]}" "${chain[i]}")" = 1 ]; then
+    pass "semver: ${chain[i + 1]} > ${chain[i]}"
+  else
+    fail "semver: ${chain[i + 1]} > ${chain[i]}"
+  fi
+done
+if [ "$(semver_cmp 1.0.0+a 1.0.0+b)" = 0 ]; then pass "semver: build metadata does not order"; else fail "semver: build metadata does not order"; fi
+
+# Then the builds, on a fresh history.
+rm -rf "$CONSUMER/.git"
+repo init -q
+repo config user.email test@example.invalid
+repo config user.name test
+commit candidate
+version() { run_task release:version; cat "$OUT"; }
+
+repo tag v1.2.0-rc.1
+expect_version '1.2.0-rc.1' "on a pre-release tag, clean: the tag"
+commit after-candidate
+clean=$(version)
+expect_before 1.2.0-rc.1 "$clean" "after v1.2.0-rc.1: a build sorts above the candidate it follows"
+expect_before "$clean" 1.2.0-rc.2 "after v1.2.0-rc.1: a build sorts below the next candidate"
+expect_before "$clean" 1.2.0 "after v1.2.0-rc.1: a build sorts below the release the candidate is for"
+
+printf 'wip\n' >> "$CONSUMER/log"
+dirty=$(version)
+repo checkout -q -- log
+expect_before "$dirty" "$clean" "after v1.2.0-rc.1: the clean build of a commit outranks its dirty one"
+expect_before 1.2.0-rc.1 "$dirty" "after v1.2.0-rc.1: a dirty build still sorts above the candidate"
+expect_version '2.0.0-dev.*.g*' "after a pre-release tag: VERSION_BASE still sets the base" VERSION_BASE=2.0.0
+expect_version '7.7.7' "after a pre-release tag: APP_VERSION still pins the version" APP_VERSION=7.7.7
+
+commit release
+repo tag v1.2.0
+commit after-release
+clean=$(version)
+expect_version '1.2.1-dev.*.g*' "after a final tag: one patch up, as before"
+expect_before 1.2.0 "$clean" "after v1.2.0: a build sorts above the release"
+expect_before "$clean" 1.2.1 "after v1.2.0: a build sorts below the next patch"
+
+printf 'wip\n' >> "$CONSUMER/log"
+dirty=$(version)
+repo checkout -q -- log
+expect_before "$dirty" "$clean" "after v1.2.0: the clean build of a commit outranks its dirty one"
 
 finish

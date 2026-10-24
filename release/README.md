@@ -63,7 +63,7 @@ workspace — tasks then read `release:<task>`.
 | `HELM_PACKAGE_FLAGS` | — | extra flags for `helm package` |
 | `RENDER_OUT` | `.task/render.yaml` | where `chart:render` writes before the gate reads it |
 | `INFO_ENV_FILE` | `./deploy/info.env` | where the build metadata is written |
-| `VERSION_BASE` | the latest version tag, one patch up; `0.1.0` with none | base for untagged builds — set it to choose the base yourself |
+| `VERSION_BASE` | the latest version tag, one patch up (a pre-release tag itself); `0.1.0` with none | base for untagged builds — set it to choose the base yourself |
 | `VERSION_TAG_EXCLUDE` | — | tag glob to keep out of the version, e.g. `api/*` |
 | `APP_VERSION` | — | pin the version outright, skipping git derivation |
 | `TIMEZONE` | `UTC` | zone of the build timestamp |
@@ -143,6 +143,18 @@ the commit descends from, one patch up — after `v1.2.0`, builds are
 `1.2.1-dev.…`, so every build after a release sorts above it. Tags that do not
 start with a version are passed over, `VERSION_TAG_EXCLUDE` still applies, and
 with no version tag at all the base is `0.1.0`.
+
+After a pre-release tag the build extends that pre-release instead:
+
+```
+after X.Y.Z-rc.N, clean tree  →  X.Y.Z-rc.N.dev.<committer-ts>.g<sha>
+after X.Y.Z-rc.N, dirty tree  →  X.Y.Z-rc.N.dev.<committer-ts>.dirty.<now>.g<sha>
+```
+
+That sorts above `rc.N`, below `rc.N+1`, and below `X.Y.Z` — so once the
+release ships, a `>=0.0.0-0` resolver moves to it. One patch up would sort
+above the release the candidate was for. Anything that recognises a dev build
+by `-dev.` must also accept `.dev.`.
 
 The **committer** timestamp, not the wall clock: a clean tree then produces the
 same version on every run, which is what makes `deploy` idempotent. A dirty tree
