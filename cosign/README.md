@@ -18,10 +18,10 @@ workspace — tasks then read `sign:<task>`.
 |---|---|
 | `sign` | Sign the image and the chart, then attest the image's SBOM |
 | `chart` | Sign the published chart at the release version |
-| `image` | Sign the published image at the release version |
+| `image` | Sign the published image by the digest `release:image:push` recorded |
 | `keygen` | One-time — generate the cosign key pair and a no-transparency-log signing config |
-| `sbom` | Generate an SBOM for the published image and attest it with cosign |
-| `verify` | Verify the signatures on the published image and chart |
+| `sbom` | Generate an SBOM for the published image and attest it to that digest |
+| `verify` | Verify the signatures on the published image, by digest, and chart |
 
 ## Inputs
 
@@ -41,6 +41,18 @@ workspace — tasks then read `sign:<task>`.
 Plus `PROJECT_NAME`, `REGISTRY`, `IMAGE_NAMESPACE` and `CHART_NAME`, read the
 same way `release` reads them.
 
+## By digest, not by tag
+
+The image is signed, attested and verified as `<image>@sha256:…` — the digest
+`release:image:push` recorded in `.task/release/<version>.digest` — never as
+`<image>:<version>`. A tag can be moved between the push and the signature,
+and the signature then vouches for whatever it points at.
+
+So `image`, `sbom` and `verify` run in the tree that pushed, after the push. A
+job that signs somewhere else has no digest file and is refused, by name,
+rather than signed by tag. The chart is still signed by tag: `helm push`
+reports its digest only as prose.
+
 ## Examples
 
 ```yaml
@@ -57,7 +69,7 @@ tasks:
 
 ```console
 $ task cosign:keygen              # once, then commit cosign.pub only
-✔ billing · cosign · wrote deploy/sigstore/cosign.{key,pub} + signing-config.json
+✔ billing · cosign · wrote deploy/sigstore/cosign.key, deploy/sigstore/cosign.pub and deploy/sigstore/signing-config.json
 ▲ billing · cosign · commit cosign.pub, keep cosign.key out of the repo
 
 $ task deploy

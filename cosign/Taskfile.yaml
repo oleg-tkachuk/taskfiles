@@ -88,6 +88,15 @@ vars:
   # `task release:version`: that re-loads the consumer Taskfile, which
   # re-includes this module, which evaluates this var again — an infinite fork.
   _CS_VERSION: '{{._REL_VERSION}}'
+  # The image is signed, attested and verified by the digest release:image:push
+  # recorded, never by its tag: a tag can be moved between the push and the
+  # signature, and the signature then vouches for whatever it points at. The
+  # file is read when the task runs — a var is fixed when the include loads,
+  # which in a deploy chain is before the push. No file is refused rather than
+  # signed by tag: that is the gap this closes. The chart is still signed by
+  # tag — `helm push` reports its digest only as prose.
+  _CS_DIGEST_FILE: '{{._REL_DIGEST_FILE}}'
+  _CS_NO_DIGEST: '{{._REL_DIGEST_FILE}} not found — no digest was recorded for {{._REL_VERSION}}. release:image:push writes it, so sign in the tree that pushed (or set COSIGN_SIGN=0)'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _CS_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
@@ -177,7 +186,7 @@ tasks:
       - test {{._CS_ON | q}} = 0
     cmds:
       - task: _sign
-        vars: { REF: "{{._REL_IMAGE}}:{{._CS_VERSION}}" }
+        vars: { REF: "{{._REL_IMAGE}}:{{._CS_VERSION}}", REF_FILE: "{{._CS_DIGEST_FILE}}" }
 
   chart:
     desc: "Sign the published chart at the release version"
@@ -199,7 +208,7 @@ tasks:
       - test {{._CS_ON | q}} = 0
     cmds:
       - task: _attest
-        vars: { REF: "{{._REL_IMAGE}}:{{._CS_VERSION}}" }
+        vars: { REF: "{{._REL_IMAGE}}:{{._CS_VERSION}}", REF_FILE: "{{._CS_DIGEST_FILE}}" }
 
   verify:
     desc: "Verify the signatures on the published image and chart"
@@ -223,25 +232,35 @@ tasks:
       - sh: test -f {{._CS_PUB | q}}
         msg: "{{._CS_PUB}} not found — nothing to verify against (run `task cosign:keygen`)"
       - sh: test -n {{._CS_VERSION | q}}
-        msg: "no version resolved — include the shared `release` module under the name `release` beside this one"
-    vars:
-      # A literal `for:` list is taken verbatim — templates in its items are
-      # not expanded — so the refs are built here and split on whitespace.
-      _CS_REFS: "{{._REL_IMAGE}}:{{._CS_VERSION}} {{._CS_CHART_REF}}:{{._CS_VERSION}}"
+        msg: "no version resolved — include the shared `release` module beside this one"
+      - sh: test -s {{._CS_DIGEST_FILE | q}}
+        msg: "{{._CS_NO_DIGEST}}"
     cmds:
-      - for: { var: _CS_REFS }
-        cmd: >-
-          cosign verify {{._CS_VERIFY_FLAGS}} --key {{._CS_PUB | q}} {{.ITEM | q}} >/dev/null 2>&1
-          && printf '%s %s · cosign · verified %s\n' "{{._CS_OK}}" {{._CS_NAME | q}} {{.ITEM | q}}
-          || { printf '%s %s · cosign · unsigned or bad signature: %s\n' "{{._CS_ERR}}" {{._CS_NAME | q}} {{.ITEM | q}} >&2; exit 1; }
+      # The image by the digest that was pushed and signed, the chart by tag.
+      - cmd: |-
+          set -eu
+          verify() {
+            if cosign verify {{._CS_VERIFY_FLAGS}} --key {{._CS_PUB | q}} "$1" >/dev/null 2>&1; then
+              printf '%s %s · cosign · verified %s\n' "{{._CS_OK}}" {{._CS_NAME | q}} "$1"
+            else
+              printf '%s %s · cosign · unsigned or bad signature: %s\n' "{{._CS_ERR}}" {{._CS_NAME | q}} "$1" >&2
+              exit 1
+            fi
+          }
+          verify "$(cat {{._CS_DIGEST_FILE | q}})"
+          verify {{._CS_CHART_REF | q}}:{{._CS_VERSION | q}}
 
+  # REF names what is signed; REF_FILE, when given, holds the digest ref to
+  # sign instead — read when the task runs, see _CS_DIGEST_FILE.
   _sign:
     internal: true
     requires:
       vars: [REF]
     preconditions:
       - sh: test -n {{._CS_VERSION | q}}
-        msg: "no version resolved — include the shared `release` module under the name `release` beside this one"
+        msg: "no version resolved — include the shared `release` module beside this one"
+      - sh: '{{if .REF_FILE}}test -s {{.REF_FILE | q}}{{else}}true{{end}}'
+        msg: "{{._CS_NO_DIGEST}}"
       - sh: command -v cosign >/dev/null
         msg: "cosign is not installed — https://docs.sigstore.dev/cosign/system_config/installation/ (or set COSIGN_SIGN=0)"
       - sh: test -f {{._CS_KEY | q}}
@@ -251,11 +270,13 @@ tasks:
       - sh: test -f {{._CS_CONFIG | q}}
         msg: "{{._CS_CONFIG}} not found — run `task cosign:keygen`, or set COSIGN_SIGNING_CONFIG"
     cmds:
-      - >-
-        COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign sign --yes
-        --signing-config {{._CS_CONFIG | q}} --key {{._CS_KEY | q}}
-        {{._CS_SIGN_FLAGS}} {{.REF | q}} >/dev/null
-      - printf '%s %s · cosign · signed %s\n' "{{._CS_OK}}" {{._CS_NAME | q}} {{.REF | q}}
+      - cmd: |-
+          set -eu
+          ref={{if .REF_FILE}}"$(cat {{.REF_FILE | q}})"{{else}}{{.REF | q}}{{end}}
+          COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign sign --yes \
+            --signing-config {{._CS_CONFIG | q}} --key {{._CS_KEY | q}} \
+            {{._CS_SIGN_FLAGS}} "$ref" >/dev/null
+          printf '%s %s · cosign · signed %s\n' "{{._CS_OK}}" {{._CS_NAME | q}} "$ref"
 
   _attest:
     internal: true
@@ -263,7 +284,9 @@ tasks:
       vars: [REF]
     preconditions:
       - sh: test -n {{._CS_VERSION | q}}
-        msg: "no version resolved — include the shared `release` module under the name `release` beside this one"
+        msg: "no version resolved — include the shared `release` module beside this one"
+      - sh: '{{if .REF_FILE}}test -s {{.REF_FILE | q}}{{else}}true{{end}}'
+        msg: "{{._CS_NO_DIGEST}}"
       - sh: command -v syft >/dev/null
         msg: "syft is not installed — https://github.com/anchore/syft#installation (or set COSIGN_SIGN=0)"
       - sh: command -v cosign >/dev/null
@@ -291,10 +314,10 @@ tasks:
           d="$(mktemp -d "${TMPDIR:-/tmp}/sbom-XXXXXX")"
           trap 'rm -rf "$d"' EXIT
           sb="$d/sbom.json"
-          ref={{.REF | q}}
+          ref={{if .REF_FILE}}"$(cat {{.REF_FILE | q}})"{{else}}{{.REF | q}}{{end}}
           fmt={{._CS_SBOM_FORMAT | q}}
           {{if eq (.SBOM_INSECURE | default "0") "1"}}SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY=true {{end}}syft {{._CS_SYFT_FLAGS}} "$ref" -q -o "$fmt=$sb"
           COSIGN_PASSWORD="${COSIGN_PASSWORD-}" cosign attest --yes \
             --signing-config {{._CS_CONFIG | q}} --key {{._CS_KEY | q}} \
             --predicate "$sb" --type {{._CS_SBOM_TYPE | q}} {{._CS_SIGN_FLAGS}} "$ref" >/dev/null
-      - printf '%s %s · cosign · SBOM attested to %s\n' "{{._CS_OK}}" {{._CS_NAME | q}} {{.REF | q}}
+          printf '%s %s · cosign · SBOM attested to %s\n' "{{._CS_OK}}" {{._CS_NAME | q}} "$ref"
