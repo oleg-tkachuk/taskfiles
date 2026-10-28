@@ -179,7 +179,7 @@ jobs:
       # renovate: datasource=github-releases depName=kubernetes-sigs/kind
       KIND_VERSION: v0.33.0
       # renovate: datasource=github-releases depName=kubernetes/kubernetes
-      KUBECTL_VERSION: v1.37.1
+      KUBECTL_VERSION: v1.37.2
       # kind names the context kind-<cluster>.
       CONTRACTS_KUBE_CONTEXT: kind-contracts
     steps:
