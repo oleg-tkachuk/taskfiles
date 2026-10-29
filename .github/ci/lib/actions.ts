@@ -7,7 +7,7 @@ import { requireEnv } from "./env.ts";
 
 // OUTPUT_FILE names the variable holding the file a step appends its outputs
 // to.
-const OUTPUT_FILE = "GITHUB_OUTPUT";
+export const OUTPUT_FILE = "GITHUB_OUTPUT";
 
 // setOutput records name=value for the steps after this one. A value is one
 // line: a newline in it would start an output of the value's choosing.

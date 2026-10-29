@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { newlyTicked } from "./renovate-tick.ts";
+import { runCommand } from "./lib/command.ts";
+import { OUTPUT, newlyTicked } from "./renovate-tick.ts";
 
 const aOpen = " - [ ] <!-- approve-branch=renovate/a -->chore(deps): update a";
 const aDone = " - [x] <!-- approve-branch=renovate/a -->chore(deps): update a";
@@ -30,4 +31,15 @@ for (const [name, want, before, after] of cases) {
 
 test("names the boxes that were ticked", () => {
   assert.deepEqual(newlyTicked(body(aOpen, bOpen), body(aDone, bDone)), [aDone, bDone]);
+});
+
+test("the command proceeds on a new tick and names it, and otherwise says there is nothing to do", async () => {
+  const ticked = await runCommand("renovate-tick.ts", { env: { BODY_BEFORE: aOpen, BODY_AFTER: aDone } });
+  assert.equal(ticked.code, 0);
+  assert.deepEqual(ticked.outputs, { [OUTPUT]: "true" });
+  assert.ok(ticked.stdout.includes(`newly ticked:\n${aDone}`), ticked.stdout);
+
+  const untouched = await runCommand("renovate-tick.ts");
+  assert.deepEqual(untouched.outputs, { [OUTPUT]: "false" });
+  assert.match(untouched.stdout, /no Renovate checkbox was newly ticked — nothing to do/);
 });
