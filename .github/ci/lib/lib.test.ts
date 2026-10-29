@@ -91,6 +91,8 @@ test("alreadyExists is GitHub's 422 already_exists and nothing else", () => {
   assert.equal(alreadyExists(refused(422, { errors: [{ code: "invalid", field: "tag_name" }] })), false);
   assert.equal(alreadyExists(refused(422, { message: "Validation Failed" })), false);
   assert.equal(alreadyExists(refused(500, { errors: [{ code: "already_exists" }] })), false);
+  assert.equal(alreadyExists(refused(422, undefined)), false);
+  assert.equal(alreadyExists(new RequestError("refused", 422, { request: { method: "POST", url: "https://api.github.com/x", headers: {} } })), false);
   assert.equal(alreadyExists(new Error("boom")), false);
 });
 
