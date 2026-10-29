@@ -21,6 +21,7 @@ const cases: [string, boolean, string, string][] = [
   ["a box without a marker", false, "- [ ] a note", "- [x] a note"],
   ["empty before and after", false, "", ""],
   ["a ticked box removed", false, aDone, ""],
+  ["a second copy of a ticked box", true, aDone, body(aDone, aDone)],
   ["CRLF line endings", true, body(aOpen, bOpen).replaceAll("\n", "\r\n"), body(aOpen, bDone).replaceAll("\n", "\r\n")],
 ];
 for (const [name, want, before, after] of cases) {

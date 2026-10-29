@@ -25,6 +25,16 @@ test("a recording shim keeps each argument whole, and answers a reply unrecorded
   }
 });
 
+test("lastCall is the latest of several calls", () => {
+  const tmp = tempDir();
+  try {
+    const record = tmp.write("argv.json", '["first"]\n["second"]\n["third"]\n');
+    assert.deepEqual(lastCall(record), ["third"]);
+  } finally {
+    tmp.cleanup();
+  }
+});
+
 test("lastCall refuses a shim nothing called; calls reads it as no calls", () => {
   assert.deepEqual(calls("/nonexistent/argv.json"), []);
   assert.throws(() => lastCall("/nonexistent/argv.json"), /nothing called the shim/);

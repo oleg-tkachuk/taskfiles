@@ -43,7 +43,7 @@ test("a checksum file is read as kubectl writes it and as kind does, and anythin
   const digest = "a".repeat(64);
   assert.equal(expectedDigest(`${digest}\n`), digest);
   assert.equal(expectedDigest(`${digest}  kind-linux-amd64\n`), digest);
-  assert.throws(() => expectedDigest("<html>Not Found</html>"), /not a sha256 checksum file/);
+  assert.throws(() => expectedDigest("<html>Not Found</html>"), /not a sha256 checksum file: "<html>/);
   assert.throws(() => expectedDigest(""), /not a sha256 checksum file/);
 });
 

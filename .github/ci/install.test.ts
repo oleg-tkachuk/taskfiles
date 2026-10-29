@@ -28,6 +28,10 @@ test("a command that runs too long is stopped", async () => {
   await assert.rejects(runInherited(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { timeoutMs: 200 }), /was stopped/);
 });
 
+test("a command that exits 0 succeeds", async () => {
+  await runInherited(process.execPath, ["-e", "process.exit(0)"]);
+});
+
 test("a command that exits non-zero fails", async () => {
   await assert.rejects(runInherited(process.execPath, ["-e", "process.exit(3)"]), /exited with 3/);
 });

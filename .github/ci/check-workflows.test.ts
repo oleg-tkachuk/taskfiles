@@ -30,6 +30,7 @@ const cases: [string, "clean" | "reported", string, string[], Record<string, str
   ["a command a composite action runs", "clean", "jobs: {}\n", ["install.ts"], { [`${ACTIONS_DIR}/setup/action.yml`]: "runs:\n  using: composite\n  steps:\n    - run: node \"$CHECKOUT/.github/ci/install.ts\"\n      shell: bash\n" }],
   ["a multi-line run in a composite action", "reported", "jobs: {}\n", [], { [`${ACTIONS_DIR}/setup/action.yml`]: "runs:\n  using: composite\n  steps:\n    - run: |\n        a\n        b\n      shell: bash\n" }],
   ["a command the Taskfile runs", "clean", "jobs: {}\n", ["lint-only.ts"], { "Taskfile.yaml": "tasks:\n  x:\n    cmds:\n      - node .github/ci/lint-only.ts .\n" }],
+  ["an empty workflow file", "clean", "", []],
 ];
 for (const [name, want, workflow, commands, extra] of cases) {
   test(name, () => {
@@ -42,6 +43,15 @@ for (const [name, want, workflow, commands, extra] of cases) {
     }
   });
 }
+
+test("a multi-line run is named by its first line", () => {
+  const tmp = fixture("jobs:\n  a:\n    steps:\n      - run: |\n          set -eu\n          echo hi\n", []);
+  try {
+    assert.deepEqual(findings(tmp.dir), [`${WORKFLOWS_DIR}/ci.yml: a multi-line run: belongs in ${CI_DIR}/: set -eu`]);
+  } finally {
+    tmp.cleanup();
+  }
+});
 
 test("isMultiLine ignores trailing newlines", () => {
   assert.equal(isMultiLine("echo hi\n\n"), false);
