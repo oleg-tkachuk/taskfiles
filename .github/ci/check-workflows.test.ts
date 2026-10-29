@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { CI_DIR, WORKFLOWS_DIR, ACTIONS_DIR, commandRefs, findings, isMultiLine } from "./check-workflows.ts";
+import { runCommand } from "./lib/command.ts";
 import { tempDir } from "./lib/temp-dir.ts";
 
 // fixture is a repository with workflow ci.yml and commands in the CI dir.
@@ -60,4 +61,21 @@ test("isMultiLine ignores trailing newlines", () => {
 
 test("commandRefs finds each command a text names", () => {
   assert.deepEqual(commandRefs('node .github/ci/a.ts && node "$X/.github/ci/b-c.ts"'), ["a.ts", "b-c.ts"]);
+});
+
+test("the command fails on a finding, naming each, and passes a clean tree", async () => {
+  const clean = fixture("jobs:\n  a:\n    steps:\n      - run: node .github/ci/smoke.ts\n", ["smoke.ts"]);
+  const broken = fixture("jobs:\n  a:\n    steps:\n      - run: task lint\n", ["orphan.ts"]);
+  try {
+    assert.equal((await runCommand("check-workflows.ts", { args: [clean.dir] })).code, 0);
+
+    // With no root named, the command checks the directory it runs in.
+    const run = await runCommand("check-workflows.ts", { cwd: broken.dir });
+    assert.equal(run.code, 1);
+    assert.ok(run.stdout.includes(`${CI_DIR}/orphan.ts: no workflow step or task runs it`), run.stdout);
+    assert.match(run.stdout, /::error::1 finding\(s\) in the workflows under \.$/m);
+  } finally {
+    clean.cleanup();
+    broken.cleanup();
+  }
 });

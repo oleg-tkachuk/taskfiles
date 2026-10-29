@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { detect, smokeSkippable } from "./changes-detect.ts";
+import { OUTPUT, detect, smokeSkippable } from "./changes-detect.ts";
+import { runCommand } from "./lib/command.ts";
 import { commitAll, initRepo } from "./lib/git.ts";
 import { tempDir } from "./lib/temp-dir.ts";
 
@@ -35,6 +36,32 @@ test("decides on the diff between two commits, and on no base runs everything", 
     assert.equal((await detect(docs, module, tmp.dir)).skippable, false);
     assert.deepEqual(await detect(undefined, module, tmp.dir), { skippable: false, changed: undefined });
     assert.deepEqual(await detect("0000000000000000000000000000000000000000", module, tmp.dir), { skippable: false, changed: undefined });
+  } finally {
+    tmp.cleanup();
+  }
+});
+
+test("the command sets the decision as an output and logs the changed files", async () => {
+  const tmp = tempDir();
+  try {
+    await initRepo(tmp.dir);
+    tmp.write("README.md", "x\n");
+    const base = await commitAll(tmp.dir, "base");
+    tmp.write("README.md", "y\n");
+    const head = await commitAll(tmp.dir, "docs");
+
+    const docs = await runCommand("changes-detect.ts", { cwd: tmp.dir, env: { BASE: base, HEAD: head } });
+    assert.equal(docs.code, 0);
+    assert.deepEqual(docs.outputs, { [OUTPUT]: "true" });
+    assert.match(docs.stdout, /changed files:\nREADME\.md/);
+
+    const noBase = await runCommand("changes-detect.ts", { cwd: tmp.dir, env: { EVENT: "push", HEAD: head } });
+    assert.deepEqual(noBase.outputs, { [OUTPUT]: "false" });
+    assert.match(noBase.stdout, /no usable base for push — running the full matrix/);
+
+    const noHead = await runCommand("changes-detect.ts", { cwd: tmp.dir, env: { BASE: base } });
+    assert.equal(noHead.code, 1);
+    assert.match(noHead.stdout, /::error::HEAD is not set/);
   } finally {
     tmp.cleanup();
   }

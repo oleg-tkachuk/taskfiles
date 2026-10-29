@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { ATTEMPTS, installWithRetries } from "./install.ts";
+import { runCommand } from "./lib/command.ts";
 import { runInherited } from "./lib/spawn.ts";
 
 test("a failed attempt is tried again", async () => {
@@ -34,4 +35,10 @@ test("a command that exits 0 succeeds", async () => {
 
 test("a command that exits non-zero fails", async () => {
   await assert.rejects(runInherited(process.execPath, ["-e", "process.exit(3)"]), /exited with 3/);
+});
+
+test("the command refuses to run with no directory to install", async () => {
+  const run = await runCommand("install.ts");
+  assert.equal(run.code, 1);
+  assert.match(run.stdout, /::error::usage: install\.ts <dir>\.\.\./);
 });
