@@ -8,8 +8,7 @@
   ],
   "extends": [
     "config:recommended",
-    ":semanticCommits",
-    ":dependencyDashboard"
+    ":semanticCommits"
   ],
   "timezone": "Europe/Kyiv",
   "schedule": ["* * * * 1"],
@@ -39,22 +38,19 @@
 
   "packageRules": [
     {
-      "description": "Actions are pinned to commit shas with a version comment; Renovate maintains both. Scoped to depType `action` — the `uses:` reference — because the same manager also reports a step's inputs (`node-version:`) as dependencies, and a version input has no digest to pin. A release waits three days before it merges itself: the same actions run in release.yml holding a write token, which no pull request check exercises, and a compromised tag is usually caught and pulled within that time.",
+      "description": "Everything in a workflow or action file: a `uses:` reference, or a step input such as setup-node's `node-version:`. No input is pinned today — Node is pinned in .github/ci/.node-version, which the ci scripts rule covers.",
+      "matchManagers": ["github-actions"],
+      "semanticCommitType": "ci",
+      "semanticCommitScope": "actions"
+    },
+    {
+      "description": "The `uses:` references — depType `action`, because a version input has no digest to pin — are pinned to commit shas with a version comment; Renovate maintains both. A release waits three days before it merges itself: the same actions run in release.yml holding a write token, which no pull request check exercises, and a compromised tag is usually caught and pulled within that time. The wait is the renovate/stability-days status Renovate posts on the branch, which is why the token needs `Commit statuses: write`: without it the post fails and Renovate abandons the whole run.",
       "matchManagers": ["github-actions"],
       "matchDepTypes": ["action"],
       "minimumReleaseAge": "3 days",
       "pinDigests": true,
       "groupName": "github actions",
-      "semanticCommitType": "ci",
-      "semanticCommitScope": "actions",
       "automerge": true
-    },
-    {
-      "description": "A step input such as setup-node's `node-version:`. None is in use: Node is pinned in .github/ci/.node-version, which the rule below covers.",
-      "matchManagers": ["github-actions"],
-      "matchDepTypes": ["uses-with"],
-      "semanticCommitType": "ci",
-      "semanticCommitScope": "actions"
     },
     {
       "description": "Task, zizmor and the tools the contracts run against: they change what the checks are, never what a consumer fetches. zizmor merges itself: Workflow audit runs the new version on the pull request. So do trivy, hadolint, gitleaks, checkov, kind and kubectl: Tool contracts runs the gates at the new version on the pull request.",
@@ -69,8 +65,8 @@
       "automerge": false
     },
     {
-      "description": "semantic-release and its plugins move together; a preset ahead of the analyzer it plugs into is the usual way a release run breaks. They run only in release.yml after a merge, so nothing on the pull request proves them.",
-      "matchManagers": ["npm"],
+      "description": "semantic-release and its plugins, in the root package.json, move together; a preset ahead of the analyzer it plugs into is the usual way a release run breaks. They run only in release.yml after a merge, so nothing on the pull request proves them.",
+      "matchFileNames": ["package.json"],
       "groupName": "release tooling",
       "semanticCommitType": "build",
       "semanticCommitScope": "release"
