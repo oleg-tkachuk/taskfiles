@@ -24,6 +24,12 @@ Create a fine-grained personal access token scoped to this repository with:
   Pull requests   read and write
   Issues          read and write   (the Dependency Dashboard)
   Workflows       read and write   (to bump pinned actions and tool versions)
+  Commit statuses read and write   (renovate/stability-days, renovate/artifacts)
+
+Without \`Commit statuses\` the run looks green and does nothing: the first
+status Renovate posts, on a branch whose release is younger than
+minimumReleaseAge, fails with 403, and Renovate abandons the whole repository
+as "changed during renovation" — no pull requests, no dashboard update.
 
 Not \`Dependabot alerts\`: .github/renovate.json turns vulnerabilityAlerts off.
 Granting it and turning them on is one change, not two.
