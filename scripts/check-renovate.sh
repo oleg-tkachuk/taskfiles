@@ -23,6 +23,9 @@ ANNOTATION='# renovate:'
 # The job-level condition that keeps an issue event from anyone but the
 # dashboard's real author from starting a run holding the token.
 AUTHOR_CHECK='github.event.issue.user.login == github.repository_owner'
+# Renovate's exitCodeForErrors: without it a repository-changed or other
+# abandoned run exits 0.
+EXIT_CODE_VAR=RENOVATE_EXIT_CODE_FOR_ERRORS
 # A pin no built-in manager sees: a *_VERSION key, or a `uvx tool@x`.
 PIN_RE='^[[:space:]]*[A-Z0-9_]+_VERSION:[[:space:]]*[0-9]|uvx [^[:space:]]+@'
 
@@ -77,6 +80,11 @@ done < <(json '.. | select(tag == "!!map" and has("postUpgradeTasks")) | .postUp
 # ─── an issue event still has to come from the dashboard's author ───────────
 yq '.jobs[].if // ""' "$WORKFLOW" | grep -qF "$AUTHOR_CHECK" \
   || report "$WORKFLOW: no job checks '$AUTHOR_CHECK' — any issue titled Dependency Dashboard could start a run"
+
+# ─── a run that abandons the repository still fails the job ─────────────────
+exit_code=$(yq ".jobs[].steps[] | select(.uses // \"\" | test(\"^renovatebot/github-action@\")) | .env.$EXIT_CODE_VAR // \"\"" "$WORKFLOW")
+[ "$exit_code" = true ] \
+  || report "$WORKFLOW: $EXIT_CODE_VAR is not 'true' — an aborted run would exit 0 and leave the workflow green"
 
 # ─── Renovate's labels keep its pull requests out of the release notes ──────
 excluded=$(yq '.changelog.exclude.labels[]' "$RELEASE_NOTES")

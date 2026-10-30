@@ -51,6 +51,10 @@ expect reported command-not-allowed \
 expect clean    command-allowed \
   'yq -i -p json -o json ".packageRules[0].postUpgradeTasks.commands = [\"bash regen.sh\"]" .github/renovate.json &&
    perl -0pi -e "s/RENOVATE_ALLOWED_COMMANDS: \x27\[\]\x27/RENOVATE_ALLOWED_COMMANDS: \x27[\"^bash regen\\\\\\\\.sh\\$\"]\x27/" .github/workflows/renovate.yml'
+expect reported exit-code-dropped \
+  'perl -0pi -e "s/\n\s+RENOVATE_EXIT_CODE_FOR_ERRORS: [^\n]*//" .github/workflows/renovate.yml'
+expect reported exit-code-off \
+  'perl -0pi -e "s/(RENOVATE_EXIT_CODE_FOR_ERRORS: )[^\n]*/\$1\x27false\x27/" .github/workflows/renovate.yml'
 expect reported label-in-release-notes \
   'yq -i ".changelog.exclude.labels -= [\"dependencies\"]" .github/release.yml'
 

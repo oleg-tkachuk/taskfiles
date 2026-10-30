@@ -112,5 +112,10 @@ jobs:
           # A manual run means now. Without this, dispatching on a Thursday
           # does nothing and looks broken.
           RENOVATE_FORCE: ${{ (github.event_name == 'workflow_dispatch' && inputs.ignoreSchedule) && '{"schedule":null}' || '' }}
+          # A run that abandons the repository fails the job. Renovate logs
+          # such a result at info and exits 0 by default, so a token missing
+          # a permission left the workflow green while doing nothing for days.
+          # scripts/check-renovate.sh keeps this set.
+          RENOVATE_EXIT_CODE_FOR_ERRORS: 'true'
         with:
           token: ${{ secrets.RENOVATE_TOKEN }}
