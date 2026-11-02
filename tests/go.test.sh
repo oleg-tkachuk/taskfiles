@@ -54,6 +54,15 @@ if [ -e "$pwned" ]; then fail "bench: a \$( ) in BENCH ran"; else pass "bench: a
 expect_call "go|test|-tags=integration|-run=^\$|-bench=Foo|$payload|-benchtime=1x|./...|" "bench: the pattern reaches go as one argument"
 
 reset_calls
+run_task go:test:integration
+expect_call "go|test|-race|-timeout=10m|-tags=integration|./...|" "integration: go test's own timeout by default"
+
+reset_calls
+run_task go:test:integration "GO_TEST_TIMEOUT=20m $payload"
+if [ -e "$pwned" ]; then fail "timeout: a \$( ) in GO_TEST_TIMEOUT ran"; else pass "timeout: a \$( ) in GO_TEST_TIMEOUT does not run"; fi
+expect_call "go|test|-race|-timeout=20m $payload|-tags=integration|./...|" "integration: GO_TEST_TIMEOUT reaches go as one argument"
+
+reset_calls
 run_task go:test:coverage "GO_TEST_FLAGS=-p 1"
 expect_call "go|test|-p|1|-coverprofile=coverage/cover.out|./...|" "coverage: the unit run's GO_TEST_FLAGS apply"
 
