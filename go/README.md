@@ -51,6 +51,7 @@ workspace — tasks then read `go:<task>`.
 | `GO_BENCH_FLAGS` | `-benchtime=1x` | flags for the benchmark run |
 | `GO_TEST_TAGS` | `integration` | for the tagged suites |
 | `GO_TEST_TIMEOUT` | `10m` | `go test -timeout` for `test:integration`: a hang still fails, load need not |
+| `GO_TEST_JSON` | — | where `test:integration` writes `go test -json`'s stream, for a consumer to read each package's result and time; needs gotestsum |
 | `GOWORK` | `off` | `auto` to build through the workspace (an empty value keeps `off`) |
 
 The `*_FLAGS` inputs are shell: they are word-split and parsed as written.
