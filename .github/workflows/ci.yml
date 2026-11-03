@@ -84,7 +84,7 @@ jobs:
         # Pinned like everything else, and --persona=auditor so this is the
         # strict run rather than the default one.
         # renovate: datasource=pypi depName=zizmor
-        run: uvx zizmor@1.31.1 --persona=auditor --format=plain .github/workflows/ .github/actions/
+        run: uvx zizmor@1.32.0 --persona=auditor --format=plain .github/workflows/ .github/actions/
 
   # Feeds consumer-smoke's `if:` below. That job proves the Task modules work
   # for a real consumer; it never reads a README and never runs a workflow
