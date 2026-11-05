@@ -168,7 +168,7 @@ jobs:
     env:
       # One official image per tool, wrapped onto PATH by contract-tools.ts.
       # renovate: datasource=docker depName=aquasec/trivy
-      TRIVY_VERSION: 0.76.1
+      TRIVY_VERSION: 0.76.2
       # renovate: datasource=docker depName=hadolint/hadolint
       HADOLINT_VERSION: v2.15.1
       # renovate: datasource=docker depName=zricethezav/gitleaks
