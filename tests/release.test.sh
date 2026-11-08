@@ -176,6 +176,16 @@ run_task release:doctor
 expect_output "no git history" "doctor: a tree with no commit has no git history"
 expect_output "did not answer" "doctor: a registry that answers neither scheme did not answer"
 
+# An exclude that matches the version-tag prefix drops every version tag.
+consumer release release "{ PROJECT_NAME: app, VERSION_TAG_PREFIX: release/v, VERSION_TAG_EXCLUDE: '*/*' }"
+run_task release:doctor
+expect_output "drops every version tag" "doctor: an exclude that matches the tag prefix is reported"
+# The exclude reaches a shell `case` to be matched as a glob, never run.
+x=$(payload pwned-exclude)
+consumer release release "{ PROJECT_NAME: app, VERSION_TAG_EXCLUDE: '$x' }"
+run_task release:version
+expect_inert pwned-exclude "VERSION_TAG_EXCLUDE is not run as shell"
+
 # A plain-HTTP registry, as the default localhost:5000 one is, answers too.
 shim curl 'case "$*" in *https://*) printf 000 ;; *) printf 200 ;; esac'
 run_task release:doctor

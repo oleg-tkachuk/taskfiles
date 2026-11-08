@@ -65,6 +65,7 @@ workspace — tasks then read `release:<task>`.
 | `INFO_ENV_FILE` | `./deploy/info.env` | where the build metadata is written |
 | `VERSION_BASE` | the latest version tag, one patch up (a pre-release tag itself); `0.1.0` with none | base for untagged builds — set it to choose the base yourself |
 | `VERSION_TAG_EXCLUDE` | — | tag glob to keep out of the version, e.g. `api/*` |
+| `VERSION_TAG_PREFIX` | `v` | what a version tag starts with. The default reads `v1.2.3` and a bare `1.2.3`; any other prefix, e.g. `release/v`, reads its own tags alone — for a numbering restarted under a new prefix. An exclude that matches the prefix drops every version tag, so `version` and `doctor` refuse it |
 | `APP_VERSION` | — | pin the version outright, skipping git derivation |
 | `TIMEZONE` | `UTC` | zone of the build timestamp |
 | `K8S_NAMESPACE` | `default` | the namespace the chart renders against |
@@ -141,8 +142,9 @@ dirty tree             →  <base>-dev.<committer-ts>.dirty.<now>.g<sha>
 `<base>` is `VERSION_BASE` when set. Otherwise it is the newest version tag
 the commit descends from, one patch up — after `v1.2.0`, builds are
 `1.2.1-dev.…`, so every build after a release sorts above it. Tags that do not
-start with a version are passed over, `VERSION_TAG_EXCLUDE` still applies, and
-with no version tag at all the base is `0.1.0`.
+start with a version — after `VERSION_TAG_PREFIX`, when it is set — are passed
+over, `VERSION_TAG_EXCLUDE` still applies, and with no version tag at all the
+base is `0.1.0`.
 
 After a pre-release tag the build extends that pre-release instead:
 
