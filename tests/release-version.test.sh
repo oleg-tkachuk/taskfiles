@@ -113,6 +113,40 @@ dirty=$(version)
 repo checkout -q -- log
 expect_before "$dirty" "$clean" "after v1.2.0: the clean build of a commit outranks its dirty one"
 
+# ─── VERSION_TAG_PREFIX ──────────────────────────────────────────────────────
+# A repository that restarts its numbering under a new prefix keeps its old,
+# higher tags in history: under the new prefix they are not versions, nor is
+# a bare number, wherever they sit.
+rm -rf "$CONSUMER/.git"
+repo init -q
+repo config user.email test@example.invalid
+repo config user.name test
+commit before-restart
+repo tag v42.1.0
+commit restart
+repo tag release/v0.1.0
+readonly PREFIX=VERSION_TAG_PREFIX=release/v
+expect_version '0.1.0' "a prefix: on its tag, clean: the tag" "$PREFIX"
+expect_version '42.1.1-dev.*.g*' "no prefix: the v tags, as before"
+
+commit after-restart
+expect_version '0.1.1-dev.*.g*' "a prefix: one patch above its last tag, not the older v tag" "$PREFIX"
+repo tag v43.0.0
+repo tag 9.9.9
+expect_version '0.1.1-dev.*.g*' "a prefix: a v tag or a bare number on HEAD is no version" "$PREFIX"
+
+commit candidate
+repo tag release/v0.2.0-rc.1
+commit after-candidate
+expect_version '0.2.0-rc.1.dev.*.g*' "a prefix: after its pre-release tag, that pre-release extended" "$PREFIX"
+
+# An exclude that matches the prefix drops every version tag; it is refused
+# rather than left to publish dev builds forever.
+run_task release:version "$PREFIX" 'VERSION_TAG_EXCLUDE=*/*'
+expect_status fail "a prefix the exclude matches: version refuses"
+expect_output "drops every version tag" "a prefix the exclude matches: version says why"
+expect_version '0.2.0-rc.1.dev.*.g*' "a prefix the exclude does not match: unaffected" "$PREFIX" 'VERSION_TAG_EXCLUDE=api/*'
+
 # ─── BUILD_KIND ──────────────────────────────────────────────────────────────
 # What kind of build a version is, said outright in the info file, so nothing
 # downstream has to recognise it from the version's shape. Written under
