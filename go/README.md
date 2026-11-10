@@ -28,6 +28,8 @@ workspace — tasks then read `go:<task>`.
 | `lint` | golangci-lint over the module |
 | `test` | Run the unit suite |
 | `tidy` | go mod tidy the way CI resolves the module — standalone |
+| `tidy:check` | Fail if go mod tidy would change go.mod or go.sum — the CI-safe half of tidy |
+| `fix:check` | Fail if go fix would change any file — code still written for an older Go |
 | `vuln` | govulncheck — vulnerabilities this module's code actually reaches |
 | `deps:outdated` | List dependencies with a newer version available (read-only) |
 | `deps:update` | Bump dependencies to the latest minor/patch, tidy, then prove it still builds |
@@ -47,6 +49,7 @@ workspace — tasks then read `go:<task>`.
 | `GO_TEST_FLAGS` | `-race -short` | flags for the unit run |
 | `GO_BUILD_FLAGS` | — | extra `go build` flags, e.g. `-ldflags` |
 | `GOLANGCI_FLAGS` | — | extra golangci-lint flags |
+| `GO_FIX_FLAGS` | — | extra `go fix` flags for `fix:check`, e.g. `-any=false` to switch an analyzer off |
 | `GO_TOOL_MODFILE` | — | a `go.mod` whose `tool` directives pin the tools, when they are not in this module's own |
 | `GO_FMT_GOIMPORTS` | runs it when it is found | `1`: `fmt` needs goimports and fails without it; `0`: `fmt` never runs it |
 | `GO_BENCH_PKG` | `GO_PKG` | packages to benchmark, space-separated like `GO_PKG` |
@@ -89,6 +92,14 @@ A build-tagged suite is invisible to the normal gate: it does not compile, it
 does not run, and nothing notices it has rotted until someone needs it. `go vet`
 with the tag takes seconds and catches exactly that — put it in the commit gate
 next to `test`.
+
+## Gates that change nothing
+
+`fmt`, `tidy` and `go fix` rewrite files, which is right on a laptop and wrong
+in CI: a step that fixes the drift and exits 0 hides it. Each has a half that
+only reports — `fmt:check`, `tidy:check`, `fix:check` — and fails with the
+diff. `tidy:check` needs Go 1.23 for `go mod tidy -diff`, `fix:check` Go 1.26
+for `go fix -diff`; an older go fails on the flag, and says so.
 
 ## gotestsum when there is one, `go test` when there is not
 
