@@ -26,6 +26,8 @@ version: "3"
 #   GO_TEST_TIMEOUT  go test's -timeout for test:integration (default 10m)
 #   GO_TEST_JSON     where test:integration writes go test -json's stream,
 #                    for a consumer to read; needs gotestsum  (default none)
+#   GO_FIX_FLAGS     extra `go fix` flags for fix:check, e.g. to switch an
+#                    analyzer off
 #   GO_BENCH_PKG     packages to benchmark              (default GO_PKG)
 #   GO_BENCH_FLAGS   default "-benchtime=1x"
 #   GOWORK           "auto" to build through a go.work workspace
@@ -44,6 +46,7 @@ version: "3"
 # version on every machine and in CI; PATH is whatever was installed last.
 # ─────────────────────────────────────────────────────────────────────────────
 # shell-verbatim: _GO_TEST_FLAGS GO_TEST_FLAGS _GO_BUILD_FLAGS GO_BUILD_FLAGS _GO_LINT_FLAGS GOLANGCI_FLAGS
+# shell-verbatim: _GO_FIX_FLAGS GO_FIX_FLAGS
 # shell-verbatim: _GO_BENCH_FLAGS GO_BENCH_FLAGS _GO_PKGS _GO_MAINS _GO_BENCH_PKGS _GO_TOOLS
 
 silent: true
@@ -56,6 +59,7 @@ vars:
   _GO_TEST_FLAGS: '{{.GO_TEST_FLAGS | default "-race -short"}}'
   _GO_BUILD_FLAGS: '{{.GO_BUILD_FLAGS | default ""}}'
   _GO_LINT_FLAGS: '{{.GOLANGCI_FLAGS | default ""}}'
+  _GO_FIX_FLAGS: '{{.GO_FIX_FLAGS | default ""}}'
   _GO_TAGS: '{{.GO_TEST_TAGS | default "integration"}}'
   # go test's own default, named: a suite that starts containers per test
   # can need more under load, and a hang must still fail.
@@ -247,6 +251,36 @@ tasks:
     cmds:
       - go mod tidy
       - printf '%s %s · go · go.mod tidy\n' "{{._GO_OK}}" {{._GO_NAME | q}}
+
+  tidy:check:
+    desc: "Fail if go mod tidy would change go.mod or go.sum — the CI-safe half of tidy"
+    # `tidy` rewrites both files, which a gate must not: a step that fixes the
+    # drift and exits 0 hides it. -diff prints what tidy would do and changes
+    # nothing; it needs Go 1.23, and an older go fails here on the flag.
+    cmds:
+      - cmd: |-
+          set -eu
+          if ! diff=$(go mod tidy -diff 2>&1); then
+            printf '%s %s · go · go.mod is not tidy — run tidy:\n' "{{._GO_ERR}}" {{._GO_NAME | q}} >&2
+            printf '%s\n' "$diff" >&2
+            exit 1
+          fi
+          printf '%s %s · go · go.mod tidy\n' "{{._GO_OK}}" {{._GO_NAME | q}}
+
+  fix:check:
+    desc: "Fail if go fix would change any file — code still written for an older Go"
+    # go fix rewrites code to what the module's go version offers. -diff
+    # prints the rewrite and changes nothing; it needs Go 1.26, and an older
+    # go fails here on the flag.
+    cmds:
+      - cmd: |-
+          set -eu
+          if ! diff=$(go fix -diff {{._GO_FIX_FLAGS}} {{._GO_PKGS}} 2>&1); then
+            printf '%s %s · go · go fix would change files — run go fix:\n' "{{._GO_ERR}}" {{._GO_NAME | q}} >&2
+            printf '%s\n' "$diff" >&2
+            exit 1
+          fi
+          printf '%s %s · go · nothing for go fix to change\n' "{{._GO_OK}}" {{._GO_NAME | q}}
 
   vuln:
     desc: "govulncheck — vulnerabilities this module's code actually reaches"

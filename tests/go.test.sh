@@ -6,7 +6,10 @@ source "$(dirname "$0")/lib.sh"
 
 # argv joined with "|", so one argument and two read differently.
 argv='printf "%s|" "$0" "$@" >> "$CALLS"; printf "\n" >> "$CALLS"'
-shim_go
+# DRIFT names the go subcommand whose -diff has something to report.
+export DRIFT="$WORK/drift"
+# shellcheck disable=SC2016 # the shim's own $1, written literally
+shim_go 'if [ -e "$DRIFT" ] && [ "$(cat "$DRIFT")" = "$1" ]; then printf "%s\n" "-old" "+new"; exit 1; fi'
 shim gotestsum "${argv/\$0/gotestsum}"
 shim golangci-lint "${argv/\$0/golangci-lint}"
 
@@ -78,6 +81,28 @@ reset_calls
 PATH="$BIN:/usr/bin:/bin" run_task go:test:integration
 expect_call "go|test|-race|-timeout=10m|-tags=integration|./...|" "integration: without gotestsum and GO_TEST_JSON, go test runs"
 mv "$WORK/gotestsum.off" "$BIN/gotestsum"
+
+# ─── gates that change nothing ───────────────────────────────────────────────
+reset_calls
+run_task go:tidy:check
+expect_status ok "tidy:check: a tidy module passes"
+expect_call "go|mod|tidy|-diff|" "tidy:check: asks go for the diff, not the rewrite"
+printf mod > "$DRIFT"
+run_task go:tidy:check
+expect_status fail "tidy:check: a module tidy would change fails"
+expect_output "go.mod is not tidy" "tidy:check: says go.mod is not tidy"
+expect_output "+new" "tidy:check: shows what tidy would change"
+
+reset_calls
+run_task go:fix:check "GO_PKG=./a/... ./b/..." "GO_FIX_FLAGS=-any=false -minmax=false"
+expect_status ok "fix:check: code go fix leaves alone passes"
+expect_call "go|fix|-diff|-any=false|-minmax=false|./a/...|./b/...|" "fix:check: flags and packages split, and nothing is rewritten"
+printf fix > "$DRIFT"
+run_task go:fix:check
+expect_status fail "fix:check: code go fix would change fails"
+expect_output "go fix would change files" "fix:check: says go fix would change files"
+expect_output "+new" "fix:check: shows the rewrite"
+rm -f "$DRIFT"
 
 # ─── tools: the pinned one first, PATH's after it ────────────────────────────
 # PATH holds the shims and the system's tools alone from here on, so a tool
