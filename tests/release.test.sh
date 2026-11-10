@@ -157,6 +157,60 @@ if [ -e "$digest_file" ]; then fail "image:push: a digest file was written anywa
 shim docker "$ARGV"'
 case "$1 $2" in "image inspect") exit 1 ;; esac'
 
+# ─── image:scan, and deploy's IMAGE_SCAN ──────────────────────────────────────
+# The image is in the local store again; helm renders one resource, enough for
+# chart:verify to pass on the way to the push.
+shim docker "$ARGV
+$DIGESTS"
+shim helm 'case "$1" in template) printf "kind: Deployment\n" ;; esac'
+shim kubeconform ':'
+shim trivy "$ARGV"
+consumer release release "{ PROJECT_NAME: app, APP_VERSION: $VERSION, TRIVY_IMAGE_FLAGS: '--severity HIGH,CRITICAL --exit-code 0' }"
+
+reset_calls
+run_task release:image:scan
+expect_status ok "image:scan: a clean image passes"
+expect_call "[image][--quiet][--severity][HIGH,CRITICAL][--exit-code][0][--exit-code][1][localhost:5000/app:$VERSION]" "image:scan: flags split, the gate's exit code last, the image one argument"
+
+# line_of <fixed string> — the first line of the call log holding it.
+line_of() { grep -nF -- "$1" "$CALLS" | head -1 | cut -d: -f1; }
+
+reset_calls
+run_task release:deploy
+expect_status ok "deploy: runs without IMAGE_SCAN"
+refute_call "trivy" "deploy: no scan unless IMAGE_SCAN asks for one"
+expect_call "docker push localhost:5000/app:$VERSION" "deploy: pushes the image"
+
+reset_calls
+run_task release:deploy IMAGE_SCAN=1
+expect_status ok "deploy: runs with IMAGE_SCAN=1"
+scan=$(line_of "trivy image") push=$(line_of "docker push")
+if [ -n "$scan" ] && [ -n "$push" ] && [ "$scan" -lt "$push" ]; then pass "deploy: the image is scanned before it is pushed"; else fail "deploy: scan at line '$scan', push at line '$push'"; fi
+
+shim trivy 'exit 1'
+reset_calls
+run_task release:deploy IMAGE_SCAN=1
+expect_status fail "deploy: a finding in the image fails the deploy"
+refute_call "docker push" "deploy: an image with a finding is not pushed"
+refute_call "helm push" "deploy: nor is its chart"
+
+shim trivy "$ARGV"
+reset_calls
+run_task release:deploy IMAGE_SCAN=true
+expect_status fail "deploy: IMAGE_SCAN=true is refused"
+expect_output "IMAGE_SCAN is true" "deploy: the refusal names the value"
+refute_call "docker push" "deploy: nothing is pushed on a refused IMAGE_SCAN"
+
+mv "$BIN/trivy" "$WORK/"
+ln -sf "$(command -v task)" "$BIN/task"
+PATH="$BIN:/usr/bin:/bin" run_task release:image:scan
+expect_status fail "image:scan: no trivy fails"
+expect_output "trivy is not installed" "image:scan: says trivy is not installed"
+rm -f "$BIN/task"
+shim docker "$ARGV"'
+case "$1 $2" in "image inspect") exit 1 ;; esac'
+shim helm "$ARGV"
+
 # ─── doctor ───────────────────────────────────────────────────────────────────
 # Its exit status is not the point here: the payload registry never answers.
 p=$(payload pwned-chart)
