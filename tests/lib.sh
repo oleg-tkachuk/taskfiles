@@ -111,12 +111,12 @@ reset_calls() { : > "$CALLS"; }
 PINNED="$WORK/pinned"
 export PINNED
 
-# shim_go — a `go` that logs its argv joined with "|", and answers
+# shim_go [script] — a `go` that logs its argv joined with "|", and answers
 # `go tool [-modfile=…] -n <name>` the way go does: with success only for a
-# tool pin_tools named.
+# tool pin_tools named. <script> runs first, for a test that logs more.
 shim_go() {
   # shellcheck disable=SC2016 # the shim's own $@, written literally
-  shim go '
+  shim go "${1-}"'
 printf "%s|" go "$@" >> "$CALLS"; printf "\n" >> "$CALLS"
 [ "${1-}" = tool ] || exit 0
 shift

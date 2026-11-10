@@ -31,6 +31,9 @@ version: "3"
 #   CODEGEN_BIN_DIR   where those plugins land            (default ./bin)
 #   GENERATED_DIRS    directories to normalise with goimports after generating
 #   SQLC_MODULE       run sqlc through `go run <module>` instead of from PATH
+#   GO_TOOL_MODFILE   a go.mod whose `tool` directives pin buf, sqlc and
+#                     goimports, when they are not in this module's own
+#                                                           (default none)
 #   MOCKS_PATHSPEC    git pathspec the mock gate watches   (default internal)
 #   PROTO_PATHSPEC    git pathspec the proto gate watches, when the `out:`
 #                     paths in the templates are not the right answer
@@ -65,8 +68,14 @@ version: "3"
 # hook commits the other, so the drift gate reports files stale on a tree that
 # was just generated — the gate failing against its own generator. Normalising
 # here is what makes generation idempotent.
+#
+# buf, sqlc and goimports are each found the same way: the one a `tool`
+# directive pins — in this module's go.mod, or in GO_TOOL_MODFILE — and only
+# then the one on PATH. A generator a version apart rewrites every file it
+# owns, and a goimports a version apart fails the drift gate on a tree that
+# was just generated. The go and security modules follow the same rule.
 # ─────────────────────────────────────────────────────────────────────────────
-# shell-verbatim: _CG_GEN_CMD GENERATE_CMD _CG_BUF_PATH PROTO_PATH _CG_BUF_FLAGS BUF_FLAGS _CG_SQLC_FLAGS SQLC_FLAGS _CG_GOIMPORTS_FLAGS GOIMPORTS_FLAGS _CG_PATHS_Q
+# shell-verbatim: _CG_GEN_CMD GENERATE_CMD _CG_BUF_PATH PROTO_PATH _CG_BUF_FLAGS BUF_FLAGS _CG_SQLC_FLAGS SQLC_FLAGS _CG_GOIMPORTS_FLAGS GOIMPORTS_FLAGS _CG_PATHS_Q _CG_TOOLS
 
 silent: true
 
@@ -96,6 +105,7 @@ vars:
   _CG_BUF_FLAGS: '{{.BUF_FLAGS | default ""}}'
   _CG_SQLC_FLAGS: '{{.SQLC_FLAGS | default ""}}'
   _CG_GOIMPORTS_FLAGS: '{{.GOIMPORTS_FLAGS | default ""}}'
+  _CG_TOOL_MOD: '{{.GO_TOOL_MODFILE | default ""}}'
   # Where the checks keep the working tree's state from before they
   # regenerate. Under .task/, which Task itself owns and repositories ignore.
   _CG_SNAP_DIR: .task/codegen
@@ -112,6 +122,21 @@ vars:
       if (index(v, "\"") == 1 || index(v, q) == 1) { v = substr(v, 2, length(v) - 2) }
       if (v != "") { print v }
     }
+  # The shell every task that calls a tool starts with. have_tool says whether
+  # a tool can be run at all; run_tool runs the pinned one, else PATH's.
+  # A GO_TOOL_MODFILE that is not there is refused here: `go tool -n` fails on
+  # it the way it does on a tool nobody pinned, and the run would carry on
+  # with whatever PATH holds — the pin gone, and nothing saying so.
+  _CG_TOOLS: |-
+    go_tool() { go tool{{if ._CG_TOOL_MOD}} -modfile={{._CG_TOOL_MOD | q}}{{end}} "$@"; }
+    have_tool() { go_tool -n "$1" >/dev/null 2>&1 || command -v "$1" >/dev/null 2>&1; }
+    run_tool() {
+      if go_tool -n "$1" >/dev/null 2>&1; then go_tool "$@"; else "$@"; fi
+    }
+    {{if ._CG_TOOL_MOD}}if [ ! -f {{._CG_TOOL_MOD | q}} ]; then
+      printf '%s %s · gen · GO_TOOL_MODFILE names %s, which does not exist\n' "{{._CG_ERR}}" {{._CG_NAME | q}} {{._CG_TOOL_MOD | q}} >&2
+      exit 1
+    fi{{end}}
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _CG_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -165,8 +190,6 @@ tasks:
   proto:
     desc: "Regenerate the protobuf and RPC stubs"
     preconditions:
-      - sh: command -v buf >/dev/null
-        msg: "buf is not installed — https://buf.build/docs/installation/"
       - sh: '{{range $f := ._CG_BUF_TPL}}test -f {{$f | q}} && {{end}}true'
         msg: 'one of {{._CG_BUF_TPL | join ", "}} is missing — check BUF_TEMPLATE'
       # A generator whose output path is relative to the working directory
@@ -196,7 +219,12 @@ tasks:
           go install {{range (splitList " " ._CG_PLUGINS | compact)}}{{q .}} {{end}}
           {{end}}
           {{if ._CG_BUF_PATH}}export PATH="{{._CG_BUF_PATH}}:$PATH"{{end}}
-          buf generate {{._CG_BUF_FLAGS}} {{if ._CG_BUF_IN}}{{._CG_BUF_IN | q}}{{end}} --template {{.ITEM | q}}
+          {{._CG_TOOLS}}
+          if ! have_tool buf; then
+            printf '%s %s · gen · buf is not installed — https://buf.build/docs/installation/\n' "{{._CG_ERR}}" {{._CG_NAME | q}} >&2
+            exit 1
+          fi
+          run_tool buf generate {{._CG_BUF_FLAGS}} {{if ._CG_BUF_IN}}{{._CG_BUF_IN | q}}{{end}} --template {{.ITEM | q}}
       - task: _normalise
 
   generate:
@@ -217,18 +245,24 @@ tasks:
       # is left as sqlc wrote it.
       _CG_SQLC_OUT:
         sh: awk {{._CG_OUT_AWK | q}} sqlc.yaml sqlc.yml 2>/dev/null | sort -u | tr '\n' ' '
-    preconditions:
-      - sh: '{{if ._CG_SQLC_MOD}}true{{else}}command -v sqlc >/dev/null{{end}}'
-        msg: "sqlc is not installed — https://docs.sqlc.dev/en/latest/overview/install.html, or set SQLC_MODULE to run it through `go run`"
     cmds:
-      - '{{if ._CG_SQLC_MOD}}go run {{._CG_SQLC_MOD | q}} generate{{else}}sqlc generate{{end}} {{._CG_SQLC_FLAGS}}'
+      # SQLC_MODULE first: it names a version outright. Without it, the pinned
+      # sqlc, then PATH's.
+      - cmd: |-
+          {{._CG_TOOLS}}
+          {{if ._CG_SQLC_MOD}}go run {{._CG_SQLC_MOD | q}} generate {{._CG_SQLC_FLAGS}}{{else}}if ! have_tool sqlc; then
+            printf '%s %s · gen · sqlc is not installed — https://docs.sqlc.dev/en/latest/overview/install.html, or set SQLC_MODULE to run it through `go run`\n' "{{._CG_ERR}}" {{._CG_NAME | q}} >&2
+            exit 1
+          fi
+          run_tool sqlc generate {{._CG_SQLC_FLAGS}}{{end}}
       # Normalised like every other generator's output (see _normalise): sqlc
       # writes one import block where goimports writes two, so a commit hook
       # running goimports made sqlc:check fail on a tree just generated.
       - cmd: |-
           {{if ._CG_SQLC_OUT}}
-          if command -v goimports >/dev/null 2>&1; then
-            goimports {{._CG_GOIMPORTS_FLAGS}} -w {{range (splitList " " ._CG_SQLC_OUT | compact)}}{{q .}} {{end}}
+          {{._CG_TOOLS}}
+          if have_tool goimports; then
+            run_tool goimports {{._CG_GOIMPORTS_FLAGS}} -w {{range (splitList " " ._CG_SQLC_OUT | compact)}}{{q .}} {{end}}
           fi
           {{end}}
 
@@ -403,6 +437,7 @@ tasks:
       - '{{if ._CG_DIRS}}false{{else}}true{{end}}'
     cmds:
       - cmd: |-
-          if command -v goimports >/dev/null 2>&1; then
-            goimports {{._CG_GOIMPORTS_FLAGS}} -w {{range $d := ._CG_DIRS}}{{$d | q}} {{end}}
+          {{._CG_TOOLS}}
+          if have_tool goimports; then
+            run_tool goimports {{._CG_GOIMPORTS_FLAGS}} -w {{range $d := ._CG_DIRS}}{{$d | q}} {{end}}
           fi

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # codegen: GOWORK is off unless a consumer names "auto" — an empty value cannot
-# opt in, `default` reads it as unset.
+# opt in, `default` reads it as unset. buf, sqlc and goimports are each the
+# pinned one before PATH's.
 source "$(dirname "$0")/lib.sh"
 
-shim go 'printf "go GOWORK=[%s]\n" "${GOWORK-unset}" >> "$CALLS"'
+# shellcheck disable=SC2016 # the shim's own GOWORK, written literally
+shim_go 'printf "go GOWORK=[%s]\n" "${GOWORK-unset}" >> "$CALLS"'
 # _normalise formats what generation wrote; nothing here needs formatting.
 shim goimports ':'
 shim gofmt ':'
@@ -75,6 +77,63 @@ reset_calls
 run_task codegen:sqlc
 expect_status ok "sqlc: generates without a sqlc.yaml it can read"
 refute_call "goimports" "sqlc: no out: path, nothing to normalise"
+
+# ─── tools: the pinned one first, PATH's after it ────────────────────────────
+# PATH holds the shims and the system's tools alone, so a tool installed on
+# this machine is not found.
+ln -sf "$(command -v task)" "$BIN/task"
+only_shims() { PATH="$BIN:/usr/bin:/bin" run_task "$@"; }
+printf 'version: "2"\nsql:\n  - gen:\n      go:\n        out: internal/a/gen\n' > "$CONSUMER/sqlc.yaml"
+
+pin_tools buf sqlc goimports
+consumer codegen codegen "{ GENERATED_DIRS: [internal] }"
+reset_calls
+only_shims codegen:sqlc "SQLC_FLAGS=--no-remote"
+expect_status ok "sqlc: runs with a pinned sqlc"
+expect_call "go|tool|sqlc|generate|--no-remote|" "sqlc: a pinned sqlc runs through go tool, flags split"
+refute_run sqlc "sqlc: PATH's sqlc is passed over for the pinned one"
+expect_call "go|tool|goimports|-w|internal/a/gen|" "sqlc: a pinned goimports normalises the out: paths"
+refute_run goimports "sqlc: PATH's goimports is passed over for the pinned one"
+
+reset_calls
+only_shims codegen:proto
+expect_status ok "proto: runs with a pinned buf"
+expect_call "go|tool|buf|generate|--template|buf.gen.yaml|" "proto: a pinned buf runs through go tool"
+refute_run buf "proto: PATH's buf is passed over for the pinned one"
+expect_call "go|tool|goimports|-w|internal|" "normalise: a pinned goimports runs over GENERATED_DIRS"
+
+reset_calls
+only_shims codegen:sqlc "SQLC_MODULE=example.com/sqlc@v1"
+expect_call "go|run|example.com/sqlc@v1|generate|" "sqlc: SQLC_MODULE still decides, pinned sqlc or not"
+refute_call "go|tool|sqlc|" "sqlc: the pinned sqlc is not run beside SQLC_MODULE"
+
+mkdir -p "$CONSUMER/tools"
+printf 'module example.com/tools\n' > "$CONSUMER/tools/go.mod"
+reset_calls
+only_shims codegen:proto "GO_TOOL_MODFILE=tools/go.mod"
+expect_call "go|tool|-modfile=tools/go.mod|buf|generate|" "modfile: the tool is asked of GO_TOOL_MODFILE"
+reset_calls
+only_shims codegen:proto "GO_TOOL_MODFILE=tools/go.mdo"
+expect_status fail "modfile: one that does not exist is refused"
+expect_output "GO_TOOL_MODFILE names tools/go.mdo, which does not exist" "modfile: the missing file is named"
+refute_call "buf|generate" "modfile: no generator runs when the file is missing"
+
+# Neither pinned nor on PATH: a generator fails, goimports is passed by.
+pin_tools
+mv "$BIN/buf" "$BIN/sqlc" "$BIN/goimports" "$WORK/"
+only_shims codegen:proto
+expect_status fail "proto: no buf anywhere fails"
+expect_output "buf is not installed" "proto: says buf is not installed"
+only_shims codegen:sqlc
+expect_status fail "sqlc: no sqlc anywhere fails"
+expect_output "sqlc is not installed" "sqlc: says sqlc is not installed"
+reset_calls
+only_shims codegen:generate
+expect_status ok "normalise: no goimports anywhere still generates"
+refute_call "goimports|-w" "normalise: no goimports, none run"
+mv "$WORK/buf" "$WORK/sqlc" "$WORK/goimports" "$BIN/"
+rm -f "$CONSUMER/sqlc.yaml"
+consumer codegen codegen
 
 git -C "$CONSUMER" init -q
 mkdir -p "$CONSUMER/internal/a/gen"
