@@ -23,6 +23,7 @@ workspace — tasks then read `k8s:<task>`.
 | `doctor` | Check that the context, namespace and deployment this component declares resolve |
 | `logs` | Tail the deployment's logs (Ctrl-C to stop) |
 | `port-forward` | Port-forward the deployment (PORT local, TARGET_PORT in the pod) |
+| `rollout:wait` | Wait until the Deployment runs VERSION and has rolled out (VERSION=1.4.0) |
 | `restart` | Roll the deployment (no-op when the cluster, namespace or deployment is absent) |
 | `status` | Show the deployment and its pods |
 | `upgrade` | helm upgrade --install the release from the local chart directory |
@@ -38,7 +39,10 @@ workspace — tasks then read `k8s:<task>`.
 | `K8S_CONTEXT` | current context | pin a cluster |
 | `CHART_DIR` | `./deploy/chart` | for `upgrade` |
 | `VALUES` | — | a values file for `upgrade` |
-| `ROLLOUT_TIMEOUT` | `2m` | how long `restart` waits |
+| `ROLLOUT_TIMEOUT` | `2m` | how long `restart` waits, and `rollout:wait` in all; a whole number with `s`, `m` or `h` |
+| `VERSION` | — | required by `rollout:wait`: the version to wait for |
+| `ROLLOUT_MATCH` | `image` | what says a Deployment runs `VERSION`: `image`, a container's image tag, or `chart`, its `helm.sh/chart` label |
+| `ROLLOUT_SELECTOR` | — | label selector: `rollout:wait` then waits for every Deployment it matches, not `K8S_DEPLOYMENT_NAME` alone |
 | `HELM_UPGRADE_FLAGS` | — | extra flags for `upgrade` |
 | `PORT` | `8080` | local port for `port-forward` |
 | `TARGET_PORT` | `PORT` | pod-side port for `port-forward`, when it differs |
@@ -103,6 +107,41 @@ way this library's own [demo/](../demo/README.md) chart does.
 the Deployment itself (`spec.selector.matchLabels`) rather than assuming a
 label convention, so it finds the right pods whatever your chart happens to
 label them.
+
+## Waiting for a version someone else deploys
+
+When Argo CD, Flux or another pipeline does the deploying, the publish step
+ends before anything has changed in the cluster. `kubectl rollout status` is
+not the wait for that: until the new chart is picked up the Deployment is the
+old one, fully rolled out, and the wait returns at once.
+
+`rollout:wait` first waits for the Deployment to carry the version, then for
+the roll, both inside `ROLLOUT_TIMEOUT`:
+
+```console
+$ task release:deploy && task argocd:refresh APP_PREFIX=acme-
+$ task k8s:rollout:wait VERSION=$(task release:version)
+◉ core-api · k8s · wait for 1.4.0 on deploy/core-api in acme
+deployment "core-api" successfully rolled out
+✔ core-api · k8s · 1.4.0 rolled out
+```
+
+By default the version is a container's image tag. A chart that runs someone
+else's image has a version of its own and no such tag: `ROLLOUT_MATCH: chart`
+reads the `helm.sh/chart` label instead, which the chart has to set on the
+Deployment.
+
+One component, one Deployment is this module's rule, and the wait follows it.
+A release that brings several sets `ROLLOUT_SELECTOR`, and every Deployment
+the selector matches has to arrive:
+
+```yaml
+vars: { ROLLOUT_SELECTOR: app.kubernetes.io/instance=core-api }
+```
+
+A wait that times out names what each Deployment runs instead. A Deployment
+that does not exist yet is waited for, since a first install creates it; a
+lookup the cluster refuses fails at once.
 
 ## Absent is not an error
 

@@ -14,7 +14,8 @@ version: "3"
 # both when a component does both; they share the same input names.
 #
 # Every task addresses the Deployment by name directly — `deploy/<name>` — not
-# by discovering it through a selector. That name must be exactly
+# by discovering it through a selector (rollout:wait alone takes one, for a
+# release that brings several). That name must be exactly
 # K8S_DEPLOYMENT_NAME (PROJECT_NAME by default): `helm create`'s own scaffold
 # names it `<release>-<chart>` instead (its "fullname" helper), which this
 # module will not find. Name the Deployment's `metadata.name` literally
@@ -33,6 +34,12 @@ version: "3"
 #   CHART_DIR            for k8s:upgrade  (default ./deploy/chart)
 #   VALUES               a values file for k8s:upgrade
 #   ROLLOUT_TIMEOUT      how long to wait for a roll      (default 2m)
+#   VERSION              required by rollout:wait: the version to wait for
+#   ROLLOUT_MATCH        what says a Deployment runs VERSION: "image", a
+#                        container's image tag, or "chart", its helm.sh/chart
+#                        label                          (default image)
+#   ROLLOUT_SELECTOR     label selector: rollout:wait then waits for every
+#                        Deployment it matches, not K8S_DEPLOYMENT_NAME alone
 #   HELM_UPGRADE_FLAGS   extra flags for k8s:upgrade
 #
 # Nothing here is declared under a bare knob name: a var declared in an included
@@ -54,6 +61,14 @@ vars:
   # How long restart's reachability probe waits before calling the cluster
   # gone: a dead context would otherwise hang the chain it sits in.
   _K8S_PROBE_TIMEOUT: 3s
+  # What ROLLOUT_MATCH may be.
+  _K8S_MATCH_IMAGE: image
+  _K8S_MATCH_CHART: chart
+  # Seconds between two looks at the Deployments while rollout:wait waits.
+  _K8S_POLL_SECONDS: "5"
+  # Where each kind of match is read from, as kubectl jsonpath.
+  _K8S_IMAGES_PATH: '{range .spec.template.spec.containers[*]}{.image}{"\n"}{end}'
+  _K8S_CHART_PATH: '{.metadata.labels.helm\.sh/chart}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
   _K8S_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
@@ -159,6 +174,94 @@ tasks:
           {{._K8S_KUBECTL}} -n {{._K8S_NS | q}} rollout restart deploy/{{._K8S_DEPLOY | q}}
           {{._K8S_KUBECTL}} -n {{._K8S_NS | q}} rollout status deploy/{{._K8S_DEPLOY | q}} --timeout={{.ROLLOUT_TIMEOUT | default "2m" | q}}
           printf '%s %s · k8s · rolled %s\n' "{{._K8S_OK}}" {{._K8S_SVC | q}} {{._K8S_DEPLOY | q}}
+
+  rollout:wait:
+    desc: "Wait until the Deployment runs VERSION and has rolled out (VERSION=1.4.0)"
+    # For the step after a publish, when something else does the deploying —
+    # Argo CD, Flux, another pipeline. `rollout status` alone is not that
+    # wait: until the new chart is picked up the Deployment is the old one,
+    # fully rolled out, and the wait returns at once having seen nothing new.
+    # So this first waits for the Deployment to carry VERSION, and only then
+    # for the roll.
+    #
+    # A lookup the cluster refuses fails at once; a Deployment that is not
+    # there yet is waited for, since a first install creates it.
+    requires:
+      vars: [VERSION]
+    preconditions:
+      - sh: '[ -n {{.VERSION | q}} ]'
+        msg: "VERSION is empty — name the version to wait for, e.g. VERSION=1.4.0"
+      - sh: '{{$m := .ROLLOUT_MATCH | default ._K8S_MATCH_IMAGE}}{{if or (eq $m ._K8S_MATCH_IMAGE) (eq $m ._K8S_MATCH_CHART)}}true{{else}}false{{end}}'
+        msg: "ROLLOUT_MATCH is {{.ROLLOUT_MATCH}} — set it to {{._K8S_MATCH_IMAGE}} (a container's image tag, the default) or {{._K8S_MATCH_CHART}} (the helm.sh/chart label)"
+    cmds:
+      - cmd: |-
+          set -eu
+          ns={{._K8S_NS | q}}
+          version={{.VERSION | q}}
+          match={{.ROLLOUT_MATCH | default ._K8S_MATCH_IMAGE | q}}
+          selector={{.ROLLOUT_SELECTOR | default "" | q}}
+          timeout={{.ROLLOUT_TIMEOUT | default "2m" | q}}
+          poll={{._K8S_POLL_SECONDS | q}}
+          svc={{._K8S_SVC | q}}
+          target=$selector
+          [ -n "$target" ] || target=deploy/{{._K8S_DEPLOY | q}}
+          nl='
+          '
+
+          # The budget covers both waits, so it has to be counted: a whole
+          # number of seconds, minutes or hours, as kubectl's --timeout takes.
+          count=${timeout%[smh]}
+          case "$count" in
+            '' | *[!0-9]*) printf '%s %s · k8s · ROLLOUT_TIMEOUT must be a whole number with s, m or h, got: %s\n' "{{._K8S_ERR}}" "$svc" "$timeout" >&2; exit 1 ;;
+          esac
+          case "${timeout#"$count"}" in
+            m) count=$((count * 60)) ;;
+            h) count=$((count * 3600)) ;;
+          esac
+          deadline=$(($(date +%s) + count))
+
+          # A chart label cannot hold a "+": helm's own scaffold writes "_".
+          if [ "$match" = {{._K8S_MATCH_CHART | q}} ]; then
+            want="-$(printf '%s' "$version" | tr + _)"
+          else
+            want=":$version"
+          fi
+          printf '%s %s · k8s · wait for %s on %s in %s\n' "{{._K8S_RUN}}" "$svc" "$version" "$target" "$ns"
+
+          while :; do
+            if [ -n "$selector" ]; then
+              names=$({{._K8S_KUBECTL}} -n "$ns" get deploy -l "$selector" -o name)
+            else
+              names=$({{._K8S_KUBECTL}} -n "$ns" get deploy/{{._K8S_DEPLOY | q}} --ignore-not-found -o name)
+            fi
+            behind=''
+            [ -n "$names" ] || behind="    $target is not there yet$nl"
+            for d in $names; do
+              if [ "$match" = {{._K8S_MATCH_CHART | q}} ]; then
+                have=$({{._K8S_KUBECTL}} -n "$ns" get "$d" -o jsonpath={{._K8S_CHART_PATH | q}})
+              else
+                have=$({{._K8S_KUBECTL}} -n "$ns" get "$d" -o jsonpath={{._K8S_IMAGES_PATH | q}})
+              fi
+              ok=0
+              for one in $have; do
+                case "$one" in *"$want" | *"$want@"*) ok=1 ;; esac
+              done
+              [ "$ok" = 1 ] || behind="$behind    $d has $(printf '%s' "${have:-nothing}" | tr '\n' ' ')$nl"
+            done
+            [ -n "$behind" ] || break
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              printf '%s %s · k8s · %s did not arrive within %s:\n%s' "{{._K8S_ERR}}" "$svc" "$version" "$timeout" "$behind" >&2
+              exit 1
+            fi
+            sleep "$poll"
+          done
+
+          for d in $names; do
+            left=$((deadline - $(date +%s)))
+            [ "$left" -ge 1 ] || left=1
+            {{._K8S_KUBECTL}} -n "$ns" rollout status "$d" --timeout="${left}s"
+          done
+          printf '%s %s · k8s · %s rolled out\n' "{{._K8S_OK}}" "$svc" "$version"
 
   upgrade:
     desc: "helm upgrade --install the release from the local chart directory"
