@@ -152,6 +152,62 @@ reset_calls
 run_task codegen:sqlc:check
 expect_status ok "sqlc:check: passes when regeneration changes no watched file"
 expect_call "sqlc generate" "sqlc:check: regenerates what it watches"
+
+# Without SQLC_DIR the gate watches what sqlc.yaml declares as out:.
+printf 'version: "2"\nsql:\n  - gen:\n      go:\n        out: internal/a/gen\n' > "$CONSUMER/sqlc.yaml"
+consumer codegen codegen
+reset_calls
+run_task codegen:sqlc:check
+expect_status ok "sqlc:check: watches sqlc.yaml's out: paths when SQLC_DIR is unset"
+expect_call "sqlc generate" "sqlc:check: regenerates what the config names"
+
+shim sqlc 'printf "package gen // regenerated\n" > internal/a/gen/q.go'
+run_task codegen:sqlc:check
+expect_status fail "sqlc:check: stale output under a derived path fails"
+expect_output "internal/a/gen/q.go" "sqlc:check: names the file regeneration changed"
+shim sqlc ':'
+printf 'package gen\n' > "$CONSUMER/internal/a/gen/q.go"
+
+printf 'version: "2"\nsql:\n  - gen:\n      go:\n        out: internal/b/gen\n' > "$CONSUMER/sqlc.yaml"
+reset_calls
+run_task codegen:sqlc:check
+expect_status fail "sqlc:check: an out: path holding no tracked file is refused"
+expect_output "internal/b/gen matches no tracked file" "sqlc:check: names the out: path that holds nothing"
+refute_call "sqlc " "sqlc:check: does not regenerate behind a blind derived gate"
+
+rm -f "$CONSUMER/sqlc.yaml"
+run_task codegen:sqlc:check
+expect_status fail "sqlc:check: no SQLC_DIR and no sqlc.yaml is refused"
+expect_output "no out: path in sqlc.yaml — set SQLC_DIR" "sqlc:check: says to set SQLC_DIR"
+
+# ─── proto gates and buf.lock ────────────────────────────────────────────────
+consumer codegen codegen "{ BUF_INPUT: 'api proto', BUF_LINT_FLAGS: '--error-format json', BUF_FORMAT_FLAGS: '--exclude-path vendor', BUF_DEP_FLAGS: '--debug' }"
+reset_calls
+run_task codegen:proto:lint
+expect_status ok "proto:lint: runs"
+expect_call "buf lint --error-format json api proto" "proto:lint: flags split, BUF_INPUT follows them"
+reset_calls
+run_task codegen:proto:fmt:check
+expect_status ok "proto:fmt:check: formatted sources pass"
+expect_call "buf format --diff --exit-code --exclude-path vendor api proto" "proto:fmt:check: asks buf for the diff and an exit code, not a rewrite"
+refute_call " -w" "proto:fmt:check: never writes"
+reset_calls
+run_task codegen:proto:deps
+expect_status ok "proto:deps: runs"
+expect_call "buf dep update --debug api proto" "proto:deps: updates the lock of BUF_INPUT"
+
+shim buf 'exit 100'
+run_task codegen:proto:fmt:check
+expect_status fail "proto:fmt:check: a file buf format would change fails"
+refute_output "buf format clean" "proto:fmt:check: does not report clean on a failure"
+run_task codegen:proto:lint
+expect_status fail "proto:lint: a lint finding fails"
+
+mv "$BIN/buf" "$WORK/"
+only_shims codegen:proto:lint
+expect_status fail "proto:lint: no buf anywhere fails"
+expect_output "buf is not installed — https://buf.build/docs/installation/" "proto:lint: says how to install buf"
+mv "$WORK/buf" "$BIN/"
 rm -rf "$CONSUMER/internal" "$CONSUMER/.git"
 
 finish
