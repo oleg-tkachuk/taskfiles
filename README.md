@@ -51,6 +51,7 @@ is another, split into three entry points by who runs the command.
   - [Logging](#logging)
   - [Versioning](#versioning)
   - [Every tool invocation takes flags](#every-tool-invocation-takes-flags)
+  - [Secrets are marked](#secrets-are-marked)
   - [Commit the remote lock](#commit-the-remote-lock)
     - [Moving the pin](#moving-the-pin)
     - [Run offline by default](#run-offline-by-default)
@@ -355,6 +356,10 @@ and `k8s:status` has no service behind a Deployment to reach through
 excludes: ["port-forward", "logs"]
 ```
 
+A group of tasks goes in one entry: `<prefix>:*` drops every task under that
+prefix, so `excludes: ["server:*"]` on `argocd` leaves the application tasks
+and takes away everything that touches the Argo server itself.
+
 Name the task the way the module itself does — `port-forward`, not
 `k8s:port-forward`. The namespaced form matches nothing, and `excludes`
 fails silently: the task stays in the list, with no error saying why the
@@ -468,6 +473,20 @@ rather than one shared bag: `HELM_LINT_FLAGS`, `HELM_TEMPLATE_FLAGS`,
 `HELM_PACKAGE_FLAGS` and `HELM_FLAGS` (registry calls) in `release`. A single
 `HELM_FLAGS` would put `--dry-run` on a `helm package` that has no such flag.
 
+### Secrets are marked
+
+A value that is a credential — the JWT key in `auth`, the admin password in
+`argocd`, the plaintext in `sealed-secrets` — is held in a var declared
+`secret: true`. Task prints `*****` for such a var wherever it echoes a task:
+under `--verbose`, `--dry` and `--summary`. The command still receives the
+real value.
+
+Two limits, both Task's. Only the var that is marked is masked, not a value
+built from it, so a module marks the var its command reads. And a module
+cannot mark a var it does not declare: the name *you* pass the value under —
+`JWT_SECRET` in your own `vars:` — is yours to mark the same way, or
+`--summary` in your repository still lists it.
+
 ### Commit the remote lock
 
 A module pulled over the network — `?ref=vX.Y.Z` rather than a checkout beside
@@ -484,7 +503,10 @@ task: Taskfile "...//go?ref=v11.2.1" not trusted by user
 ```
 
 That is the only thing standing between a moved tag and your build, so commit
-those `.checksum` files. Most repositories ignore `.task/`, which throws the
+those `.checksum` files. It is also why this library asks for Task 3.54: 3.53.1
+is the first release that checks an include's pinned `checksum:` when the file
+comes from the cache, and 3.54.0 fixes poisoning of the remote git cache on a
+host several users share. Most repositories ignore `.task/`, which throws the
 lock away. Ignore what is *inside* it instead, then make the exception — git
 re-includes nothing under a directory that is itself excluded, so `.task/`
 followed by `!.task/remote/` still ignores the lock:
