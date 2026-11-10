@@ -32,7 +32,7 @@ workspace — tasks then read `go:<task>`.
 | `fix:check` | Fail if go fix would change any file — code still written for an older Go |
 | `vuln` | govulncheck — vulnerabilities this module's code actually reaches |
 | `deps:outdated` | List dependencies with a newer version available (read-only) |
-| `deps:update` | Bump dependencies to the latest minor/patch, tidy, then prove it still builds |
+| `deps:update` | Bump the direct dependencies to the latest minor/patch, tidy, then prove it still builds |
 | `test:coverage` | Run the unit suite with coverage; HTML report lands in coverage/ |
 | `test:integration` | Run the integration suite (build tag, needs Docker) |
 | `test:tagged:compile` | Type-check build-tagged suites that the default test run never compiles |

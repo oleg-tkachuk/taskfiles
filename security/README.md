@@ -1,6 +1,7 @@
 # security — the scans worth running before a release
 
-govulncheck, golangci-lint, gitleaks, trivy and buf breaking. A missing binary
+gitleaks, trivy, govulncheck, golangci-lint, gosec and hadolint, plus buf
+breaking on its own. A missing binary
 produces an install hint rather than a stack trace, but present-and-failing is
 always fatal: a scan that can be silently skipped is a scan that does not exist.
 
@@ -11,13 +12,13 @@ includes:
 
 `dir: .` is required: it pins the module's commands to the including
 component's directory. The namespace above is the convention used across this
-workspace — tasks then read `sec:<task>`.
+workspace — tasks then read `security:<task>`.
 
 ## Tasks
 
 | Task | What it does |
 |---|---|
-| `scan` | Run every scan: vulnerabilities, lint, secrets, SAST, filesystem |
+| `scan` | Run every scan: secrets, filesystem, Go vuln + lint + SAST, Dockerfiles |
 | `lint` | golangci-lint across every Go module, limited to issues new since main |
 | `gosec` | gosec — insecure patterns the compiler is happy with; part of `scan` |
 | `dockerfile` | hadolint over the Dockerfiles this repository ships |
@@ -67,17 +68,17 @@ includes:
 ```
 
 ```console
-$ task security:scan          # vuln · lint · secrets · gosec · trivy
+$ task security:scan          # secrets · trivy · vuln · lint · gosec · dockerfile
 $ task security:secrets       # gitleaks over the whole history
 $ task security:proto:breaking
 ```
 
 ## A repository with no Go still gets scanned
 
-Three of the five scans read Go — `vuln`, `lint` and `gosec` — and two apply to
-anything: `secrets` and `trivy`. `scan` runs the agnostic pair first, then the
-Go ones, and a directory in `GO_MODULES` without a `go.mod` is skipped with a
-line saying so:
+Three of the six scans read Go — `vuln`, `lint` and `gosec` — and three apply
+to anything: `secrets`, `trivy` and `dockerfile`. `scan` runs `secrets` and
+`trivy` first, then the Go ones, then `dockerfile`, and a directory in
+`GO_MODULES` without a `go.mod` is skipped with a line saying so:
 
 ```
 ◉ sec · gitleaks

@@ -38,6 +38,7 @@ workspace — tasks then read `argocd:<task>`.
 | `K8S_CONTEXT` | current | pin a cluster |
 | `ARGOCD_ADMIN_PASSWORD` | — | required by `server:set-password` |
 | `ROLLOUT_TIMEOUT` | `2m` | how long `server:restart` waits |
+| `LOG_TAIL` | `100` | line count for `server:logs` |
 
 ## Examples
 
