@@ -23,6 +23,9 @@ version: "3"
 #   SCAN_EXCLUDE find(1) predicates discovery skips — vendored and throwaway trees
 #   BASE         branch the new-findings and breaking gates compare against
 #   GOSEC_FLAGS        extra gosec flags
+#   GO_TOOL_MODFILE    a go.mod whose `tool` directives pin govulncheck,
+#                      golangci-lint and gosec, when a module's own does not;
+#                      relative to the include's directory   (default none)
 #   GOVULNCHECK_FLAGS  extra govulncheck flags
 #   GOLANGCI_FLAGS     extra golangci-lint flags
 #   GITLEAKS_FLAGS     extra gitleaks flags
@@ -61,8 +64,11 @@ vars:
   # Branch the breaking-change and new-issue gates compare against.
   _SEC_BASE: '{{.BASE | default "main"}}'
   _SEC_GOSEC_FLAGS: '{{.GOSEC_FLAGS | default ""}}'
-  # The package a module's `tool` directive names to pin gosec.
-  _SEC_GOSEC_TOOL: github.com/securego/gosec/v2/cmd/gosec
+  _SEC_TOOL_MOD: '{{.GO_TOOL_MODFILE | default ""}}'
+  # What to say when a Go tool is neither pinned nor on PATH.
+  _SEC_GOSEC_HINT: go get -tool github.com/securego/gosec/v2/cmd/gosec
+  _SEC_VULN_HINT: go get -tool golang.org/x/vuln/cmd/govulncheck
+  _SEC_LINT_HINT: https://golangci-lint.run/docs/welcome/install/
   _SEC_VULN_FLAGS: '{{.GOVULNCHECK_FLAGS | default ""}}'
   _SEC_LINT_FLAGS: '{{.GOLANGCI_FLAGS | default ""}}'
   _SEC_GL_FLAGS: '{{.GITLEAKS_FLAGS | default ""}}'
@@ -145,28 +151,24 @@ tasks:
 
   vuln:
     desc: "govulncheck across every Go module — vulnerabilities the code actually reaches"
-    preconditions:
-      - sh: 'has=0; {{range $d := ._SEC_MODULES}}[ -f {{$d | q}}/go.mod ] && has=1; {{end}}[ "$has" = 0 ] || command -v govulncheck >/dev/null'
-        msg: "govulncheck is not installed — go install golang.org/x/vuln/cmd/govulncheck@latest"
     cmds:
       - for: { var: _SEC_MODULES }
         task: _in-module
-        vars: { MODULE: "{{.ITEM}}", CMD: "govulncheck {{._SEC_VULN_FLAGS}} ./...", LABEL: "govulncheck" }
+        vars: { MODULE: "{{.ITEM}}", TOOL: govulncheck, HINT: "{{._SEC_VULN_HINT}}", CMD: "{{._SEC_VULN_FLAGS}} ./...", LABEL: "govulncheck" }
 
   lint:
     desc: "golangci-lint across every Go module, limited to issues new since {{._SEC_BASE}}"
     # Whole-repo mode on a codebase with years of accumulated findings is a
     # permanently red gate that everyone learns to ignore. New-since-base is a
     # gate that can actually stay green. Full audit: golangci-lint run ./...
-    preconditions:
-      - sh: 'has=0; {{range $d := ._SEC_MODULES}}[ -f {{$d | q}}/go.mod ] && has=1; {{end}}[ "$has" = 0 ] || command -v golangci-lint >/dev/null'
-        msg: "golangci-lint is not installed — https://golangci-lint.run/docs/welcome/install/"
     cmds:
       - for: { var: _SEC_MODULES }
         task: _in-module
         vars:
           MODULE: "{{.ITEM}}"
-          CMD: "golangci-lint run --new-from-merge-base={{._SEC_BASE | q}} {{._SEC_LINT_FLAGS}} ./..."
+          TOOL: golangci-lint
+          HINT: "{{._SEC_LINT_HINT}}"
+          CMD: "run --new-from-merge-base={{._SEC_BASE | q}} {{._SEC_LINT_FLAGS}} ./..."
           LABEL: "golangci-lint"
 
   secrets:
@@ -217,11 +219,27 @@ tasks:
   # through `status:`, which is silent: a GO_MODULES typo must be visible.
   # No `dir:`: Task creates a dir that is not there, so a typo in GO_MODULES
   # left an empty directory in the consumer's tree and a green "skipped".
+  # Runs TOOL with the arguments in CMD inside MODULE. The tool is the one a
+  # `tool` directive pins — in the module's own go.mod, or in GO_TOOL_MODFILE —
+  # and only then the one on PATH: the same rule the go module follows, so
+  # `go:lint` and `security:lint` cannot run two versions of one linter.
   _in-module:
     internal: true
     cmds:
       - cmd: |-
           set -eu
+          # Made absolute before the cd below: the input is relative to the
+          # include's directory, not to each module's.
+          modfile={{._SEC_TOOL_MOD | q}}
+          case "$modfile" in '' | /*) ;; *) modfile="$PWD/$modfile" ;; esac
+          # Refused when it is not there: `go tool -n` fails on it the way it
+          # does on a tool nobody pinned, and the scan would carry on with
+          # whatever PATH holds.
+          if [ -n "$modfile" ] && [ ! -f "$modfile" ]; then
+            printf '%s sec · %s · GO_TOOL_MODFILE names %s, which does not exist\n' "{{._SEC_ERR}}" {{.LABEL | q}} {{._SEC_TOOL_MOD | q}} >&2
+            exit 1
+          fi
+          go_tool() { if [ -n "$modfile" ]; then go tool -modfile="$modfile" "$@"; else go tool "$@"; fi; }
           if [ ! -d {{.MODULE | q}} ]; then
             printf '%s sec · %s · GO_MODULES names %s, which does not exist\n' "{{._SEC_ERR}}" {{.LABEL | q}} {{.MODULE | q}} >&2
             exit 1
@@ -232,7 +250,13 @@ tasks:
             exit 0
           fi
           printf '%s sec · %s · %s\n' "{{._SEC_RUN}}" {{.LABEL | q}} {{.MODULE | q}}
-          {{.CMD}}
+          if go_tool -n {{.TOOL | q}} >/dev/null 2>&1; then set -- go_tool {{.TOOL | q}}
+          elif command -v {{.TOOL | q}} >/dev/null 2>&1; then set -- {{.TOOL | q}}
+          else
+            printf '%s sec · %s is not installed — %s\n' "{{._SEC_ERR}}" {{.TOOL | q}} {{.HINT | q}} >&2
+            exit 1
+          fi
+          "$@" {{.CMD}}
 
 
   dockerfile:
@@ -285,11 +309,4 @@ tasks:
     cmds:
       - for: { var: _SEC_MODULES }
         task: _in-module
-        vars:
-          MODULE: "{{.ITEM}}"
-          LABEL: "gosec"
-          CMD: >-
-            if go tool -n gosec >/dev/null 2>&1; then set -- go tool gosec;
-            elif command -v gosec >/dev/null; then set -- gosec;
-            else printf '%s\n' "{{._SEC_ERR}} sec · gosec is not installed — go get -tool {{._SEC_GOSEC_TOOL}}" >&2; exit 1; fi;
-            "$@" {{._SEC_GOSEC_FLAGS}} ./...
+        vars: { MODULE: "{{.ITEM}}", TOOL: gosec, HINT: "{{._SEC_GOSEC_HINT}}", CMD: "{{._SEC_GOSEC_FLAGS}} ./...", LABEL: "gosec" }

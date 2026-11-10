@@ -46,6 +46,7 @@ workspace — tasks then read `sec:<task>`.
 | `BUF_BREAKING_FLAGS` | — | extra buf breaking flags |
 | `GITLEAKS_BASELINE` | — | findings accepted as known, so the gate reports only new ones |
 | `GOSEC_FLAGS` | — | extra gosec flags |
+| `GO_TOOL_MODFILE` | — | a `go.mod` whose `tool` directives pin govulncheck, golangci-lint and gosec, when a module's own does not; relative to the include's directory |
 | `BASE` | `main` | branch the new-findings and breaking gates compare against |
 
 Every tool takes a FLAGS input, appended rather than replacing the invocation:
@@ -95,8 +96,15 @@ install hint rather than passing quietly. The skip is printed rather than done
 with `status:`, which is silent — a typo in `GO_MODULES` has to be visible, or
 the scan it disables is one nobody notices is gone.
 
-## gosec runs the module's own, when it has one
+## A pinned tool before PATH's
 
+govulncheck, golangci-lint and gosec each run the one a `tool` directive pins
+— in the module's own `go.mod`, or in `GO_TOOL_MODFILE` — and only then the
+one on `PATH`. The [`go`](../go/README.md#a-pinned-tool-before-paths) module
+follows the same rule, so `go:lint` and `security:lint` cannot run two
+versions of one linter.
+
+For gosec the pin is more than a version.
 Pin gosec in each Go module with `go get -tool github.com/securego/gosec/v2/cmd/gosec`.
 gosec reads compiled export data through `golang.org/x/tools`, and a release
 binary or an `@latest` install carries the x/tools gosec itself requires — which
