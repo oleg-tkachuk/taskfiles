@@ -47,7 +47,7 @@ component's directory.
 | `SQLC_MODULE` | — | run sqlc through `go run` at a pinned version instead of from PATH |
 | `MOCKS_PATHSPEC` | `internal` | git pathspec the mock gate watches |
 | `PROTO_PATHSPEC` | derived from the templates' `out:` | git pathspec the proto gate watches |
-| `SQLC_DIR` | — | directory the sqlc gate watches; required by `sqlc:check` |
+| `SQLC_DIR` | — | git pathspec the sqlc gate watches; required by `sqlc:check`, which refuses one that names no tracked file |
 | `GOWORK` | `off` | `auto` to generate through a go.work workspace (an empty value keeps `off`) |
 
 ## Examples
@@ -104,7 +104,8 @@ and the two disagree: generators emit one import grouping, goimports rewrites
 it. Left alone, the generator writes one form and the hook commits the other, so
 the drift gate reports files stale on a tree that was just generated — the gate
 failing against its own generator. Normalising here is what makes generation
-idempotent.
+idempotent. sqlc's output is normalised the same way, at the `out:` paths its
+`sqlc.yaml` names, with no input to set.
 
 ## What the gates compare
 
