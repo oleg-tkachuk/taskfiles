@@ -62,6 +62,22 @@ run_task go:test:integration "GO_TEST_TIMEOUT=20m $payload" "GO_TEST_JSON=out $p
 if [ -e "$pwned" ]; then fail "integration: a \$( ) in its values ran"; else pass "integration: a \$( ) in its values does not run"; fi
 expect_call "gotestsum|--format|pkgname|--hide-summary|skipped|--jsonfile|out $payload.json|--|-race|-timeout=20m $payload|-tags=integration|./...|" "integration: the timeout and the json file reach gotestsum as one argument each"
 
+# Without gotestsum go test keeps no stream: a GO_TEST_JSON fails the run
+# rather than leave a consumer to read none, or an earlier run's. PATH holds
+# the shims and the system's tools alone, so an installed gotestsum is not
+# found.
+ln -sf "$(command -v task)" "$BIN/task"
+mv "$BIN/gotestsum" "$WORK/gotestsum.off"
+reset_calls
+PATH="$BIN:/usr/bin:/bin" run_task go:test:integration "GO_TEST_JSON=out.json"
+expect_status fail "integration: without gotestsum a GO_TEST_JSON fails the run"
+expect_output "go test alone keeps no stream" "integration: without gotestsum the failure says why"
+refute_call "go|test|" "integration: without gotestsum no suite runs whose stream is lost"
+reset_calls
+PATH="$BIN:/usr/bin:/bin" run_task go:test:integration
+expect_call "go|test|-race|-timeout=10m|-tags=integration|./...|" "integration: without gotestsum and GO_TEST_JSON, go test runs"
+mv "$WORK/gotestsum.off" "$BIN/gotestsum"
+
 reset_calls
 run_task go:test:coverage "GO_TEST_FLAGS=-p 1"
 expect_call "go|test|-p|1|-coverprofile=coverage/cover.out|./...|" "coverage: the unit run's GO_TEST_FLAGS apply"
