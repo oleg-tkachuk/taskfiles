@@ -124,4 +124,109 @@ expect_status fail "logs: the old TAIL is refused"
 expect_output "TAIL is now LOG_TAIL" "logs: the refusal names the new input"
 refute_call "logs deploy/" "logs: nothing runs on the old TAIL"
 
+# ─── rollout:wait ────────────────────────────────────────────────────────────
+# What the cluster holds is read from files: the Deployments a lookup names,
+# and per Deployment its images and its chart label. BEHIND counts down the
+# looks that still see the old version; sleep is instant.
+export STATE="$WORK/state"
+mkdir -p "$STATE"
+shim sleep ':'
+# shellcheck disable=SC2016 # the shim's own variables, written literally
+shim kubectl '
+case "$*" in
+  *" rollout status "*) [ -z "${FAKE_STUCK:-}" ] ;;
+  *"-o name"*)
+    if [ -n "${FAKE_FORBIDDEN:-}" ]; then echo "Error from server (Forbidden)" >&2; exit 1; fi
+    cat "$STATE/names" 2>/dev/null ;;
+  *"-o jsonpath="*)
+    left=$(cat "$STATE/behind" 2>/dev/null || printf 0)
+    if [ "$left" -gt 0 ]; then printf "%s" $((left - 1)) > "$STATE/behind"; kind=old; else kind=new; fi
+    case "$*" in *helm*) what=chart ;; *) what=images ;; esac
+    for a in "$@"; do case "$a" in deployment.apps/*) name=${a#deployment.apps/} ;; esac; done
+    cat "$STATE/$name.$what.$kind" 2>/dev/null ;;
+esac'
+unset FAKE_NO_DEPLOY FAKE_FORBIDDEN FAKE_UNREACHABLE FAKE_NO_LABELS
+
+# cluster <name> <old|new> <images...> — what a Deployment runs, at one moment.
+images() { name=$1 kind=$2; shift 2; printf '%s\n' "$@" > "$STATE/$name.images.$kind"; }
+printf 'deployment.apps/web\n' > "$STATE/names"
+images web old localhost:5000/web:1.3.0 envoy:v2
+images web new localhost:5000/web:1.4.0 envoy:v2
+printf 'web-1.3.0' > "$STATE/web.chart.old"
+printf 'web-1.4.0_build.7' > "$STATE/web.chart.new"
+
+consumer k8s k8s '{ PROJECT_NAME: web, K8S_NAMESPACE: apps, K8S_CONTEXT: dev }'
+reset_calls
+run_task k8s:rollout:wait VERSION=1.4.0
+expect_status ok "rollout:wait: a Deployment already on VERSION passes"
+expect_call "kubectl --context dev -n apps get deploy/web --ignore-not-found -o name" "rollout:wait: looks the component's Deployment up by name, on the pinned context"
+expect_call "kubectl --context dev -n apps rollout status deployment.apps/web --timeout=" "rollout:wait: then waits for the roll"
+expect_output "1.4.0 rolled out" "rollout:wait: reports the version"
+
+printf 3 > "$STATE/behind"
+reset_calls
+run_task k8s:rollout:wait VERSION=1.4.0
+expect_status ok "rollout:wait: waits while the Deployment still runs the old version"
+expect_call "sleep 5" "rollout:wait: looks again after the poll interval"
+
+run_task k8s:rollout:wait VERSION=1.5.0 ROLLOUT_TIMEOUT=0s
+expect_status fail "rollout:wait: a version that never arrives fails at the timeout"
+expect_output "1.5.0 did not arrive within 0s" "rollout:wait: says the version did not arrive"
+expect_output "deployment.apps/web has localhost:5000/web:1.4.0 envoy:v2" "rollout:wait: names what the Deployment runs instead"
+refute_output "rolled out" "rollout:wait: does not report a roll that was never waited for"
+
+images web new localhost:5000/web:1.4.0@sha256:abc
+run_task k8s:rollout:wait VERSION=1.4.0
+expect_status ok "rollout:wait: a tag followed by a digest still matches"
+images web new localhost:5000/web:11.4.0
+run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_TIMEOUT=0s
+expect_status fail "rollout:wait: a tag that only ends in VERSION is not VERSION"
+images web new localhost:5000/web:1.4.0-rc.1
+run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_TIMEOUT=0s
+expect_status fail "rollout:wait: a longer tag is not VERSION"
+images web new localhost:5000/web:1.4.0 envoy:v2
+
+run_task k8s:rollout:wait VERSION=1.4.0+build.7 ROLLOUT_MATCH=chart
+expect_status ok "rollout:wait: ROLLOUT_MATCH=chart reads the helm.sh/chart label, + written as _"
+run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_MATCH=chart ROLLOUT_TIMEOUT=0s
+expect_status fail "rollout:wait: a chart label of another version fails"
+expect_output "has web-1.4.0_build.7" "rollout:wait: names the chart label it found"
+run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_MATCH=tag
+expect_status fail "rollout:wait: a ROLLOUT_MATCH that is neither image nor chart is refused"
+
+# ROLLOUT_SELECTOR: every Deployment it matches has to arrive.
+printf 'deployment.apps/web\ndeployment.apps/worker\n' > "$STATE/names"
+images worker new localhost:5000/worker:1.3.0
+reset_calls
+run_task k8s:rollout:wait VERSION=1.4.0 "ROLLOUT_SELECTOR=app.kubernetes.io/part-of=shop $INJECT" ROLLOUT_TIMEOUT=0s
+expect_status fail "rollout:wait: one matched Deployment behind fails the wait"
+expect_call "get deploy -l app.kubernetes.io/part-of=shop $INJECT -o name" "rollout:wait: the selector reaches kubectl as one argument"
+expect_not_pwned "rollout:wait: selector"
+expect_output "deployment.apps/worker has localhost:5000/worker:1.3.0" "rollout:wait: names the Deployment that is behind"
+refute_output "deployment.apps/web has" "rollout:wait: does not name the one that arrived"
+images worker new localhost:5000/worker:1.4.0
+reset_calls
+run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_SELECTOR=app.kubernetes.io/part-of=shop
+expect_status ok "rollout:wait: passes once every matched Deployment is on VERSION"
+expect_call "rollout status deployment.apps/worker" "rollout:wait: waits for each matched Deployment's roll"
+
+# Not there yet is waited for; refused, or stuck, is a failure.
+: > "$STATE/names"
+run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_TIMEOUT=0s
+expect_status fail "rollout:wait: a Deployment that never appears fails at the timeout"
+expect_output "deploy/web is not there yet" "rollout:wait: says the Deployment is not there"
+printf 'deployment.apps/web\n' > "$STATE/names"
+reset_calls
+FAKE_FORBIDDEN=1 run_task k8s:rollout:wait VERSION=1.4.0
+expect_status fail "rollout:wait: a lookup the cluster refuses fails"
+refute_call "sleep" "rollout:wait: a refused lookup is not waited on"
+FAKE_STUCK=1 run_task k8s:rollout:wait VERSION=1.4.0
+expect_status fail "rollout:wait: a roll that does not finish fails"
+
+run_task k8s:rollout:wait VERSION=
+expect_status fail "rollout:wait: an empty VERSION is refused"
+run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_TIMEOUT=soon
+expect_status fail "rollout:wait: a ROLLOUT_TIMEOUT that is not a duration is refused"
+expect_output "ROLLOUT_TIMEOUT must be a whole number with s, m or h, got: soon" "rollout:wait: the refusal names the value"
+
 finish
