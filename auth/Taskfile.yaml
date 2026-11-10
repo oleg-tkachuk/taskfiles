@@ -35,7 +35,10 @@ tasks:
     aliases: [mint]
     vars:
       _AUTH_ALG: '{{.JWT_ALG | default "HS256"}}'
-      _AUTH_SECRET: '{{.JWT_SECRET | default "dev-secret-change-me-32-bytes-min"}}'
+      # secret: Task prints ***** for it wherever it echoes this task — under
+      # --verbose, --dry and --summary — so a real key passed for one run
+      # does not land in a terminal log or a CI transcript.
+      _AUTH_SECRET: { value: '{{.JWT_SECRET | default "dev-secret-change-me-32-bytes-min"}}', secret: true }
       _AUTH_ISS: '{{.JWT_ISS | default "local-dev"}}'
       _AUTH_AUD: '{{.JWT_AUD | default "local-api"}}'
       _AUTH_SUB: '{{.JWT_SUB | default "dev-user"}}'
