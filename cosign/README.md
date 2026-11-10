@@ -10,7 +10,7 @@ includes:
 
 `dir: .` is required: it pins the module's commands to the including
 component's directory. The namespace above is the convention used across this
-workspace — tasks then read `sign:<task>`.
+workspace — tasks then read `cosign:<task>`.
 
 ## Tasks
 
@@ -38,8 +38,8 @@ workspace — tasks then read `sign:<task>`.
 | `SYFT_FLAGS` | — | verbatim extra syft flags |
 | `SBOM_INSECURE` | `0` | `1` when the registry's certificate is one syft rejects |
 
-Plus `PROJECT_NAME`, `REGISTRY`, `IMAGE_NAMESPACE` and `CHART_NAME`, read the
-same way `release` reads them.
+Plus `PROJECT_NAME`, `REGISTRY`, `GLOBAL_REGISTRY`, `IMAGE_NAMESPACE` and
+`CHART_NAME`, read the same way `release` reads them.
 
 ## By digest, not by tag
 

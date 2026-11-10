@@ -66,7 +66,7 @@ version: "3"
 silent: true
 
 vars:
-  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v11.2.1'
+  TASKLIB: 'https://github.com/oleg-tkachuk/taskfiles.git//%s?ref=v14.6.0'
   PROJECT_NAME: '{{.PROJECT_NAME | default "orders-api"}}'
   IMAGE_NAMESPACE: '{{.IMAGE_NAMESPACE | default "acme"}}'
   K8S_NAMESPACE: '{{.K8S_NAMESPACE | default "acme"}}'
@@ -176,21 +176,21 @@ implementation; they are not the current one.
 | [`auth/`](auth/README.md) | `auth` | mint a local-dev JWT |
 | [`github/`](github/README.md) | `github` | force-push a protected branch without leaving protection off |
 | [`checkov/`](checkov/README.md) | `checkov` | policy-scan manifests, charts, Dockerfiles and workflows |
-| [`codegen/`](codegen/README.md) | `codegen` | mocks, protobuf stubs, `go generate`, sqlc — and the drift gates for them |
+| [`codegen/`](codegen/README.md) | `codegen` | mocks, protobuf stubs, `go generate`, sqlc — the drift gates for them, and buf lint, format and dep update |
 | [`compose/`](compose/README.md) | `compose` | local stack up/down/reset/logs |
 | [`cosign/`](cosign/README.md) | `cosign` | sign the published image and chart, attest an SBOM, verify both |
-| [`go/`](go/README.md) | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, bench, dep bumps |
+| [`go/`](go/README.md) | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, bench, dep bumps — and the fmt, tidy and fix gates that rewrite nothing |
 | [`hcloud/`](hcloud/README.md) | `hcloud` | what a project owns in Hetzner Cloud, the power state of its servers, restarts at three levels of force, SSH and a VNC console |
 | [`helm/`](helm/README.md) | `helm` | what is installed on a cluster, and removing it |
-| [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward |
+| [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward, and waiting for a version to roll out |
 | [`monorepo/`](monorepo/README.md) | `monorepo` | run one target across every component, registry preflight |
 | [`node/`](node/README.md) | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
 | [`pnpm/`](pnpm/README.md) | `pnpm` | keep the corepack pnpm pin current and agreed across a repo's apps |
 | [`python/*`](python/README.md) — poetry, uv | `python` | install/test/lint/format/typecheck/lock and dep bumps, one surface per manager |
-| [`release/`](release/README.md) | `release` | version derivation, image build/push, chart lint/render/package/push, `deploy` |
+| [`release/`](release/README.md) | `release` | version derivation, image build/scan/push, chart lint/render/package/push, `deploy` |
 | [`runtime/*`](runtime/README.md) — docker, orbstack, minikube, kind, k3d | `local` | run a locally built image on a local cluster, no registry |
 | [`sealed-secrets/`](sealed-secrets/README.md) | `sealed-secrets` | seal a value into a committable SealedSecret, fetch the controller key |
-| [`security/`](security/README.md) | `security` | govulncheck, golangci-lint, gitleaks, trivy, buf breaking |
+| [`security/`](security/README.md) | `security` | gitleaks, trivy, govulncheck, golangci-lint, gosec, hadolint, buf breaking |
 | [`tasklib/`](tasklib/README.md) | `tasklib` | move every Taskfile's pin on this library and its lock together, and fail when they have come apart |
 
 ### Local clusters
@@ -499,7 +499,7 @@ you — leaves a lock in `.task/remote/`:
 Task refuses to run when the content behind that ref no longer matches it:
 
 ```
-task: Taskfile "...//go?ref=v11.2.1" not trusted by user
+task: Taskfile "...//go?ref=v14.6.0" not trusted by user
 ```
 
 That is the only thing standing between a moved tag and your build, so commit

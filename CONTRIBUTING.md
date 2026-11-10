@@ -98,7 +98,7 @@ it.
 
 `main` is branch-protected — there is no direct push, for anyone, including
 the maintainer. Open a PR; CI runs the lint, a consumer smoke test that
-includes every module side by side, and a `zizmor` audit of the workflows
+includes the modules side by side, and a `zizmor` audit of the workflows
 themselves. All three are required checks, and the branch merges with rebase
 once they pass, so the individual commits land on `main` as you wrote them.
 

@@ -11,7 +11,7 @@ includes:
 
 `dir: .` is required: it pins the module's commands to the including
 component's directory. The namespace above is the convention used across this
-workspace — tasks then read `all:<task>`.
+workspace — tasks then read `monorepo:<task>`.
 
 ## Tasks
 
