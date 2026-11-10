@@ -31,4 +31,16 @@ expect_output "JWT_TTL_SECONDS must be a whole number" "mint-token: the refusal 
 if [ -e "$pwned" ]; then fail "mint-token: a \$( ) in the TTL ran"; else pass "mint-token: a \$( ) in the TTL does not run"; fi
 refute_call "[crypto]" "mint-token: step is not called on a refused TTL"
 
+# The key is a secret var: Task prints ***** for it when it echoes the task,
+# and the real value still reaches step.
+readonly KEY=hunter2-not-in-any-log
+reset_calls
+run_task -v auth:mint-token "JWT_SECRET=$KEY"
+expect_status ok "mint-token: runs under --verbose"
+refute_output "$KEY" "mint-token: --verbose does not print the key"
+expect_output "*****" "mint-token: --verbose prints the mask in its place"
+expect_call "key=$KEY" "mint-token: the masked key still reaches step"
+run_task --summary auth:mint-token
+expect_output "_AUTH_SECRET: *****" "mint-token: --summary masks the key, the default one too"
+
 finish

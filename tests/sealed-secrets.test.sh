@@ -60,4 +60,28 @@ expect_status fail "renamed: the old lowercase inputs are refused"
 expect_output "SECRET_NAMESPACE" "renamed: the refusal names the new inputs"
 refute_call "kubeseal" "renamed: nothing is sealed on the old inputs"
 
+# The plaintext is a secret var: Task prints ***** for it when it echoes the
+# task, and the real value still reaches kubectl.
+readonly PLAIN=hunter2-not-in-any-log
+shim kubeseal 'cat >/dev/null; printf "kind: SealedSecret\n"'
+consumer ss sealed-secrets
+reset_calls
+run_task -v ss:seal SECRET_NAMESPACE=app SECRET_NAME=creds SECRET_KEY=k "SECRET_VALUE=$PLAIN" SECRET_OUTPUT=out/creds.yaml
+expect_status ok "seal: runs under --verbose"
+refute_output "$PLAIN" "seal: --verbose does not print the plaintext"
+expect_output "*****" "seal: --verbose prints the mask in its place"
+expect_call "--from-literal=k=$PLAIN" "seal: the masked plaintext still reaches kubectl"
+
+reset_calls
+run_task -v ss:seal:literals SECRET_NAMESPACE=app SECRET_NAME=creds SECRET_OUTPUT=out/creds.yaml "SECRET_LITERALS=a=$PLAIN b=2"
+expect_status ok "literals: runs under --verbose"
+refute_output "$PLAIN" "literals: --verbose does not print a plaintext"
+expect_call "--from-literal=a=$PLAIN --from-literal=b=2" "literals: the masked pairs still reach kubectl"
+
+reset_calls
+run_task -v ss:seal:merge SECRET_NAMESPACE=app SECRET_NAME=creds SECRET_KEY=k "SECRET_VALUE=$PLAIN" SECRET_OUTPUT=out/creds.yaml
+expect_status ok "merge: runs under --verbose"
+refute_output "$PLAIN" "merge: --verbose does not print the plaintext"
+expect_call "--from-literal=k=$PLAIN" "merge: the masked plaintext still reaches kubectl"
+
 finish

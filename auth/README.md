@@ -63,6 +63,9 @@ $ export TOKEN=$(task auth:mint-token)
 It goes in through a process substitution rather than an argument. Needs the
 smallstep `step` CLI.
 
+Nor does it reach a log: the module holds it in a `secret: true` var, so
+`task --verbose` and `task --summary` print `*****` in its place.
+
 ---
 
 Part of [taskfiles](../README.md).

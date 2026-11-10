@@ -72,4 +72,14 @@ reset_calls
 run_task argocd:server:logs ARGOCD_SERVER_LABEL=argo-server LOG_TAIL=5
 expect_call "kubectl --context prod -n argocd logs -l app.kubernetes.io/name=argo-server -f --tail=5" "logs: passes the context, label and tail"
 
+# The password is a secret var: Task prints ***** for it when it echoes the
+# task, and the real value still reaches argocd.
+readonly PASSWORD=hunter2-not-in-any-log
+reset_calls
+run_task -v argocd:server:set-password "ARGOCD_ADMIN_PASSWORD=$PASSWORD"
+expect_status ok "set-password: runs under --verbose"
+refute_output "$PASSWORD" "set-password: --verbose does not print the password"
+expect_output "--password '*****'" "set-password: --verbose prints the mask in its place"
+expect_call "argocd account bcrypt --password $PASSWORD" "set-password: the masked password still reaches argocd"
+
 finish

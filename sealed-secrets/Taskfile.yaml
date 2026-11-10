@@ -35,7 +35,7 @@ version: "3"
 # with --dry-run=client and hand it to kubeseal, so the plaintext never leaves
 # this machine and the output is encrypted to a key only the controller holds.
 # ─────────────────────────────────────────────────────────────────────────────
-# shell-verbatim: _SS_CTX _SS_KUBECTL _SS_SEAL KUBESEAL_FLAGS FROM
+# shell-verbatim: _SS_CTX _SS_KUBECTL _SS_SEAL KUBESEAL_FLAGS FROM _SS_FROM
 
 silent: true
 
@@ -102,6 +102,12 @@ tasks:
     internal: true
     requires:
       vars: [SECRET_NAMESPACE, SECRET_NAME, SECRET_OUTPUT, FROM]
+    vars:
+      # secret: FROM carries the plaintext for seal and seal:literals, and Task
+      # prints ***** for a secret var wherever it echoes this task — under
+      # --verbose, --dry and --summary. Only a var marked so is masked, not a
+      # value derived from one, so the mark sits on the var the command reads.
+      _SS_FROM: { value: '{{.FROM}}', secret: true }
     preconditions:
       - sh: command -v kubeseal >/dev/null
         msg: "kubeseal is not installed — https://github.com/bitnami-labs/sealed-secrets#installation"
@@ -115,7 +121,7 @@ tasks:
           tmp=$(mktemp {{printf "%s.XXXXXX" .SECRET_OUTPUT | q}})
           trap 'rm -f "$tmp"' EXIT
           {{._SS_KUBECTL}} create secret generic {{.SECRET_NAME | q}} \
-            --namespace {{.SECRET_NAMESPACE | q}} {{.FROM}} --dry-run=client -o yaml \
+            --namespace {{.SECRET_NAMESPACE | q}} {{._SS_FROM}} --dry-run=client -o yaml \
             | {{._SS_SEAL}} --format yaml {{.KUBESEAL_FLAGS | default ""}} > "$tmp"
           mv "$tmp" {{.SECRET_OUTPUT | q}}
       - printf '%s sealed-secrets · %s/%s → %s\n' "{{._SS_OK}}" {{.SECRET_NAMESPACE | q}} {{.SECRET_NAME | q}} {{.SECRET_OUTPUT | q}}
@@ -124,6 +130,10 @@ tasks:
     desc: "Seal one key and merge it into an existing SealedSecret, leaving the rest"
     requires:
       vars: [SECRET_NAMESPACE, SECRET_NAME, SECRET_KEY, SECRET_VALUE, SECRET_OUTPUT]
+    vars:
+      # secret, as _seal's _SS_FROM: the plaintext, masked wherever Task
+      # echoes this task.
+      _SS_LITERAL: { value: '{{printf "%s=%s" .SECRET_KEY .SECRET_VALUE}}', secret: true }
     preconditions:
       - sh: command -v kubeseal >/dev/null
         msg: "kubeseal is not installed — https://github.com/bitnami-labs/sealed-secrets#installation"
@@ -137,7 +147,7 @@ tasks:
           set -euo pipefail
           {{._SS_KUBECTL}} create secret generic {{.SECRET_NAME | q}} \
             --namespace {{.SECRET_NAMESPACE | q}} \
-            --from-literal={{printf "%s=%s" .SECRET_KEY .SECRET_VALUE | q}} \
+            --from-literal={{._SS_LITERAL | q}} \
             --dry-run=client -o yaml \
             | {{._SS_SEAL}} --format yaml {{.KUBESEAL_FLAGS | default ""}} --merge-into {{.SECRET_OUTPUT | q}}
       - printf '%s sealed-secrets · %s/%s · %s merged → %s\n' "{{._SS_OK}}" {{.SECRET_NAMESPACE | q}} {{.SECRET_NAME | q}} {{.SECRET_KEY | q}} {{.SECRET_OUTPUT | q}}

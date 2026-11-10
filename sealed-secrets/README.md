@@ -67,6 +67,10 @@ shell history. That is a fair trade for a one-off dev credential and a poor one
 for anything that matters. `seal:file` reads from disk instead; prefer it when
 the value is real.
 
+It does not sit in Task's own output, though: the plaintext is held in a
+`secret: true` var, so `task --verbose` and `task --summary` print `*****`
+where the command carries it.
+
 The value is passed as a single shell-quoted argument, so a quote or a
 semicolon in it is data. Before v2.1.2 it was interpolated between hand-written
 quotes, and a value containing `'` closed them: the remainder of the value ran
