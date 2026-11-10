@@ -273,7 +273,7 @@ tasks:
           exit "$fail"
 
   check:api:
-    desc: "Refuse a task, alias or input the latest release had and this tree has lost"
+    desc: "Refuse a task, alias or input the latest release had and this tree has lost, or a default that changed unnamed"
     # A name that vanishes without a `!` on its commit reaches consumers as a
     # minor, and breaks every Taskfile that called it. A rename keeps the old
     # name for a major instead (RELEASE.md); a deliberate removal is named in
@@ -285,6 +285,13 @@ tasks:
       # above it, or <module>:* for a whole module. Empty again once the major
       # that removes them has shipped — check-api.sh reports a stale entry.
       API_REMOVED: ""
+      # <module>:<INPUT> whose default changed on purpose, each with its
+      # reason in a comment above it. A default is what every consumer who
+      # never set the input runs with, so a changed one is named here and
+      # under the pull request's Consumer impact — and its commit carries the
+      # `!` when a consumer relying on the old one has to act. Empty again
+      # once the release that changes them has shipped.
+      API_DEFAULTS_CHANGED: ""
     cmds:
       - bash scripts/check-api.test.sh >/dev/null
       - cmd: |-
@@ -297,8 +304,8 @@ tasks:
           # since is compared too.
           files=$( { printf '%s\n' {{.MODULE_FILES}}; git ls-tree -r --name-only "$base" | grep -E '^[^/]+/([^/]+/)?Taskfile.yaml$' | grep -v '^demo/'; } | sort -u)
           # shellcheck disable=SC2086 # one path per word, by construction
-          bash scripts/check-api.sh "$base" {{.API_REMOVED | q}} $files
-          printf '%s\n' "{{._LIB_OK}} taskfiles · nothing $base offered is gone without being named"
+          API_DEFAULTS_CHANGED={{.API_DEFAULTS_CHANGED | q}} bash scripts/check-api.sh "$base" {{.API_REMOVED | q}} $files
+          printf '%s\n' "{{._LIB_OK}} taskfiles · nothing $base offered is gone, and no default changed, without being named"
 
   check:surface:
     desc: "Refuse a family whose variants no longer expose the same tasks, or disagree on which ones need deps:"

@@ -43,7 +43,7 @@ git -C "$repo" tag v1.0.0
 expect() {
   want=$1 name=$2 allowed=$3 body=$4
   if [ "$body" = - ]; then rm -f "$repo/m/Taskfile.yaml"; else printf '%s\n' "$body" > "$repo/m/Taskfile.yaml"; fi
-  if (cd "$repo" && bash "$here/check-api.sh" v1.0.0 "$allowed" m/Taskfile.yaml) > "$work/out" 2>&1; then got=clean; else got=reported; fi
+  if (cd "$repo" && API_DEFAULTS_CHANGED=${defaults_changed-} bash "$here/check-api.sh" v1.0.0 "$allowed" m/Taskfile.yaml) > "$work/out" 2>&1; then got=clean; else got=reported; fi
   if [ "$got" = "$want" ]; then
     printf '%s\n' "✔ $name: $got"
   else
@@ -84,10 +84,37 @@ loop='      - for: [a]
 '
 expect clean loop-removed '' "${BASE/"$loop"/}"
 
-expect clean input-moved-into-a-list-ref '' "${BASE/.PORT | default \"80\" | q/._PORTS | join \" \" | q}
+# A string that becomes a list keeps its name and changes what a consumer has
+# to pass: the default says so, and the change has to be named.
+moved="${BASE/.PORT | default \"80\" | q/._PORTS | join \" \" | q}
 vars:
   _PORTS:
     ref: 'default (list \"80\") .PORT'"
+expect reported input-moved-into-a-list-ref '' "$moved"
+defaults_changed='m:PORT' expect clean input-moved-into-a-list-ref-and-named '' "$moved"
+
+expect reported default-changed '' "${BASE/default \"80\"/default \"8080\"}"
+if grep -qF 'PORT defaulted to "80" in v1.0.0 and to "8080" now' "$work/out"; then
+  printf '%s\n' "✔ default-changed: names both defaults"
+else
+  printf '%s\n' "✖ default-changed: the report does not name both defaults" >&2; cat "$work/out" >&2; failures=$((failures + 1))
+fi
+defaults_changed='m:PORT' expect clean default-changed-and-named '' "${BASE/default \"80\"/default \"8080\"}"
+defaults_changed='m:PORT' expect reported stale-default-entry '' "$BASE"
+# An input that gains a default asks nothing of anyone; one that loses its
+# default now has to be set.
+expect clean default-added '' "${BASE/.REF | q/.REF | q}
+      - echo {{.EXTRA | default \"x\" | q}}"
+# Naming the literal as one of the module's own constants changes nothing, and
+# neither does an empty default, which is no default at all.
+expect clean default-moved-into-a-constant '' "${BASE/default \"80\"/default ._M_PORT}
+vars:
+  _M_PORT: \"80\""
+expect reported default-changed-through-a-constant '' "${BASE/default \"80\"/default ._M_PORT}
+vars:
+  _M_PORT: \"8080\""
+expect clean empty-default-added '' "${BASE/.REF | q/.REF | default \"\" | q}"
+expect reported default-removed '' "${BASE/.PORT | default \"80\" | q/.PORT | q}"
 
 expect reported input-dropped-from-a-list-ref '' "${BASE/.PORT | default \"80\" | q/._PORTS | join \" \" | q}
 vars:
