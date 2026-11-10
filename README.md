@@ -43,6 +43,7 @@ is another, split into three entry points by who runs the command.
   - [Local clusters](#local-clusters)
 - [Conventions](#conventions)
   - [Variable scoping](#variable-scoping)
+  - [A monorepo runs its components, it does not include them](#a-monorepo-runs-its-components-it-does-not-include-them)
   - [When a module's values are decided](#when-a-modules-values-are-decided)
   - [Task naming](#task-naming)
   - [A task you don't need](#a-task-you-dont-need)
@@ -85,10 +86,12 @@ tasks:
 `dir: .` is required on every include — it pins the module's commands to the
 including component's directory.
 
-In a monorepo, module inputs belong in the include's own `vars:` rather than at
-the top level shown here — see [Variable scoping](#variable-scoping).
-`task monorepo:doctor` reports the names a root Taskfile's components would
-otherwise read from one another.
+This is one component's Taskfile. In a repository with several, each keeps
+one like it and the root **runs** them, it does not include them: included,
+one component reads another's `PROJECT_NAME` in a share of its runs and
+publishes under it. See
+[A monorepo runs its components](#a-monorepo-runs-its-components-it-does-not-include-them)
+before writing the root.
 
 The three names above `includes:` are inputs, not decoration. A module never
 declares a bare input name — a var declared inside an included file *shadows*
@@ -289,6 +292,80 @@ shapes — a name only some components declare, and a name several declare
 with different values. The two ways out are the include's own `vars:`, as
 above, and running each component as a child `task` process, which is what
 `monorepo:each` does: a process of its own has a pool of its own.
+
+### A monorepo runs its components, it does not include them
+
+The one mistake this library cannot stop you making, and the costliest: a
+root Taskfile that pulls each component's Taskfile in with `includes:`.
+
+```yaml
+# DO NOT: every component's top-level vars land in one pool
+includes:
+  api: { taskfile: ./backend/api, dir: ./backend/api }
+  web: { taskfile: ./frontend/web, dir: ./frontend/web }
+```
+
+It looks right and mostly works. `task api:deploy` runs, each component
+declares its own `PROJECT_NAME`, and nothing fails. But Task keeps a single
+pool for the top-level `vars:` of everything a Taskfile includes, and which
+component's value a module reads from it is not stable. Measured on 3.54.0,
+`api` and `web` each declaring `PROJECT_NAME`, a third include beside them,
+sixteen runs of one unchanged task:
+
+| How the component gets its name | What `api`'s module read |
+|---|---|
+| top level of `vars:`, components included by the root | `api` 12 times, `web` 4 times |
+| the `vars:` of the include that reads it | `api` 16 times |
+| top level of `vars:`, component run as a child `task` process | `api` 16 times |
+
+That is not a wrong label in a log. `PROJECT_NAME` is the image and the chart
+`release:deploy` publishes under, `K8S_NAMESPACE` is where `k8s:restart`
+rolls, `DOCKERFILE` is what gets built. One run in four, a component ships
+under its sibling's name — and reports success.
+
+**Run each component as a process of its own.** A process has a pool of its
+own, so a component's Taskfile can stay exactly as the quickstart shows it.
+For a fan-out — one target across every component — that is
+[`monorepo:each`](monorepo/README.md). For `task api:<anything>` from the
+root, a wildcard task per component:
+
+```yaml
+tasks:
+  _component:
+    internal: true
+    dir: "{{.COMPONENT}}"
+    requires: { vars: [COMPONENT, TARGET] }
+    # What the root decides for every component goes through the
+    # environment: a var on the call does not reach the child's own vars.
+    env: { GLOBAL_REGISTRY: "{{.GLOBAL_REGISTRY}}" }
+    cmd: task {{.TARGET | q}} -- {{.CLI_ARGS}}
+
+  "api:*":
+    desc: "Run a task in backend/api (task api:test)"
+    cmds: [{ task: _component, vars: { COMPONENT: backend/api, TARGET: "{{index .MATCH 0}}" } }]
+  "web:*":
+    desc: "Run a task in frontend/web (task web:test)"
+    cmds: [{ task: _component, vars: { COMPONENT: frontend/web, TARGET: "{{index .MATCH 0}}" } }]
+```
+
+`task api:test`, `task api:release:deploy` and `task api:test -- -run TestX`
+all work as before, and so does a root task that calls `task: api:test`. What
+changes: `task --list-all` at the root shows one `api:*` line instead of the
+component's tasks — `task api:default`, or `task --list-all` in the
+component, lists them — and a `vars:` block on a call to a component task no
+longer arrives, so a value the root has to hand down goes through `env:` as
+above, where the component reads it with `{{.NAME | default "…"}}`.
+
+**Where a component has to be included** — the root needs its tasks inlined,
+not just run — nothing a module reads may sit at the top level of the
+component's `vars:`. It goes in the `vars:` of the include that reads it, as
+[Variable scoping](#variable-scoping) shows, once per include. That protects
+the modules and not the component's own tasks: one of those reading
+`{{.PROJECT_NAME}}` from the top level is in the pool like everything else.
+
+`task monorepo:doctor` reads a root Taskfile and names every var that can
+reach one included component from another. A root with nothing to report is
+one whose components cannot see each other.
 
 ### When a module's values are decided
 
