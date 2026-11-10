@@ -52,6 +52,9 @@ is another, split into three entry points by who runs the command.
   - [Versioning](#versioning)
   - [Every tool invocation takes flags](#every-tool-invocation-takes-flags)
   - [Commit the remote lock](#commit-the-remote-lock)
+    - [Moving the pin](#moving-the-pin)
+    - [Run offline by default](#run-offline-by-default)
+    - [In a git hook](#in-a-git-hook)
   - [Idempotency](#idempotency)
 - [License](#license)
 
@@ -126,6 +129,10 @@ references and evaluates nothing else there: no `{{if}}`, and no variable whose
 value is itself a template. So `TASKLIB: '...//%s?ref={{.V | default "v2.2.0"}}'`
 does not resolve — it reaches git as a literal ref and fails. The version is a
 constant in the file, which is what pinning means anyway.
+
+For the same reason the switch is an edit and not an argument: a `TASKLIB=`
+on the command line or in the environment does not reach an include path,
+which is resolved from the file's own `vars:` before either is read.
 
 `task lint` is the whole gate, and it includes the behaviour tests in
 `tests/<module>.test.sh`: each runs a module's tasks against shims for the tools
@@ -489,10 +496,72 @@ followed by `!.task/remote/` still ignores the lock:
 
 `release:doctor` warns when the lock is ignored or not committed.
 
-Refresh it deliberately when you bump the pin, with `task --download`.
+Each include leaves three files there, and they are not the same kind of thing:
+
+| File | What it is | Commit it |
+|---|---|---|
+| `.checksum` | the hash of what the ref served when it was trusted | always — it is the lock |
+| `.yaml` | the module itself, as fetched | to run without the network |
+| `.timestamp` | when it was fetched | with the other two, or not at all — nothing reads it offline |
 
 A checkout-based include produces no lock, because there is no fetch to
 verify — nothing to commit until you move to a tag.
+
+#### Moving the pin
+
+The files are named by a hash of the include's whole URL, ref included. So a
+new ref invalidates every one of them at once, in every directory that has a
+Taskfile, and leaves the old ones behind. A pin moved without its lock fails
+with `not trusted by user` — or, with no terminal to ask, the same error and
+no prompt.
+
+[`tasklib`](tasklib/README.md) does the whole move — every Taskfile's ref,
+every lock, the stale files — and holds a repository to it afterwards:
+
+```console
+$ task tasklib:bump VERSION=v15.0.0
+$ task tasklib:check
+```
+
+It also ships the Renovate presets that find a pin in any Taskfile.
+
+#### Run offline by default
+
+Committed `.checksum` and `.yaml` files are everything Task needs, so a
+repository that has them can stop fetching:
+
+```yaml
+# .taskrc.yml
+remote:
+  offline: true
+```
+
+This is the setup to prefer, and not only for speed. Online, every `task`
+process clones each ref into one cache per user —
+`~/Library/Caches/task` on macOS, `~/.cache/task` on Linux — and two that
+start together collide there:
+
+```
+task: failed to clone repository
+error: could not lock config file
+```
+
+Hook jobs running side by side do that, and so do two worktrees of one
+repository, and so does a fan-out over a monorepo's components. Offline, none
+of them touches the cache. The one command that has to go online says so
+itself: `task --yes --offline=false --download tasklib:lock`.
+
+#### In a git hook
+
+A hook runs with `GIT_DIR` and `GIT_INDEX_FILE` set, and in a linked worktree
+they point at the repository the hook fired in. A clone Task makes while they
+are set writes into that repository's index. Offline there is no clone; a
+hook that may go online clears them first:
+
+```yaml
+# lefthook.yml
+run: env $(git rev-parse --local-env-vars | sed 's/^/-u /') task lint
+```
 
 ### Idempotency
 
