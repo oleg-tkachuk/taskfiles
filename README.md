@@ -278,9 +278,17 @@ includes:
 ```
 
 The quickstart above puts inputs at the top level because it shows one
-repository with one component — a pool of one, which cannot collide. A name
-*every* component declares is safe there too, because the pool then holds one
-value per component. A name only some declare is the shape that bites.
+repository with one component — a pool of one, which cannot collide.
+
+Declaring the name in *every* component does not make it safe. Measured on
+3.54.0, with two components declaring different values and a third include
+beside them: the component that declares `name-a` reads `name-b` in one run
+out of four. That is the label in a log line, and it is also the image and the
+chart a `release:deploy` publishes under. `task monorepo:doctor` reports both
+shapes — a name only some components declare, and a name several declare
+with different values. The two ways out are the include's own `vars:`, as
+above, and running each component as a child `task` process, which is what
+`monorepo:each` does: a process of its own has a pool of its own.
 
 ### When a module's values are decided
 

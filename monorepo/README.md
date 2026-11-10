@@ -19,7 +19,7 @@ workspace — tasks then read `monorepo:<task>`.
 |---|---|
 | `build` | Run `task build` in every component |
 | `deploy` | Run `task deploy` in every component, after checking the registry answers |
-| `doctor` | Report a top-level var some included components declare and others do not |
+| `doctor` | Report a top-level var that included components can read from one another |
 | `each` | Run TARGET in every component (TARGET=test, TARGET=deploy, ...) |
 | `lint` | Run `task lint` in every component |
 | `test` | Run `task test` in every component |
@@ -83,12 +83,20 @@ A root Taskfile that *includes* its components is different: their top-level
 `vars:` land in one pool, and a name one component declares is what every
 other component's includes read — see
 [Variable scoping](../README.md#variable-scoping). `doctor` reads the root's
-local includes and names each var some of them declare and others do not:
+local includes and names each var some of them declare and others do not, and
+each var several declare with different values:
 
 ```console
 $ task monorepo:doctor
 ▲ monorepo · DOCKERFILE is declared at the top level of api only — every other component reads that value; move it into the vars: of the include that reads it
+▲ monorepo · PROJECT_NAME is declared at the top level of api web with different values — which one a module reads is not stable, in the declaring components too; move it into the vars: of the include that reads it
 ```
+
+The second is the quieter one. Each component declares its own name, so
+nothing looks shared — and still, once the root holds a third include, the
+component that declares one value reads the other in a share of its runs. A
+module reads `PROJECT_NAME` for the image and the chart it publishes, not only
+for its log lines.
 
 A warning rather than a failure: a name only one component uses is harmless
 until a module in another component reads it, which this cannot see. It needs
