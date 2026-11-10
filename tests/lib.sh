@@ -107,6 +107,37 @@ refute_call() {
 
 reset_calls() { : > "$CALLS"; }
 
+# The tools a module's go.mod is taken to pin, one name per line.
+PINNED="$WORK/pinned"
+export PINNED
+
+# shim_go — a `go` that logs its argv joined with "|", and answers
+# `go tool [-modfile=…] -n <name>` the way go does: with success only for a
+# tool pin_tools named.
+shim_go() {
+  # shellcheck disable=SC2016 # the shim's own $@, written literally
+  shim go '
+printf "%s|" go "$@" >> "$CALLS"; printf "\n" >> "$CALLS"
+[ "${1-}" = tool ] || exit 0
+shift
+case "${1-}" in -modfile=*) shift ;; esac
+[ "${1-}" = -n ] || exit 0
+grep -qxF -- "${2-}" "$PINNED" 2>/dev/null || { printf "go: no such tool \"%s\"\n" "${2-}" >&2; exit 2; }'
+}
+
+# pin_tools [name...] — the tools `go tool -n` finds from here on; none clears.
+pin_tools() { printf '%s\n' "$@" > "$PINNED"; }
+
+# expect_run <name> <case name> — <name> itself was run, from PATH.
+expect_run() {
+  if grep -q -- "^$1[| ]" "$CALLS"; then pass "$2"; else fail "$2: $1 was not run from PATH"; sed 's/^/    > /' "$CALLS" >&2; fi
+}
+
+# refute_run <name> <case name>
+refute_run() {
+  if grep -q -- "^$1[| ]" "$CALLS"; then fail "$2: $1 was run from PATH"; sed 's/^/    > /' "$CALLS" >&2; else pass "$2"; fi
+}
+
 # semver_cmp <a> <b> — prints -1, 0 or 1: a's precedence against b's, by
 # SemVer 2.0.0 §11. Build metadata is ignored; the core compares numerically;
 # a pre-release sorts below its release; pre-release identifiers compare left
