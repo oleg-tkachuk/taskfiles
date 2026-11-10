@@ -9,7 +9,7 @@ through a pull request, rebase-merged once the same checks CI runs pass. That
 keeps the small-commit-per-change history direct pushes used to produce —
 rebase replays each commit onto `main` rather than collapsing them — and it is
 also what makes the GitHub release notes below mean something: they are built
-from merged PRs, and a PR with no label falls into "Other Changes".
+from merged PRs.
 
 ## Cutting one
 
@@ -61,7 +61,18 @@ is why the workflow is slower than a lint.
 
 The GitHub release notes are generated from merged pull requests — see
 [`.github/release.yml`](.github/release.yml) for how a PR's label sorts it
-into a category. There is no hand-written changelog to keep in sync with
+into a category. The `publish` job labels each PR from its commits before the
+notes are written, the same commits the version number comes from: a `feat`
+is a feature, a `fix` a bug fix, a `!` a breaking change. A label put on by
+hand is kept.
+
+A list of what merged does not say what a consumer has to do about it. That
+is the **Consumer impact** section of the pull request's description, and the
+notes open with it, under the pull request's title. Whoever writes the change
+writes it there, once — a default that moved, a check that became stricter, a
+tool now picked up from `PATH`. "None" leaves the pull request out.
+
+There is no hand-written changelog to keep in sync with
 that: [CHANGELOG.md](CHANGELOG.md) is a frozen historical record through
 5.4.0, the last version cut by hand before this workflow existed.
 
