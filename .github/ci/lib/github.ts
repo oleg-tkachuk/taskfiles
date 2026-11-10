@@ -5,6 +5,8 @@
 
 import { Octokit, RequestError } from "octokit";
 
+import type { PullRequest } from "./release-notes.ts";
+
 // NOT_FOUND is the status GitHub answers for a release or ref that is not
 // there.
 const NOT_FOUND = 404;
@@ -25,9 +27,17 @@ export interface GitHub {
   tagExists(tag: string): Promise<boolean>;
   // releaseExists reports whether a release is published for tag.
   releaseExists(tag: string): Promise<boolean>;
-  // createRelease publishes a release for tag, with notes GitHub generates.
-  // It is false when tag already has a release.
-  createRelease(tag: string): Promise<boolean>;
+  // pullRequestsFor lists the merged pull requests that brought commit sha.
+  pullRequestsFor(sha: string): Promise<PullRequest[]>;
+  // addLabels puts labels on pull request number, creating any the
+  // repository does not have yet.
+  addLabels(number: number, labels: string[]): Promise<void>;
+  // generateNotes is the notes GitHub writes for tag from the pull requests
+  // merged since previous — or since the release before it, when undefined.
+  generateNotes(tag: string, previous: string | undefined): Promise<string>;
+  // createRelease publishes a release for tag with notes as its body. It is
+  // false when tag already has a release.
+  createRelease(tag: string, notes: string): Promise<boolean>;
 }
 
 // splitRepository is owner and name of an owner/name repository.
@@ -75,9 +85,26 @@ export function gitHubFor(token: string, repository: string): GitHub {
     },
     tagExists: (tag) => found(octokit.rest.git.getRef({ ...where, ref: `tags/${tag}` })),
     releaseExists: (tag) => found(octokit.rest.repos.getReleaseByTag({ ...where, tag })),
-    async createRelease(tag) {
+    async pullRequestsFor(sha) {
+      const { data } = await octokit.rest.repos.listPullRequestsAssociatedWithCommit({ ...where, commit_sha: sha });
+      return data
+        .filter((pull) => pull.merged_at !== null)
+        .map((pull) => ({ number: pull.number, title: pull.title, body: pull.body ?? "", labels: pull.labels.map((label) => label.name) }));
+    },
+    async addLabels(number, labels) {
+      await octokit.rest.issues.addLabels({ ...where, issue_number: number, labels });
+    },
+    async generateNotes(tag, previous) {
+      const { data } = await octokit.rest.repos.generateReleaseNotes({
+        ...where,
+        tag_name: tag,
+        ...(previous === undefined ? {} : { previous_tag_name: previous }),
+      });
+      return data.body;
+    },
+    async createRelease(tag, notes) {
       try {
-        await octokit.rest.repos.createRelease({ ...where, tag_name: tag, name: tag, generate_release_notes: true });
+        await octokit.rest.repos.createRelease({ ...where, tag_name: tag, name: tag, body: notes });
         return true;
       } catch (err) {
         if (alreadyExists(err)) {

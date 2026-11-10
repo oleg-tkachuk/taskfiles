@@ -609,7 +609,8 @@ jobs:
     permissions:
       # The only job in this file that needs more than read, which is why the
       # elevation sits here rather than at the top.
-      contents: write # `gh release create` writes the release and its notes
+      contents: write # creates the release and its notes
+      pull-requests: write # labels the merged pull requests the notes sort by
     steps:
       - name: 'Setup: check out the tag'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -627,6 +628,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
-        # Notes come from merged PRs since the previous tag, which is why
-        # opening one carries a label — see .github/release.yml.
+        # Notes come from merged PRs since the previous tag: each is labelled
+        # from its commits first, and what it says under "Consumer impact"
+        # opens the notes — see .github/release.yml.
         run: node .github/ci/publish-release.ts
