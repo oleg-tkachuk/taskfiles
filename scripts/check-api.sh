@@ -52,7 +52,9 @@ listed() { case " $allowed " in *" $1 "*) return 0 ;; esac; return 1; }
 
 for file in "$@"; do
   module=${file%/Taskfile.yaml}
-  before=$(git show "$base:$file" 2>/dev/null | names | sort -u)
+  # A file the base does not have fails git show, which pipefail would turn
+  # into this script's own exit: a new module is nothing to compare.
+  before=$( { git show "$base:$file" 2>/dev/null || true; } | names | sort -u)
   [ -n "$before" ] || continue
   now=$( { if [ -f "$file" ]; then names < "$file"; fi; } | sort -u)
   if [ -z "$now" ]; then

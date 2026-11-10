@@ -103,4 +103,16 @@ expect reported module-removed '' -
 
 expect clean module-removed-and-named 'm:*' -
 
+# A module the release never had is new, not lost: nothing to compare.
+printf '%s\n' "$BASE" > "$repo/m/Taskfile.yaml"
+mkdir -p "$repo/n"
+printf '%s\n' "$BASE" > "$repo/n/Taskfile.yaml"
+if (cd "$repo" && bash "$here/check-api.sh" v1.0.0 '' m/Taskfile.yaml n/Taskfile.yaml) > "$work/out" 2>&1; then
+  printf '%s\n' "✔ module-added: clean"
+else
+  printf '%s\n' "✖ module-added: want clean, got reported" >&2
+  cat "$work/out" >&2
+  failures=$((failures + 1))
+fi
+
 [ "$failures" = 0 ] || exit 1
