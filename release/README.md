@@ -27,6 +27,7 @@ workspace — tasks then read `release:<task>`.
 | `version` | Print the version this working tree publishes as |
 | `image:build` | Build the component image (skipped when the tree is clean and it is already built) |
 | `image:push` | Push the component image to the registry, and record the digest it pushed in `.task/release/<version>.digest` |
+| `image:scan` | trivy image — vulnerabilities in the built image, before it is pushed |
 | `image:gc` | Trim the BuildKit cache to the keep floor and drop dangling images |
 | `chart:verify` | Lint the chart and render it through the multi-doc separator gate |
 | `chart:lint` | helm lint the chart |
@@ -49,6 +50,8 @@ workspace — tasks then read `release:<task>`.
 | `DOCKERFILE` | `./Dockerfile` | resolved from the component directory, **not** from `DOCKER_CONTEXT` |
 | `DOCKER_CONTEXT` | `.` | build context, when it is not the component directory |
 | `DOCKER_BUILD_FLAGS` | — | verbatim extra buildx flags |
+| `IMAGE_SCAN` | `0` | set to `1` to have `deploy` run `image:scan` before the push; any other value than `0` or `1` is refused |
+| `TRIVY_IMAGE_FLAGS` | — | verbatim extra `trivy image` flags, e.g. `--ignore-unfixed --severity HIGH,CRITICAL` |
 | `IMAGE_LATEST` | `0` | set to `1` to push a floating `:latest` beside the version tag; any other value than `0` or `1` is refused |
 | `BUILDX_BUILDER` | active builder | which buildx builder `image:gc` prunes |
 | `BUILDX_KEEP_STORAGE` | `8GB` | cache floor `image:gc` trims down to |
@@ -262,5 +265,29 @@ it resolved to yesterday is gone, and a rollback has nothing to roll back to.
 `IMAGE_LATEST: '1'` turns it on for the repositories that genuinely need it —
 where something outside this pipeline pulls the image by name. The version tag
 is still pushed first, and `:latest` is a second tag on the same digest.
+
+## Scanning the image before it is pushed
+
+`security:trivy` reads the source tree: lockfiles and manifests. What ships
+also carries a base image and whatever the build installed into it, and only
+the built image shows those. `image:scan` runs `trivy image` on it, and
+`IMAGE_SCAN: '1'` puts that step in `deploy`, between the build and the push —
+an image with a finding does not reach the registry, and neither does its
+chart.
+
+```yaml
+release:
+  taskfile: '{{printf .TASKLIB "release"}}'
+  dir: .
+  vars:
+    IMAGE_SCAN: '1'
+    TRIVY_IMAGE_FLAGS: '--ignore-unfixed --severity HIGH,CRITICAL --ignorefile .trivyignore'
+```
+
+It is off by default: `deploy` would otherwise need trivy on every machine
+that publishes. The flags narrow what counts as a finding; the exit code that
+fails the task is set after them and is not theirs to change.
+
+---
 
 Part of [taskfiles](../README.md).

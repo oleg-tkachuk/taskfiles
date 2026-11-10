@@ -25,6 +25,9 @@ component's directory.
 | `mocks:check` | Fail when the mocks are stale against the working tree |
 | `proto:check` | Fail when the protobuf stubs are stale against the working tree |
 | `sqlc:check` | Fail when the sqlc output is stale against the working tree |
+| `proto:lint` | buf lint — the proto sources against the module's lint rules |
+| `proto:fmt:check` | Fail if buf format would change any proto file — nothing is rewritten |
+| `proto:deps` | buf dep update — move buf.lock to the newest dependencies (network; rewrites buf.lock) |
 
 ## Inputs
 
@@ -42,13 +45,16 @@ component's directory.
 | `PROTO_PATH` | — | directories prepended to `PATH` before buf runs; evaluated by the shell, so `$(pnpm -C ../web bin)` works |
 | `GENERATE_CMD` | `go generate ./...` | what `generate` runs |
 | `BUF_FLAGS` | — | verbatim extra flags for every `buf generate` |
+| `BUF_LINT_FLAGS` | — | verbatim extra flags for `buf lint` |
+| `BUF_FORMAT_FLAGS` | — | verbatim extra flags for `buf format` |
+| `BUF_DEP_FLAGS` | — | verbatim extra flags for `buf dep update` |
 | `SQLC_FLAGS` | — | verbatim extra sqlc flags |
 | `GOIMPORTS_FLAGS` | — | verbatim extra goimports flags |
 | `SQLC_MODULE` | — | run sqlc through `go run` at a pinned version instead of from PATH |
 | `GO_TOOL_MODFILE` | — | a `go.mod` whose `tool` directives pin buf, sqlc and goimports, when they are not in this module's own |
 | `MOCKS_PATHSPEC` | `internal` | git pathspec the mock gate watches |
 | `PROTO_PATHSPEC` | derived from the templates' `out:` | git pathspec the proto gate watches |
-| `SQLC_DIR` | — | git pathspec the sqlc gate watches; required by `sqlc:check`, which refuses one that names no tracked file |
+| `SQLC_DIR` | derived from `sqlc.yaml`'s `out:` | git pathspec the sqlc gate watches; `sqlc:check` refuses one that names no tracked file |
 | `GOWORK` | `off` | `auto` to generate through a go.work workspace (an empty value keeps `off`) |
 
 ## Examples
@@ -66,7 +72,6 @@ includes:
       GENERATED_DIRS: ["internal/domain/mocks", "api/"]
       MOCKS_PATHSPEC: ':(glob)internal/**/mocks/**'
       SQLC_MODULE: github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
-      SQLC_DIR: internal/repo/db
 ```
 
 ```console

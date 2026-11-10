@@ -26,6 +26,9 @@ version: "3"
 #                     the shell, so `$(pnpm -C ../web bin)` works.
 #   GENERATE_CMD      what `generate` runs (default `go generate ./...`)
 #   BUF_FLAGS         verbatim extra flags for every buf generate
+#   BUF_LINT_FLAGS    verbatim extra flags for buf lint
+#   BUF_FORMAT_FLAGS  verbatim extra flags for buf format
+#   BUF_DEP_FLAGS     verbatim extra flags for buf dep update
 #   SQLC_FLAGS        verbatim extra sqlc flags
 #   GOIMPORTS_FLAGS   verbatim extra goimports flags
 #   CODEGEN_BIN_DIR   where those plugins land            (default ./bin)
@@ -37,8 +40,9 @@ version: "3"
 #   MOCKS_PATHSPEC    git pathspec the mock gate watches   (default internal)
 #   PROTO_PATHSPEC    git pathspec the proto gate watches, when the `out:`
 #                     paths in the templates are not the right answer
-#   SQLC_DIR          git pathspec the sqlc gate watches; one that names no
-#                     tracked file is refused
+#   SQLC_DIR          git pathspec the sqlc gate watches, when the `out:`
+#                     paths in sqlc.yaml are not the right answer; one that
+#                     names no tracked file is refused
 #
 # Order is fixed, not configurable: mocks first, so they are written against
 # the interfaces the tree already has; buf before the generate step, so the
@@ -76,6 +80,7 @@ version: "3"
 # was just generated. The go and security modules follow the same rule.
 # ─────────────────────────────────────────────────────────────────────────────
 # shell-verbatim: _CG_GEN_CMD GENERATE_CMD _CG_BUF_PATH PROTO_PATH _CG_BUF_FLAGS BUF_FLAGS _CG_SQLC_FLAGS SQLC_FLAGS _CG_GOIMPORTS_FLAGS GOIMPORTS_FLAGS _CG_PATHS_Q _CG_TOOLS
+# shell-verbatim: _CG_BUF_LINT_FLAGS BUF_LINT_FLAGS _CG_BUF_FMT_FLAGS BUF_FORMAT_FLAGS _CG_BUF_DEP_FLAGS BUF_DEP_FLAGS
 
 silent: true
 
@@ -103,6 +108,12 @@ vars:
   _CG_PROTO_SPEC: '{{.PROTO_PATHSPEC | default ""}}'
   _CG_GEN_CMD: '{{.GENERATE_CMD | default "go generate ./..."}}'
   _CG_BUF_FLAGS: '{{.BUF_FLAGS | default ""}}'
+  _CG_BUF_LINT_FLAGS: '{{.BUF_LINT_FLAGS | default ""}}'
+  _CG_BUF_FMT_FLAGS: '{{.BUF_FORMAT_FLAGS | default ""}}'
+  _CG_BUF_DEP_FLAGS: '{{.BUF_DEP_FLAGS | default ""}}'
+  # What to say when a tool is neither pinned nor on PATH.
+  _CG_BUF_HINT: https://buf.build/docs/installation/
+  _CG_SQLC_HINT: https://docs.sqlc.dev/en/latest/overview/install.html, or set SQLC_MODULE to run it through `go run`
   _CG_SQLC_FLAGS: '{{.SQLC_FLAGS | default ""}}'
   _CG_GOIMPORTS_FLAGS: '{{.GOIMPORTS_FLAGS | default ""}}'
   _CG_TOOL_MOD: '{{.GO_TOOL_MODFILE | default ""}}'
@@ -123,7 +134,8 @@ vars:
       if (v != "") { print v }
     }
   # The shell every task that calls a tool starts with. have_tool says whether
-  # a tool can be run at all; run_tool runs the pinned one, else PATH's.
+  # a tool can be run at all; run_tool runs the pinned one, else PATH's;
+  # need_tool stops the task, with the hint, when there is neither.
   # A GO_TOOL_MODFILE that is not there is refused here: `go tool -n` fails on
   # it the way it does on a tool nobody pinned, and the run would carry on
   # with whatever PATH holds — the pin gone, and nothing saying so.
@@ -132,6 +144,11 @@ vars:
     have_tool() { go_tool -n "$1" >/dev/null 2>&1 || command -v "$1" >/dev/null 2>&1; }
     run_tool() {
       if go_tool -n "$1" >/dev/null 2>&1; then go_tool "$@"; else "$@"; fi
+    }
+    need_tool() {
+      have_tool "$1" && return 0
+      printf '%s %s · gen · %s is not installed — %s\n' "{{._CG_ERR}}" {{._CG_NAME | q}} "$1" "$2" >&2
+      exit 1
     }
     {{if ._CG_TOOL_MOD}}if [ ! -f {{._CG_TOOL_MOD | q}} ]; then
       printf '%s %s · gen · GO_TOOL_MODFILE names %s, which does not exist\n' "{{._CG_ERR}}" {{._CG_NAME | q}} {{._CG_TOOL_MOD | q}} >&2
@@ -220,12 +237,40 @@ tasks:
           {{end}}
           {{if ._CG_BUF_PATH}}export PATH="{{._CG_BUF_PATH}}:$PATH"{{end}}
           {{._CG_TOOLS}}
-          if ! have_tool buf; then
-            printf '%s %s · gen · buf is not installed — https://buf.build/docs/installation/\n' "{{._CG_ERR}}" {{._CG_NAME | q}} >&2
-            exit 1
-          fi
+          need_tool buf {{._CG_BUF_HINT | q}}
           run_tool buf generate {{._CG_BUF_FLAGS}} {{if ._CG_BUF_IN}}{{._CG_BUF_IN | q}}{{end}} --template {{.ITEM | q}}
       - task: _normalise
+
+  proto:lint:
+    desc: "buf lint — the proto sources against the module's lint rules"
+    cmds:
+      - printf '%s %s · gen · buf lint\n' "{{._CG_RUN}}" {{._CG_NAME | q}}
+      - cmd: |-
+          {{._CG_TOOLS}}
+          need_tool buf {{._CG_BUF_HINT | q}}
+          run_tool buf lint {{._CG_BUF_LINT_FLAGS}} {{if ._CG_BUF_IN}}{{._CG_BUF_IN | q}}{{end}}
+      - printf '%s %s · gen · proto lint clean\n' "{{._CG_OK}}" {{._CG_NAME | q}}
+
+  proto:fmt:check:
+    desc: "Fail if buf format would change any proto file — nothing is rewritten"
+    cmds:
+      - cmd: |-
+          {{._CG_TOOLS}}
+          need_tool buf {{._CG_BUF_HINT | q}}
+          run_tool buf format --diff --exit-code {{._CG_BUF_FMT_FLAGS}} {{if ._CG_BUF_IN}}{{._CG_BUF_IN | q}}{{end}}
+      - printf '%s %s · gen · proto files are buf format clean\n' "{{._CG_OK}}" {{._CG_NAME | q}}
+
+  proto:deps:
+    desc: "buf dep update — move buf.lock to the newest dependencies (network; rewrites buf.lock)"
+    # Not part of `proto` or `regenerate`: it reaches the network and rewrites
+    # a committed file, and generating must do neither.
+    cmds:
+      - printf '%s %s · gen · buf dep update\n' "{{._CG_RUN}}" {{._CG_NAME | q}}
+      - cmd: |-
+          {{._CG_TOOLS}}
+          need_tool buf {{._CG_BUF_HINT | q}}
+          run_tool buf dep update {{._CG_BUF_DEP_FLAGS}} {{if ._CG_BUF_IN}}{{._CG_BUF_IN | q}}{{end}}
+      - printf '%s %s · gen · buf.lock updated — review git diff\n' "{{._CG_OK}}" {{._CG_NAME | q}}
 
   generate:
     desc: "Run this component's generate step (default: `go generate ./...`)"
@@ -250,10 +295,7 @@ tasks:
       # sqlc, then PATH's.
       - cmd: |-
           {{._CG_TOOLS}}
-          {{if ._CG_SQLC_MOD}}go run {{._CG_SQLC_MOD | q}} generate {{._CG_SQLC_FLAGS}}{{else}}if ! have_tool sqlc; then
-            printf '%s %s · gen · sqlc is not installed — https://docs.sqlc.dev/en/latest/overview/install.html, or set SQLC_MODULE to run it through `go run`\n' "{{._CG_ERR}}" {{._CG_NAME | q}} >&2
-            exit 1
-          fi
+          {{if ._CG_SQLC_MOD}}go run {{._CG_SQLC_MOD | q}} generate {{._CG_SQLC_FLAGS}}{{else}}need_tool sqlc {{._CG_SQLC_HINT | q}}
           run_tool sqlc generate {{._CG_SQLC_FLAGS}}{{end}}
       # Normalised like every other generator's output (see _normalise): sqlc
       # writes one import block where goimports writes two, so a commit hook
@@ -291,25 +333,35 @@ tasks:
 
   sqlc:check:
     desc: "Fail when the sqlc output is stale against the working tree"
+    vars:
+      # What to watch is what sqlc.yaml already declares as `out:`, as
+      # proto:check reads buf's templates: derived, the gate moves with the
+      # generator. SQLC_DIR overrides it for a layout the config does not
+      # express, or a sqlc.json, which is not read.
+      _CG_SQLC_WATCH:
+        sh: |-
+          spec={{._CG_SQLC_DIR | q}}
+          if [ -n "$spec" ]; then printf '%s' "$spec"; exit 0; fi
+          awk {{._CG_OUT_AWK | q}} sqlc.yaml sqlc.yml 2>/dev/null | sort -u | tr '\n' ' ' | sed 's/ $//'
     preconditions:
-      - sh: test -n {{._CG_SQLC_DIR | q}}
-        msg: "SQLC_DIR is not set — the gate needs to know which directory holds the generated bindings"
+      - sh: test -n {{._CG_SQLC_WATCH | q}}
+        msg: "no out: path in sqlc.yaml — set SQLC_DIR to the directory that holds the generated bindings"
     cmds:
       # A pathspec that names no tracked file compares two empty snapshots and
       # reports a clean tree it never looked at — `dir/**/gen` without a
       # trailing `/**` names directories, which hold no file of their own.
       - cmd: |-
           set -eu
-          if [ -z "$(git ls-files -- {{range (splitList " " ._CG_SQLC_DIR | compact)}}{{q .}} {{end}})" ]; then
-            printf '%s %s · gen · SQLC_DIR %s matches no tracked file — this gate checks nothing\n' "{{._CG_ERR}}" {{._CG_NAME | q}} {{._CG_SQLC_DIR | q}} >&2
+          if [ -z "$(git ls-files -- {{range (splitList " " ._CG_SQLC_WATCH | compact)}}{{q .}} {{end}})" ]; then
+            printf '%s %s · gen · %s matches no tracked file — this gate checks nothing; set SQLC_DIR\n' "{{._CG_ERR}}" {{._CG_NAME | q}} {{._CG_SQLC_WATCH | q}} >&2
             exit 1
           fi
       - task: _cg_snapshot
-        vars: { PATHS: '{{._CG_SQLC_DIR}}', OUT: '{{._CG_SNAP_DIR}}/sqlc' }
+        vars: { PATHS: '{{._CG_SQLC_WATCH}}', OUT: '{{._CG_SNAP_DIR}}/sqlc' }
       - task: sqlc
       - task: _cg_compare
         vars:
-          PATHS: '{{._CG_SQLC_DIR}}'
+          PATHS: '{{._CG_SQLC_WATCH}}'
           OUT: '{{._CG_SNAP_DIR}}/sqlc'
           STALE: "sqlc output is stale — run the generator"
           FRESH: "sqlc bindings match their queries"

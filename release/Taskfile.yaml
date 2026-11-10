@@ -36,6 +36,9 @@ version: "3"
 #   DOCKERFILE           default ./Dockerfile
 #   DOCKER_CONTEXT       default .
 #   DOCKER_BUILD_FLAGS   verbatim extra buildx flags    (default none)
+#   IMAGE_SCAN           1 to have deploy scan the built image with trivy
+#                        before it is pushed            (default 0)
+#   TRIVY_IMAGE_FLAGS    verbatim extra `trivy image` flags (default none)
 #
 # `image:build` writes to whatever Docker daemon the host talks to. Getting
 # that image into a local cluster is the `runtime/*` modules' job — they differ
@@ -77,6 +80,7 @@ version: "3"
 # ─────────────────────────────────────────────────────────────────────────────
 # exports: _REL_VERSION _REL_IMAGE _REL_DIGEST_FILE
 # shell-verbatim: _REL_BUILD_FLAGS DOCKER_BUILD_FLAGS _REL_HELM_FLAGS HELM_FLAGS _REL_HELM_LINT_FLAGS HELM_LINT_FLAGS _REL_HELM_TPL_FLAGS HELM_TEMPLATE_FLAGS _REL_HELM_PKG_FLAGS HELM_PACKAGE_FLAGS _REL_KUBECONFORM_FLAGS KUBECONFORM_FLAGS _REL_TAG_MATCH
+# shell-verbatim: _REL_TRIVY_FLAGS TRIVY_IMAGE_FLAGS
 
 silent: true
 
@@ -249,6 +253,8 @@ vars:
   _REL_K8S_VERSION: '{{.K8S_VERSION | default ""}}'
   _REL_KUBECONFORM_FLAGS: '{{.KUBECONFORM_FLAGS | default ""}}'
   _REL_LATEST: '{{.IMAGE_LATEST | default "0"}}'
+  _REL_SCAN: '{{.IMAGE_SCAN | default "0"}}'
+  _REL_TRIVY_FLAGS: '{{.TRIVY_IMAGE_FLAGS | default ""}}'
   _REL_DIRTY:
     sh: git status --porcelain 2>/dev/null | head -c1
   _REL_NOW:
@@ -582,6 +588,21 @@ tasks:
           docker push {{._REL_IMAGE | q}}:latest
           printf '%s %s · image · pushed latest → %s\n' "{{._REL_OK}}" {{._REL_SVC | q}} {{._REL_VERSION | q}}
 
+  image:scan:
+    desc: "trivy image — vulnerabilities in the built image, before it is pushed"
+    # The image, not the source tree: `security:trivy` reads lockfiles, and
+    # what ships also carries a base image and whatever its build installed.
+    deps: [image:build]
+    preconditions:
+      - sh: command -v trivy >/dev/null
+        msg: "trivy is not installed — https://github.com/aquasecurity/trivy#installation"
+    cmds:
+      - printf '%s %s · image · trivy image %s:%s\n' "{{._REL_RUN}}" {{._REL_SVC | q}} {{._REL_IMAGE | q}} {{._REL_VERSION | q}}
+      # --exit-code comes last, where trivy's last-flag-wins parsing keeps it:
+      # TRIVY_IMAGE_FLAGS narrows what counts, it cannot switch the gate off.
+      - trivy image --quiet {{._REL_TRIVY_FLAGS}} --exit-code 1 {{._REL_IMAGE | q}}:{{._REL_VERSION | q}}
+      - printf '%s %s · image · scan clean\n' "{{._REL_OK}}" {{._REL_SVC | q}}
+
   image:gc:
     desc: "Trim the BuildKit cache to the keep floor and drop dangling images"
     cmds:
@@ -759,8 +780,16 @@ tasks:
     desc: "Verify the chart, then publish image + chart to the registry"
     # Gate first: a chart regression must never reach the registry, and the
     # verify costs seconds against a push that costs minutes.
+    preconditions:
+      # 0 or 1 and nothing else, as IMAGE_LATEST: a scan asked for with
+      # IMAGE_SCAN=true must not be the one that quietly does not run.
+      - sh: '{{if or (eq ._REL_SCAN "0") (eq ._REL_SCAN "1")}}true{{else}}false{{end}}'
+        msg: "IMAGE_SCAN is {{._REL_SCAN}} — set it to 1 to scan the image before it is pushed, or 0 (the default) not to"
     cmds:
       - task: chart:verify
+      # Before the push: an image with a finding must not reach the registry.
+      - if: '{{eq ._REL_SCAN "1"}}'
+        task: image:scan
       - task: image:push
       - task: chart:push
       - printf '%s %s · deploy · %s → %s\n' "{{._REL_OK}}" {{._REL_SVC | q}} {{._REL_VERSION | q}} {{._REL_REG | q}}
