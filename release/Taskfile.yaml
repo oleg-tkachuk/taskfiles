@@ -53,6 +53,10 @@ version: "3"
 #   HELM_TEMPLATE_FLAGS  extra flags for `helm template`
 #   HELM_PACKAGE_FLAGS   extra flags for `helm package`
 #   K8S_NAMESPACE        namespace the chart renders against (default "default")
+#   RENDER_OUT           where chart:render writes  (default .task/render.yaml)
+#   BUILDX_BUILDER       which buildx builder image:gc prunes (default: active)
+#   BUILDX_KEEP_STORAGE  cache floor image:gc trims down to     (default 8GB)
+#   TIMEZONE             zone of the build timestamp            (default UTC)
 #   INFO_ENV_FILE        default ./deploy/info.env
 #   VERSION_BASE         base for untagged builds  (default: latest version
 #                        tag one patch up, or 0.1.0 when there is none)
