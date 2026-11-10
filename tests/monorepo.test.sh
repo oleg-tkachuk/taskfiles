@@ -65,7 +65,8 @@ expect_status ok "registry:check: a registry answering over plain http is reacha
 # ─── doctor: the shared vars pool ─────────────────────────────────────────────
 # A root Taskfile that includes its components puts all their top-level vars in
 # one pool: a name one declares is what the others read, and which of two
-# declarations wins is not stable. A name every component declares is safe.
+# declarations wins is not stable — for the components that declare it too.
+# Only a name every component declares with ONE value is safe.
 # pool_root <c's Taskfile body> — a root including this module and three
 # components; a declares DOCKERFILE and PORT, b declares PORT.
 pool_root() {
@@ -90,7 +91,7 @@ vars:
 run_task mono:doctor
 expect_status ok "doctor: a name only some components declare is a warning, not a failure"
 expect_output "DOCKERFILE is declared at the top level of a only" "doctor: names the input and who declares it"
-refute_output "PORT is declared" "doctor: a name every component declares is not reported"
+expect_output "PORT is declared at the top level of a b c with different values" "doctor: a name declared with different values is reported, with who declares it"
 refute_output "_MONO_" "doctor: the library module's own vars are not components'"
 
 pool_root 'version: "3"
@@ -99,7 +100,15 @@ vars:
   PORT: "8082"'
 printf 'version: "3"\nvars:\n  DOCKERFILE: ./Dockerfile\n  PORT: "8081"\n' > "$CONSUMER/b/Taskfile.yaml"
 run_task mono:doctor
-expect_output "every top-level var is declared by every component" "doctor: a pool every component fills says so"
+expect_output "DOCKERFILE is declared at the top level of a b c with different values" "doctor: every component declaring a name does not make it safe when the values differ"
+refute_output "only —" "doctor: a name every component declares is not reported as partial"
+
+# One value everywhere is the one shape with nothing to leak.
+for c in a b; do printf 'version: "3"\nvars:\n  DOCKERFILE: ./Dockerfile\n  PORT: "8082"\n' > "$CONSUMER/$c/Taskfile.yaml"; done
+run_task mono:doctor
+expect_status ok "doctor: one value in every component passes"
+expect_output "no top-level var can reach one component from another" "doctor: a pool with one value per name says so"
+refute_output "is declared at the top level" "doctor: nothing is reported for it"
 
 # Without yq the check cannot read the includes, and says so.
 shim yq 'exit 1'
