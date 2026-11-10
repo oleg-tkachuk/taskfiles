@@ -1,0 +1,18 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Finds every pin of this library in a consumer: `?ref=<tag>` on a taskfiles.git include, in any Taskfile, with no annotation above it. Every pin shares one depName, so they move in one pull request.",
+    "A moved pin needs its lock refreshed before the Taskfile loads again: extend renovate/tasklib-lock.json as well, or run `task --yes --offline=false --download tasklib:lock` on the branch.",
+    "The file pattern is the one tasklib/Taskfile.yaml names _TL_NAME_RE; tests/tasklib.test.sh holds the two equal."
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)[Tt]askfile(\\.[A-Za-z0-9_-]+)?\\.ya?ml$/"],
+      "matchStrings": [
+        "github\\.com/(?<depName>oleg-tkachuk/taskfiles)\\.git//[^?\\s'\"]*\\?ref=(?<currentValue>[^\\s'\"&]+)"
+      ],
+      "datasourceTemplate": "github-releases"
+    }
+  ]
+}
