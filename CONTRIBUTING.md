@@ -102,10 +102,14 @@ includes every module side by side, and a `zizmor` audit of the workflows
 themselves. All three are required checks, and the branch merges with rebase
 once they pass, so the individual commits land on `main` as you wrote them.
 
-Label the PR `bug`, `enhancement` or `documentation` — the GitHub release
-notes are generated from merged PRs and sorted by that label (see
-[`.github/release.yml`](.github/release.yml)); an unlabeled PR still merges
-fine, it just lands in "Other Changes".
+Fill in **Consumer impact** in the description: what someone moving their
+`?ref=` to this has to know or do, or "None". It is copied into the release
+notes as written — see
+[Notes live on GitHub](RELEASE.md#notes-live-on-github-not-in-the-repository).
+
+No label is needed. The release labels each merged PR from its commits, and
+the notes sort by that; a `bug`, `enhancement` or `documentation` label put
+on by hand is kept.
 
 ## Reporting a security issue
 
