@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # go: values reach go as data, package lists split into one argument per
-# pattern, and verbatim flag inputs still word-split.
+# pattern, verbatim flag inputs still word-split, and every tool is the pinned
+# one before it is PATH's.
 source "$(dirname "$0")/lib.sh"
 
 # argv joined with "|", so one argument and two read differently.
 argv='printf "%s|" "$0" "$@" >> "$CALLS"; printf "\n" >> "$CALLS"'
-shim go "${argv/\$0/go}"
+shim_go
 shim gotestsum "${argv/\$0/gotestsum}"
 shim golangci-lint "${argv/\$0/golangci-lint}"
 
@@ -77,6 +78,95 @@ reset_calls
 PATH="$BIN:/usr/bin:/bin" run_task go:test:integration
 expect_call "go|test|-race|-timeout=10m|-tags=integration|./...|" "integration: without gotestsum and GO_TEST_JSON, go test runs"
 mv "$WORK/gotestsum.off" "$BIN/gotestsum"
+
+# ─── tools: the pinned one first, PATH's after it ────────────────────────────
+# PATH holds the shims and the system's tools alone from here on, so a tool
+# installed on this machine is not found.
+only_shims() { PATH="$BIN:/usr/bin:/bin" run_task "$@"; }
+shim gofmt "${argv/\$0/gofmt}"
+shim govulncheck "${argv/\$0/govulncheck}"
+
+reset_calls
+only_shims go:lint
+expect_status ok "lint: runs PATH's golangci-lint when none is pinned"
+expect_run golangci-lint "lint: PATH's golangci-lint is the one run"
+
+pin_tools golangci-lint gotestsum govulncheck goimports
+reset_calls
+only_shims go:lint "GOLANGCI_FLAGS=--timeout 5m"
+expect_call "go|tool|golangci-lint|run|--timeout|5m|./...|" "lint: a pinned golangci-lint runs through go tool, flags split"
+refute_run golangci-lint "lint: PATH's golangci-lint is passed over for the pinned one"
+
+reset_calls
+only_shims go:vuln
+expect_call "go|tool|govulncheck|./...|" "vuln: a pinned govulncheck runs through go tool"
+refute_run govulncheck "vuln: PATH's govulncheck is passed over for the pinned one"
+
+reset_calls
+only_shims go:test
+expect_call "go|tool|gotestsum|--format|pkgname|--hide-summary|skipped|--|-race|-short|./...|" "test: a pinned gotestsum runs through go tool"
+refute_run gotestsum "test: PATH's gotestsum is passed over for the pinned one"
+
+reset_calls
+only_shims go:test:integration "GO_TEST_JSON=out.json"
+expect_call "go|tool|gotestsum|--format|pkgname|--hide-summary|skipped|--jsonfile|out.json|" "integration: a pinned gotestsum keeps the json stream"
+
+# GO_TOOL_MODFILE: the pins live in another go.mod.
+mkdir -p "$CONSUMER/tools"
+printf 'module example.com/tools\n' > "$CONSUMER/tools/go.mod"
+reset_calls
+only_shims go:lint "GO_TOOL_MODFILE=tools/go.mod"
+expect_call "go|tool|-modfile=tools/go.mod|golangci-lint|run|./...|" "modfile: the tool is asked of GO_TOOL_MODFILE"
+reset_calls
+only_shims go:lint "GO_TOOL_MODFILE=tools/go.mdo"
+expect_status fail "modfile: one that does not exist is refused"
+expect_output "GO_TOOL_MODFILE names tools/go.mdo, which does not exist" "modfile: the missing file is named"
+refute_call "golangci-lint" "modfile: no linter runs when the file is missing"
+
+# Neither pinned nor on PATH: a gate fails and says what to install.
+pin_tools
+mv "$BIN/golangci-lint" "$BIN/govulncheck" "$WORK/"
+only_shims go:lint
+expect_status fail "lint: no golangci-lint anywhere fails"
+expect_output "golangci-lint is not installed" "lint: says golangci-lint is not installed"
+only_shims go:vuln
+expect_status fail "vuln: no govulncheck anywhere fails"
+expect_output "govulncheck is not installed — go get -tool golang.org/x/vuln/cmd/govulncheck" "vuln: says how to pin govulncheck"
+mv "$WORK/golangci-lint" "$WORK/govulncheck" "$BIN/"
+
+# fmt: goimports runs when there is one, unless GO_FMT_GOIMPORTS says which.
+reset_calls
+only_shims go:fmt
+expect_status ok "fmt: runs without goimports"
+expect_run gofmt "fmt: gofmt runs"
+refute_call "goimports|-w" "fmt: no goimports, none run"
+
+reset_calls
+only_shims go:fmt GO_FMT_GOIMPORTS=1
+expect_status fail "fmt: GO_FMT_GOIMPORTS=1 without goimports fails"
+expect_output "goimports is not installed" "fmt: says goimports is not installed"
+
+shim goimports "${argv/\$0/goimports}"
+reset_calls
+only_shims go:fmt
+expect_run goimports "fmt: PATH's goimports runs when it is found"
+reset_calls
+only_shims go:fmt GO_FMT_GOIMPORTS=0
+expect_status ok "fmt: GO_FMT_GOIMPORTS=0 runs"
+refute_call "goimports" "fmt: GO_FMT_GOIMPORTS=0 never runs goimports"
+expect_output "formatted" "fmt: GO_FMT_GOIMPORTS=0 still reports the gofmt run"
+
+pin_tools goimports
+reset_calls
+only_shims go:fmt GO_FMT_GOIMPORTS=1
+expect_status ok "fmt: GO_FMT_GOIMPORTS=1 with a pinned goimports runs"
+expect_call "go|tool|goimports|-w|.|" "fmt: a pinned goimports runs through go tool"
+refute_run goimports "fmt: PATH's goimports is passed over for the pinned one"
+
+only_shims go:fmt GO_FMT_GOIMPORTS=yes
+expect_status fail "fmt: a GO_FMT_GOIMPORTS that is neither 1 nor 0 is refused"
+expect_output "GO_FMT_GOIMPORTS must be 1 or 0, got: yes" "fmt: the refusal names the value"
+pin_tools
 
 reset_calls
 run_task go:test:coverage "GO_TEST_FLAGS=-p 1"
