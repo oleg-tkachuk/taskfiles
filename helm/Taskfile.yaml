@@ -22,6 +22,8 @@ version: "3"
 #   K8S_CONTEXT   pin a cluster                            (default: current)
 #   HELM_NS       limit to one namespace          (default: every namespace)
 #   HELM_UNINSTALL_FLAGS  verbatim extra flags for `helm uninstall`
+#   RELEASE       required by uninstall: one release name, or `all`
+#   CONFIRM       required by uninstall: must name the context being emptied
 # ─────────────────────────────────────────────────────────────────────────────
 # shell-verbatim: _HELM_CTX _HELM_KCTX _HELM_SCOPE _HELM_EVERY_STATE _HELM_UNINSTALL_FLAGS HELM_UNINSTALL_FLAGS
 

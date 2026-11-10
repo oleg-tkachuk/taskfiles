@@ -16,6 +16,8 @@ version: "3"
 #   GH_REPO      owner/name           (default: the origin remote)
 #   GH_BRANCH    protected branch     (default: main)
 #   GH_REMOTE    git remote to push   (default: origin)
+#   REF          what to push         (default: HEAD)
+#   REASON       required: why the branch is being rewritten
 #
 # ── Why this module exists ───────────────────────────────────────────────────
 # A protected `main` with `enforce_admins` on refuses EVERY direct ref update,

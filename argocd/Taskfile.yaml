@@ -34,6 +34,10 @@ version: "3"
 #                  release called `argo-cd` has deployment
 #                  argo-cd-argocd-server wearing the label argocd-server.
 #   ARGOCD_PORT    local port for server:port-forward     (default 8443)
+#   ARGOCD_ADMIN_PASSWORD
+#                  required by server:set-password
+#   ROLLOUT_TIMEOUT  how long server:restart waits        (default 2m)
+#   LOG_TAIL       line count for server:logs             (default 100)
 #   K8S_CONTEXT    pin a cluster                          (default: current)
 #
 # APP_PREFIX is matched as a literal prefix, not a regular expression.

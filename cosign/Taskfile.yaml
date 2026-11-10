@@ -26,6 +26,7 @@ version: "3"
 #
 #   PROJECT_NAME       image and chart name, as in the release module
 #   REGISTRY           OCI host                        (default localhost:5000)
+#   GLOBAL_REGISTRY    monorepo-wide override, wins over REGISTRY
 #   IMAGE_NAMESPACE    path between host and name
 #   CHART_NAME         when the chart is not named after PROJECT_NAME
 #   IMAGE_NAME         when the image is not named after PROJECT_NAME
@@ -178,7 +179,7 @@ tasks:
       - task: sbom
 
   image:
-    desc: "Sign the published image at the release version"
+    desc: "Sign the published image, by the digest image:push recorded"
     # COSIGN_SIGN=0 turns this off. The guard sits here rather than on the
     # internal task because Task evaluates preconditions BEFORE status, so a
     # status guard cannot skip past the internal task's own preconditions.

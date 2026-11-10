@@ -16,10 +16,17 @@ version: "3"
 # `vars:`. In a repository with more than one component the top level is
 # shared with every other component — see README.md#variable-scoping.
 #
-# The same vars the `release` module reads: PROJECT_NAME, REGISTRY,
-# IMAGE_NAMESPACE, CHART_DIR, K8S_NAMESPACE, K8S_CONTEXT. Include this
-# alongside `release`, not instead of it: `image:load` moves what
-# `release:image:build` produced.
+#   PROJECT_NAME         the label in every log line
+#   K8S_NAMESPACE        namespace install targets        (default "default")
+#   K8S_CONTEXT          the cluster's kube context  (default: the runtime's)
+#   K8S_DEPLOYMENT_NAME  the helm release name          (default PROJECT_NAME)
+#   CHART_DIR            default ./deploy/chart
+#   VALUES               a values file for install
+#   HELM_UPGRADE_FLAGS   extra flags for install
+#
+# The image and its version are not inputs here: they are what the `release`
+# module derived. Include this alongside `release`, not instead of it —
+# `image:load` moves what `release:image:build` produced.
 # ─────────────────────────────────────────────────────────────────────────────
 # shell-verbatim: HELM_UPGRADE_FLAGS
 
