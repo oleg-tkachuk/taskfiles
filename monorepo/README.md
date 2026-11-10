@@ -102,6 +102,30 @@ A warning rather than a failure: a name only one component uses is harmless
 until a module in another component reads it, which this cannot see. It needs
 yq, and says so when yq is not there.
 
+## One component from the root: `task api:test`
+
+`each` is the fan-out. For a single component by name, do not include its
+Taskfile in the root — that is what puts its vars in the shared pool. Give
+the root a wildcard task that runs the component as a child process, the way
+`each` does:
+
+```yaml
+tasks:
+  _component:
+    internal: true
+    dir: "{{.COMPONENT}}"
+    requires: { vars: [COMPONENT, TARGET] }
+    env: { GLOBAL_REGISTRY: "{{.GLOBAL_REGISTRY}}" }
+    cmd: task {{.TARGET | q}} -- {{.CLI_ARGS}}
+
+  "api:*":
+    desc: "Run a task in backend/api (task api:test)"
+    cmds: [{ task: _component, vars: { COMPONENT: backend/api, TARGET: "{{index .MATCH 0}}" } }]
+```
+
+The measurements, and what changes for someone used to an include, are in
+[A monorepo runs its components](../README.md#a-monorepo-runs-its-components-it-does-not-include-them).
+
 ## A component that is not there
 
 Both halves of "COMPONENTS is wrong" used to pass silently, so `each` refuses
