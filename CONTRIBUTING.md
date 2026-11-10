@@ -92,13 +92,15 @@ that case, and without the marker it reads as an ordinary `feat`. A rename
 keeps the old name for a major instead, and is a plain `feat`; see
 [Deprecating instead of breaking](RELEASE.md#deprecating-instead-of-breaking).
 `check:api` refuses a name the latest release had unless `API_REMOVED` lists
-it.
+it, and a default that differs from the latest release unless
+`API_DEFAULTS_CHANGED` lists the input — see
+[A default is part of the API](RELEASE.md#a-default-is-part-of-the-api).
 
 ## Opening a PR
 
 `main` is branch-protected — there is no direct push, for anyone, including
 the maintainer. Open a PR; CI runs the lint, a consumer smoke test that
-includes the modules side by side, and a `zizmor` audit of the workflows
+includes every module side by side, and a `zizmor` audit of the workflows
 themselves. All three are required checks, and the branch merges with rebase
 once they pass, so the individual commits land on `main` as you wrote them.
 

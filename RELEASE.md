@@ -117,6 +117,27 @@ major rather than spending one each.
 latest release and missing now is refused unless `API_REMOVED` names it, with a
 reason. That is the deliberate removal, and its commit carries the `!`.
 
+## A default is part of the API
+
+An input's default is what every consumer who never set it runs with — which,
+for most inputs, is most consumers. Changing one changes their build on the
+next bump, with no line in their Taskfile to point at.
+
+So a default does not change in passing. `check:api` refuses one that differs
+from the latest release unless `API_DEFAULTS_CHANGED` names the input, and the
+pull request says what moved under **Consumer impact**. What version that
+makes follows from what a consumer has to do:
+
+- **Nothing** — the new default is one they would have chosen, and nothing of
+  theirs can fail on it: a `feat` or a `fix`, as the change is.
+- **Something** — a gate that now fails, a flag that is no longer passed, an
+  input that now has to be set, a string that became a list: the commit
+  carries the `!`, and it is worth holding for the next major with the others.
+
+An input that gains a default where it had none asks nothing of anyone and is
+not reported. Moving a literal into one of the module's own constants is not a
+change either: the check reads through it.
+
 ---
 
 Part of [taskfiles](README.md).
