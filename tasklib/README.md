@@ -45,7 +45,8 @@ $ git add -A . && git commit -m 'build(tasks): bump taskfiles v14.3.2 → v15.0.
 ```
 
 `bump` rewrites the ref of every include of this library and of nothing else,
-then runs `lock`. Run it while the old pin still loads: once a ref has been
+then runs `lock`. A pin written in a YAML comment is an example, not a pin: it
+is neither rewritten nor counted by `check`. Run it while the old pin still loads: once a ref has been
 edited by hand, that Taskfile is not trusted and `task tasklib:bump` cannot
 start. From there, the way back is the lock alone:
 

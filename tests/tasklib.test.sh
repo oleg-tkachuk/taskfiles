@@ -45,12 +45,16 @@ if [ "$mode" = download ]; then
 fi
 for r in $refs; do [ -f "$cache/remote/git.fake.$r.checksum" ] || { echo "not found in the cache" >&2; exit 1; }; done'
 
+# What a comment showing how to pin looks like: not a pin.
+readonly EXAMPLE="  # TASKLIB: '$PIN<tag>'"
+
 # pinned <path> <ref> — a Taskfile at <path> pinning the library at <ref>.
 pinned() {
   mkdir -p "$(dirname "$CONSUMER/$1")"
   cat > "$CONSUMER/$1" <<YAML
 version: "3"
 vars:
+$EXAMPLE
   TASKLIB: '$PIN$2'
   OTHER: 'https://github.com/acme/other.git//%s?ref=v9.9.9'
 YAML
@@ -82,6 +86,7 @@ expect_status ok "bump: runs"
 expect_pin Taskfile.yaml "$NEW" "bump: moves the root pin"
 expect_pin Taskfile.dev.yaml "$NEW" "bump: moves a second entry point's pin"
 expect_pin api/Taskfile.yaml "$NEW" "bump: moves a component's pin"
+if grep -qxF -- "$EXAMPLE" "$CONSUMER/api/Taskfile.yaml"; then pass "bump: leaves a pin written in a comment alone"; else fail "bump: rewrote a pin written in a comment"; fi
 if grep -qF 'other.git//%s?ref=v9.9.9' "$CONSUMER/api/Taskfile.yaml"; then pass "bump: leaves another library's pin alone"; else fail "bump: rewrote another library's pin"; fi
 expect_file "$(lock_file "$NEW")" "bump: locks the root at the new ref"
 expect_file "api/$(lock_file "$NEW")" "bump: locks a component at the new ref"
@@ -99,6 +104,7 @@ reset_calls
 run_task tasklib:check
 expect_status ok "check: agreeing pins with their locks pass"
 expect_output "$NEW pinned by 3 Taskfile(s)" "check: names the ref and how many pin it"
+refute_output "<tag>" "check: a pin written in a comment is not a pin"
 expect_call "--offline --remote-cache-dir .task" "check: loads each Taskfile offline, from the lock's directory"
 refute_call "--download" "check: downloads nothing"
 
