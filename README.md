@@ -87,6 +87,8 @@ including component's directory.
 
 In a monorepo, module inputs belong in the include's own `vars:` rather than at
 the top level shown here — see [Variable scoping](#variable-scoping).
+`task monorepo:doctor` reports the names a root Taskfile's components would
+otherwise read from one another.
 
 The three names above `includes:` are inputs, not decoration. A module never
 declares a bare input name — a var declared inside an included file *shadows*
@@ -557,6 +559,11 @@ repository that has them can stop fetching:
 remote:
   offline: true
 ```
+
+The file is what Task reads, in the repository root and from every directory
+below it. A `TASK_OFFLINE=1` in the environment is not: measured on 3.54.0, a
+run under it downloads every include as if it were not there. `--offline` on
+the command line works, for one command.
 
 This is the setup to prefer, and not only for speed. Online, every `task`
 process clones each ref into one cache per user —
