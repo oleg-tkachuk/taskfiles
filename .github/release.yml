@@ -2,14 +2,16 @@
 # `.github/workflows/ci.yml` calls `gh release create --generate-notes`, and
 # this is the file that decides what those notes contain.
 #
-# It is the mechanical half. The curated half lives in CHANGELOG.md and says
-# what an upgrading consumer has to *do*; this half says what landed and who
-# landed it. Neither replaces the other, and the release gate refuses a tag
-# that has no changelog entry precisely because generated notes cannot answer
-# that question.
+# It is the mechanical half: what landed and who landed it. What an upgrading
+# consumer has to *do* is the other half, and generated notes cannot answer
+# that — so .github/ci/publish-release.ts puts it above them, copied from the
+# "Consumer impact" section of each merged pull request.
 #
-# Categories match on pull-request labels, so a change merged without one
-# falls through to "Other Changes" rather than disappearing.
+# Categories match on pull-request labels. publish-release.ts labels each
+# pull request from its commits before these notes are written, so a change
+# merged without a label is still sorted; "Other Changes" is what releases
+# nothing — CI, refactors, tests. lib/release-notes.test.ts holds the labels
+# it adds to the categories below.
 changelog:
   exclude:
     labels:
@@ -26,6 +28,11 @@ changelog:
     authors:
       - github-actions[bot]
   categories:
+    # First, and a pull request appears once, in the first category that
+    # matches: whatever else a breaking change is, this is where it is read.
+    - title: ⚠️ Breaking Changes
+      labels:
+        - breaking
     - title: 🚀 Features
       labels:
         - enhancement
