@@ -112,6 +112,17 @@ can be too old for the Go the module targets, and then every package fails to
 type-check. Built from the module's `tool` directive it gets the module's
 x/tools instead. A module without one falls back to a gosec on `PATH`.
 
+## gosec on a large module
+
+gosec starts one worker per core, and each loads the module's whole typed
+package graph. With a large generated SDK among the dependencies that is more
+memory than a laptop has, and the scan swaps instead of finishing. Cap the
+workers where that happens:
+
+```yaml
+vars: { GOSEC_FLAGS: '-concurrency=4' }
+```
+
 ## Python and Node dependencies are trivy's job
 
 There is no separate scan for them, and adding one made coverage worse rather
