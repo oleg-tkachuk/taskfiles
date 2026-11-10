@@ -44,6 +44,9 @@ vars:
   # Taskfile.dev.yaml. renovate/tasklib.json matches the same names, and
   # tests/tasklib.test.sh holds the two equal.
   _TL_NAME_RE: '(^|/)[Tt]askfile(\.[A-Za-z0-9_-]+)?\.ya?ml$'
+  # A YAML comment line. A pin written in one is an example, not a pin: it
+  # is neither counted nor rewritten.
+  _TL_COMMENT_RE: '^[[:space:]]*#'
   # A pin of this library, up to the ref; and the ref itself.
   _TL_PIN_RE: 'taskfiles\.git//[^?[:space:]''"]*\?ref='
   _TL_REF_RE: '[^[:space:]''"&]+'
@@ -83,6 +86,7 @@ tasks:
           cache={{._TL_CACHE | q}}
           pin_re={{._TL_PIN_RE | q}}
           ref_re={{._TL_REF_RE | q}}
+          comment_re={{._TL_COMMENT_RE | q}}
           files=$({{._TL_LIST}})
           work=$(mktemp -d)
           trap 'rm -rf "$work"' EXIT
@@ -94,7 +98,7 @@ tasks:
           # "<ref>\t<file>" for every pin.
           : > "$work/pins"
           for f in $files; do
-            grep -oE "$pin_re$ref_re" "$f" | sed -E "s#^$pin_re##" | sort -u | while IFS= read -r ref; do
+            { grep -vE "$comment_re" "$f" || true; } | grep -oE "$pin_re$ref_re" | sed -E "s#^$pin_re##" | sort -u | while IFS= read -r ref; do
               printf '%s\t%s\n' "$ref" "$f" >> "$work/pins"
             done
           done
@@ -207,6 +211,7 @@ tasks:
           version={{.VERSION | q}}
           pin_re={{._TL_PIN_RE | q}}
           ref_re={{._TL_REF_RE | q}}
+          comment_re={{._TL_COMMENT_RE | q}}
           files=$({{._TL_LIST}})
           work=$(mktemp -d)
           trap 'rm -rf "$work"' EXIT
@@ -217,8 +222,8 @@ tasks:
 
           moved=0
           for f in $files; do
-            grep -qE "$pin_re$ref_re" "$f" || continue
-            sed -E "s#($pin_re)$ref_re#\1$version#g" "$f" > "$work/next"
+            { grep -vE "$comment_re" "$f" || true; } | grep -qE "$pin_re$ref_re" || continue
+            sed -E "/$comment_re/!s#($pin_re)$ref_re#\1$version#g" "$f" > "$work/next"
             # Written through the file, not moved over it: its mode stays.
             cat "$work/next" > "$f"
             moved=$((moved + 1))
