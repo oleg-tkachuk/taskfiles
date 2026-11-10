@@ -16,7 +16,8 @@ import { runMain } from "./lib/main.ts";
 import { LIBRARY_CHECKOUT, passed } from "./lib/smoke.ts";
 
 // INCLUDES is every module, side by side: a module quietly claiming a name
-// another one uses shows up as the consumer failing to load.
+// another one uses shows up as the consumer failing to load. includes.test.ts
+// holds the list to the modules on disk, so a new one cannot be left out.
 export const INCLUDES: Includes = {
   release: "release",
   k8s: "k8s",
@@ -33,8 +34,11 @@ export const INCLUDES: Includes = {
   auth: "auth",
   codegen: "codegen",
   cosign: "cosign",
+  github: "github",
+  hcloud: "hcloud",
   helm: "helm",
   sealedsecrets: "sealed-secrets",
+  tasklib: "tasklib",
   local: "runtime/orbstack",
   localdocker: "runtime/docker",
   localk3d: "runtime/k3d",
