@@ -17,7 +17,7 @@ directory the include carries, so `dir: .` there is the whole repository.
 | Task | What it does |
 |---|---|
 | `bump` | Pin every Taskfile to VERSION, then refresh every lock (VERSION=v15.0.0) |
-| `check` | Fail when the Taskfiles pin different refs, or one does not load from its lock |
+| `check` | Fail when the Taskfiles pin different refs, one does not load from its lock, or a lock holds more or less than its pin names |
 | `lock` | Download every Taskfile's remote includes again and replace its lock, dropping what no pin names |
 
 ## Inputs
@@ -27,7 +27,8 @@ directory the include carries, so `dir: .` there is the whole repository.
 | `VERSION` | — | required by `bump`: the tag to pin |
 | `TASKLIB_FILES` | every file git knows that is named like a Taskfile | list of the Taskfiles to act on |
 | `TASKLIB_CACHE_DIR` | `.task` | what Task takes as `--remote-cache-dir`, relative to each Taskfile's directory |
-| `TASKLIB_RETRIES` | `3` | attempts at one Taskfile's download |
+| `TASKLIB_RETRIES` | `5` | attempts at one Taskfile's download |
+| `TASKLIB_TIMEOUT` | `1m` | how long one download may take, as Task's `--timeout` takes it |
 
 A Taskfile is `Taskfile.yaml`, `taskfile.yml` or one with a middle name —
 `Taskfile.dev.yaml` — tracked or not, unless git ignores it. Each is loaded as
@@ -76,7 +77,17 @@ task: failed to clone repository
 
 A fan-out over the components — or a second worktree, or two hook jobs — does
 exactly that. A download that still loses to another process is tried again,
-`TASKLIB_RETRIES` times.
+`TASKLIB_RETRIES` times. So is one that fails with nothing else running:
+measured across eight repositories, the first attempt at a Taskfile with
+several includes of this library failed for a quarter to a half of the
+directories, and the second went through. Each attempt gets
+`TASKLIB_TIMEOUT`, where Task's own ten seconds is less than a clone can take
+on a busy machine.
+
+The command that starts it all, `task --yes --offline=false --download
+tasklib:lock`, has one step this module cannot guard: Task loads the root
+Taskfile's own includes before any task runs, straight into `.task/remote/`
+and with no second attempt. When that step fails, run the command again.
 
 A directory whose Taskfiles have no remote include left loses its lock.
 
@@ -96,6 +107,18 @@ Then it loads every Taskfile with `--offline`, so a pin whose lock was never
 refreshed, or never committed, fails here rather than for whoever runs it
 next. It downloads nothing.
 
+Last, the lock itself. Offline, Task reads a module's `.yaml` and never its
+`.checksum`, so a lock can load and still be wrong. `check` refuses:
+
+- a module with no `.checksum` beside it — online, Task would ask to trust it
+  again, and with no terminal it fails;
+- a module that is not what its `.checksum` records;
+- a file no Taskfile in that directory reads, which is what an earlier ref
+  leaves behind when the pin is moved by hand.
+
+Which files are read is what Task itself reports under `--verbose`. Should a
+later Task stop saying, `check` says that it could not tell, and passes.
+
 ## Renovate
 
 Two presets ship with the library. The first finds every pin, in any Taskfile,
@@ -113,12 +136,31 @@ Renovate can do that itself:
 { "extends": ["github>oleg-tkachuk/taskfiles//renovate/tasklib-lock"] }
 ```
 
-which needs `task` on the runner's `PATH`, this module included in the root
-Taskfile, and the command in Renovate's `allowedCommands`:
+which needs this module included in `Taskfile.yaml`, and the command in
+Renovate's `allowedCommands`:
 
 ```
 ^task --yes --offline=false --download tasklib:lock$
 ```
+
+A repository that includes it in `Taskfile.dev.yaml` — the root its gates run
+from — extends `…//renovate/tasklib-lock-dev` instead, whose command carries
+`-t Taskfile.dev.yaml`:
+
+```
+^task -t Taskfile\.dev\.yaml --yes --offline=false --download tasklib:lock$
+```
+
+`task` has to be where the command runs. With `renovatebot/github-action`
+that is inside Renovate's container, not on the runner: install Task on the
+runner and mount the binary into the container (the action's
+`docker-volumes`), or the command is not found.
+
+One more thing a consumer's own rules can do: the pin is found by a
+`custom.regex` manager, from `github-releases`. A `packageRules` entry that
+matches every `custom.regex` dependency — a "pinned tools" group, say — takes
+the library's bump into that group too. Exclude it there
+(`"matchDepNames": ["!oleg-tkachuk/taskfiles"]`) when it should arrive alone.
 
 A command missing from that list is skipped with a log line and nothing turns
 red — the pull request simply arrives without its lock.

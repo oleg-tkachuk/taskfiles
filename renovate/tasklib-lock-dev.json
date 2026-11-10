@@ -1,0 +1,27 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Refreshes every lock on the branch that moves the pin, so the pull request arrives loadable. Self-hosted Renovate only: the hosted app runs no post-upgrade command.",
+    "For a repository that includes the tasklib module in Taskfile.dev.yaml, the root its gates run from. renovate/tasklib-lock is the same for Taskfile.yaml.",
+    "The command below has to be in Renovate's allowedCommands, and `task` has to be where Renovate runs it — inside its container, under renovatebot/github-action. A command missing from the allow-list is skipped with a log line, and nothing turns red."
+  ],
+  "extends": [
+    "github>oleg-tkachuk/taskfiles//renovate/tasklib"
+  ],
+  "packageRules": [
+    {
+      "matchDepNames": [
+        "oleg-tkachuk/taskfiles"
+      ],
+      "postUpgradeTasks": {
+        "commands": [
+          "task -t Taskfile.dev.yaml --yes --offline=false --download tasklib:lock"
+        ],
+        "fileFilters": [
+          "**/.task/remote/**"
+        ],
+        "executionMode": "branch"
+      }
+    }
+  ]
+}

@@ -16,9 +16,10 @@ lock_file() { printf '%s/git.fake.%s.checksum' "$LOCK" "$1"; }
 # The module runs `task` once per Taskfile, always with --remote-cache-dir.
 # Those calls are faked; any other is the test's own and goes to the real one.
 #
-# --download writes one lock file per ref the Taskfile pins, after failing
-# FAIL_TIMES times; --offline succeeds when every such file is there. Each
-# faked call records whether git's GIT_DIR reached it.
+# --download writes a module and its checksum per ref the Taskfile pins, after
+# failing FAIL_TIMES times; --offline succeeds when every module is there and,
+# as Task does under -v, names each lock file it reads — unless FAKE_SILENT is
+# set. Each faked call records whether git's GIT_DIR reached it.
 REAL_TASK=$(command -v task)
 export REAL_TASK
 export FAILS="$WORK/fails"
@@ -40,10 +41,17 @@ refs=$(sed -n "s/.*taskfiles\.git[^?]*?ref=\([^'"'"' ]*\).*/\1/p" "$file" | sort
 if [ "$mode" = download ]; then
   left=$(cat "$FAILS" 2>/dev/null || printf 0)
   if [ "$left" -gt 0 ]; then printf "%s" $((left - 1)) > "$FAILS"; echo "failed to clone repository" >&2; exit 1; fi
-  for r in $refs; do mkdir -p "$cache/remote"; : > "$cache/remote/git.fake.$r.checksum"; done
+  for r in $refs; do
+    mkdir -p "$cache/remote"
+    printf "module at %s\n" "$r" > "$cache/remote/git.fake.$r.yaml"
+    shasum -a 256 "$cache/remote/git.fake.$r.yaml" | awk "{ printf \"%s\", \$1 }" > "$cache/remote/git.fake.$r.checksum"
+  done
   exit 0
 fi
-for r in $refs; do [ -f "$cache/remote/git.fake.$r.checksum" ] || { echo "not found in the cache" >&2; exit 1; }; done'
+for r in $refs; do
+  [ -f "$cache/remote/git.fake.$r.yaml" ] || { echo "not found in the cache" >&2; exit 1; }
+  [ -n "${FAKE_SILENT:-}" ] || printf "checking cache for \"https://example.invalid//m?ref=%s\" in \"%s/%s/remote/git.fake.%s.yaml\"\n" "$r" "$PWD" "$cache" "$r" >&2
+done'
 
 # What a comment showing how to pin looks like: not a pin.
 readonly EXAMPLE="  # TASKLIB: '$PIN<tag>'"
@@ -76,9 +84,11 @@ git init -q "$CONSUMER"
 root
 pinned Taskfile.dev.yaml "$OLD"
 pinned api/Taskfile.yaml "$OLD"
-mkdir -p "$CONSUMER/$LOCK" "$CONSUMER/api/$LOCK"
-: > "$CONSUMER/$(lock_file "$OLD")"
-: > "$CONSUMER/api/$(lock_file "$OLD")"
+# An old lock in both directories, for bump to replace.
+for d in . api; do
+  mkdir -p "$CONSUMER/$d/$LOCK"
+  : > "$CONSUMER/$d/$(lock_file "$OLD")"
+done
 
 # ─── bump ────────────────────────────────────────────────────────────────────
 run_task tasklib:bump "VERSION=$NEW"
@@ -104,6 +114,37 @@ reset_calls
 run_task tasklib:check
 expect_status ok "check: agreeing pins with their locks pass"
 expect_output "$NEW pinned by 3 Taskfile(s)" "check: names the ref and how many pin it"
+expect_call "-v -t Taskfile.yaml --offline" "check: asks Task which lock files it reads"
+
+# The lock itself: a module with no checksum, one that changed after it was
+# fetched, and a file no Taskfile reads are each refused.
+module="$CONSUMER/api/$LOCK/git.fake.$NEW"
+mv "$module.checksum" "$WORK/held.checksum"
+run_task tasklib:check
+expect_status fail "check: a module with no .checksum beside it is refused"
+expect_output "git.fake.$NEW.yaml has no .checksum beside it" "check: names the module with no checksum"
+mv "$WORK/held.checksum" "$module.checksum"
+
+printf 'tampered\n' >> "$module.yaml"
+run_task tasklib:check
+expect_status fail "check: a module that changed after it was fetched is refused"
+expect_output "git.fake.$NEW.yaml is not what its .checksum records" "check: names the changed module"
+printf 'module at %s\n' "$NEW" > "$module.yaml"
+
+: > "$CONSUMER/api/$(lock_file "$OLD")"
+run_task tasklib:check
+expect_status fail "check: a lock file no Taskfile reads is refused"
+expect_output "git.fake.$OLD.checksum is read by no Taskfile in api" "check: names the file an earlier ref left"
+rm -f "$CONSUMER/api/$(lock_file "$OLD")"
+
+# A Task that does not name what it reads: said, not guessed.
+: > "$CONSUMER/api/$(lock_file "$OLD")"
+FAKE_SILENT=1 run_task tasklib:check
+expect_status ok "check: passes when Task does not say which files it read"
+expect_output "files left by earlier refs are not checked" "check: says the leftover check was skipped"
+rm -f "$CONSUMER/api/$(lock_file "$OLD")"
+run_task tasklib:check
+expect_status ok "check: a restored lock passes again"
 refute_output "<tag>" "check: a pin written in a comment is not a pin"
 expect_call "--offline --remote-cache-dir .task" "check: loads each Taskfile offline, from the lock's directory"
 refute_call "--download" "check: downloads nothing"
@@ -124,7 +165,7 @@ reset_calls
 run_task tasklib:lock
 expect_status ok "lock: runs"
 expect_file "api/$(lock_file "$NEW")" "lock: writes a lock that was missing"
-expect_call "-t Taskfile.dev.yaml --yes --offline=false --download" "lock: downloads each entry point, whatever offline default is set"
+expect_call "-t Taskfile.dev.yaml --yes --offline=false --download --timeout 1m" "lock: downloads each entry point, whatever offline default is set, with its own timeout"
 refute_call "GIT_DIR=/" "lock: no GIT_DIR reaches the download"
 
 reset_calls

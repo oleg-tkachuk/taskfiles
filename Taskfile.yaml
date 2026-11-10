@@ -291,7 +291,10 @@ tasks:
       # under the pull request's Consumer impact — and its commit carries the
       # `!` when a consumer relying on the old one has to act. Empty again
       # once the release that changes them has shipped.
-      API_DEFAULTS_CHANGED: ""
+      # tasklib:TASKLIB_RETRIES — 3 to 5: a first attempt often fails even
+      # with nothing else running, and three ran out on a busy machine. More
+      # attempts ask nothing of a consumer.
+      API_DEFAULTS_CHANGED: "tasklib:TASKLIB_RETRIES"
     cmds:
       - bash scripts/check-api.test.sh >/dev/null
       - cmd: |-
