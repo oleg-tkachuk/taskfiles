@@ -73,7 +73,7 @@ done
 
 for entry in $allowed; do
   module=${entry%%:*} name=${entry#*:}
-  had=$(git show "$base:$module/Taskfile.yaml" 2>/dev/null | names | sort -u)
+  had=$( { git show "$base:$module/Taskfile.yaml" 2>/dev/null || true; } | names | sort -u)
   if [ -z "$had" ] || { [ "$name" != "$WHOLE" ] && ! printf '%s\n' "$had" | grep -qxF -- "$name"; }; then
     report "API_REMOVED: $entry is not in $base — the removal has shipped; drop the entry"
   fi

@@ -115,4 +115,17 @@ else
   failures=$((failures + 1))
 fi
 
+# An API_REMOVED entry for a module the release never had is stale, and is
+# said to be: git show failing on it must not be the script's own exit.
+if (cd "$repo" && bash "$here/check-api.sh" v1.0.0 'gone:*' m/Taskfile.yaml) > "$work/out" 2>&1; then
+  printf '%s\n' "✖ stale-entry-for-a-module-never-released: want reported, got clean" >&2
+  failures=$((failures + 1))
+elif grep -qF 'API_REMOVED: gone:* is not in v1.0.0' "$work/out"; then
+  printf '%s\n' "✔ stale-entry-for-a-module-never-released: reported"
+else
+  printf '%s\n' "✖ stale-entry-for-a-module-never-released: failed without naming the entry" >&2
+  cat "$work/out" >&2
+  failures=$((failures + 1))
+fi
+
 [ "$failures" = 0 ] || exit 1
