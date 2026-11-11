@@ -42,7 +42,7 @@ readonly shell_texts='
 
 found=0
 for file in "$@"; do
-  verbatim=$(awk -F': ' '/^# shell-verbatim: /{print $2}' "$file" | tr '\n' ' ')
+  verbatim=$(awk -F': ' '/^# shell-verbatim: / { printf "%s ", $2 }' "$file")
   # The bodies of declared variables the module defines as plain strings.
   # One record per shell text, so a quote opened on one line of a script is
   # still open on the next.

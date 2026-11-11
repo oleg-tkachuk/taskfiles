@@ -38,6 +38,93 @@ readonly BUILTINS='ITEM KEY TASK ALIAS ROOT_DIR ROOT_TASKFILE TASKFILE TASKFILE_
 # Marks an allowlist entry that covers a whole module.
 readonly WHOLE='*'
 
+# Prints each template action, {{ … }}, of the lines it reads, one per line.
+readonly ACTIONS_AWK='{
+  s = $0
+  while (match(s, /[{][{][^}]*[}][}]/)) {
+    print substr(s, RSTART, RLENGTH)
+    s = substr(s, RSTART + RLENGTH)
+  }
+}'
+
+# Prints each name read as .NAME, less the ones EXCLUDE lists. A name is cut
+# off one character short of its end, so the next search starts on a character
+# of the name: `.A.B` reads A, and B is a field of it, not a name.
+readonly READS_AWK='BEGIN {
+  n = split(ENVIRON["EXCLUDE"], word, /[ \t\n]+/)
+  for (i = 1; i <= n; i++) skip[word[i]] = 1
+}
+{
+  s = $0
+  while (match(s, /(^|[^A-Za-z0-9_.])\.[A-Z][A-Z0-9_]*/)) {
+    name = substr(s, RSTART, RLENGTH)
+    sub(/^[^.]*\./, "", name)
+    s = substr(s, RSTART + RLENGTH - 1)
+    if (!(name in skip)) print name
+  }
+}'
+
+# Prints "<input>\t<default>" for each default a line reads an input with.
+# value() is what may follow `default`: a quoted string, a parenthesised
+# expression, or — unless strict — one word.
+readonly DEFAULTS_AWK='function value(t, strict,   i, c, n) {
+  if (substr(t, 1, 1) == "\"") {
+    n = length(t)
+    for (i = 2; i <= n; i++) {
+      c = substr(t, i, 1)
+      if (c == "\\") { i++; continue }
+      if (c == "\"") return substr(t, 1, i)
+    }
+  } else if (substr(t, 1, 1) == "(") {
+    i = index(t, ")")
+    if (i) return substr(t, 1, i)
+  }
+  if (!strict && match(t, /^[^ \t|})]+/)) return substr(t, 1, RLENGTH)
+  return ""
+}
+{
+  # `.NAME | default X`. The search goes on right after NAME, so the value
+  # of one default can be the input of the next: `.NEW | default .OLD |
+  # default "d"` reads OLD with a default too.
+  rest = $0
+  prev = ""
+  while (match(rest, /\.[A-Z][A-Z0-9_]*/)) {
+    before = (RSTART > 1) ? substr(rest, RSTART - 1, 1) : prev
+    name = substr(rest, RSTART + 1, RLENGTH - 1)
+    prev = substr(rest, RSTART + RLENGTH - 1, 1)
+    rest = substr(rest, RSTART + RLENGTH)
+    if (before ~ /[A-Za-z0-9_.]/) continue
+    if (!match(rest, /^[ \t]*\|[ \t]*default[ \t]+/)) continue
+    v = value(substr(rest, RLENGTH + 1), 0)
+    if (v != "") print name "\t" v
+  }
+  # `default X .NAME`, as a ref writes it.
+  rest = $0
+  prev = ""
+  while ((at = index(rest, "default")) > 0) {
+    before = (at > 1) ? substr(rest, at - 1, 1) : prev
+    rest = substr(rest, at + length("default"))
+    prev = "t"
+    if (before ~ /[A-Za-z0-9_]/) continue
+    if (!match(rest, /^[ \t]+/)) continue
+    t = substr(rest, RLENGTH + 1)
+    v = value(t, 1)
+    if (v == "") continue
+    t = substr(t, length(v) + 1)
+    if (!match(t, /^[ \t]+\.[A-Z][A-Z0-9_]*/)) continue
+    len = RLENGTH
+    if (substr(t, len + 1, 1) ~ /[A-Za-z0-9_]/) continue
+    name = substr(t, 1, len)
+    sub(/^[ \t]+\./, "", name)
+    print name "\t" v
+    prev = substr(t, len, 1)
+    rest = substr(t, len + 1)
+  }
+}'
+
+# has_line <lines> <line> — whether one of the lines is exactly that line.
+has_line() { WANT=$2 awk '$0 == ENVIRON["WANT"] { found = 1 } END { exit !found }' <<< "$1"; }
+
 # names — the public names in the Taskfile on stdin, one per line.
 names() {
   local yaml params
@@ -48,10 +135,9 @@ names() {
   # Template actions in any string, and `ref:` expressions, which are a
   # template without the braces — a list input is read only there.
   {
-    printf '%s\n' "$yaml" | yq -r '.. | select(tag == "!!str")' | grep -oE '\{\{[^}]*\}\}' || true
+    printf '%s\n' "$yaml" | yq -r '.. | select(tag == "!!str")' | awk "$ACTIONS_AWK"
     printf '%s\n' "$yaml" | yq -r '[.vars // {}, (.tasks // {} | .[] | select(type == "!!map") | .vars // {})] | .[] | .[] | select(type == "!!map") | .ref // ""'
-  } | grep -oE '(^|[^A-Za-z0-9_.])\.[A-Z][A-Z0-9_]*' | sed 's/^[^.]*\.//' \
-    | grep -vxF -f <(printf '%s\n' $BUILTINS $params) || true
+  } | EXCLUDE="$BUILTINS $params" awk "$READS_AWK"
 }
 
 # templates — every template the Taskfile on stdin holds, one string per
@@ -74,13 +160,7 @@ defaults() {
   local yaml name value constant
   yaml=$(cat)
   [ -n "$yaml" ] || return 0
-  printf '%s\n' "$yaml" | templates | perl -ne '
-    my $value = qr/"(?:[^"\\]|\\.)*"|\([^)]*\)|[^\s|})]+/;
-    # A lookahead, so the value of one default can be the input of the next:
-    # `.NEW | default .OLD | default "d"` reads OLD with a default too.
-    while (/(?<![A-Za-z0-9_.])\.([A-Z][A-Z0-9_]*)(?=\s*\|\s*default\s+($value))/g) { print "$1\t$2\n" }
-    while (/\bdefault\s+("(?:[^"\\]|\\.)*"|\([^)]*\))\s+\.([A-Z][A-Z0-9_]*)\b/g) { print "$2\t$1\n" }
-  ' | while IFS=$'\t' read -r name value; do
+  printf '%s\n' "$yaml" | templates | awk "$DEFAULTS_AWK" | while IFS=$'\t' read -r name value; do
     case "$value" in
       ._*)
         constant=$(printf '%s\n' "$yaml" | NAME=${value#.} yq -r '.vars[strenv(NAME)] | select(tag == "!!str")')
@@ -132,7 +212,7 @@ for file in "$@"; do
   is=$(defaults < "$file")
   while IFS= read -r name; do
     [ -n "$name" ] || continue
-    printf '%s\n' "$now" | grep -qxF -- "$name" || continue
+    has_line "$now" "$name" || continue
     old=$(default_of "$was" "$name") new=$(default_of "$is" "$name")
     if [ "$old" = "$new" ]; then
       if changed_listed "$module:$name"; then
@@ -142,13 +222,13 @@ for file in "$@"; do
     fi
     changed_listed "$module:$name" && continue
     report "$module: $name defaulted to $old in $base and to ${new:-nothing} now — every consumer who never set it gets the new one; name $module:$name in API_DEFAULTS_CHANGED, say it under Consumer impact, and mark the commit ! if a consumer relying on the old one has to act"
-  done < <(printf '%s\n' "$was" | cut -f1 | sort -u)
+  done < <(printf '%s\n' "$was" | awk -F'\t' '{ print $1 }' | sort -u)
 done
 
 for entry in $allowed; do
   module=${entry%%:*} name=${entry#*:}
   had=$( { git show "$base:$module/Taskfile.yaml" 2>/dev/null || true; } | names | sort -u)
-  if [ -z "$had" ] || { [ "$name" != "$WHOLE" ] && ! printf '%s\n' "$had" | grep -qxF -- "$name"; }; then
+  if [ -z "$had" ] || { [ "$name" != "$WHOLE" ] && ! has_line "$had" "$name"; }; then
     report "API_REMOVED: $entry is not in $base — the removal has shipped; drop the entry"
   fi
 done

@@ -41,7 +41,10 @@ json() { yq -p json -o tsv "$1" "$CONFIG"; }
 patterns=$(json '.customManagers[].managerFilePatterns[] | sub("^/"; "") | sub("/$"; "")')
 regexes=$(json '.customManagers[].matchStrings[]')
 
-for file in $(git ls-files 2>/dev/null || find . -type f | sed 's|^\./||'); do
+# The patterns and expressions below are Renovate's own, written for a regex
+# engine with named groups and lazy quantifiers. awk has neither, so they are
+# matched with perl; everything else here reads text with awk.
+for file in $(git ls-files 2>/dev/null || find . -type f | awk '{ sub(/^\.\//, ""); print }'); do
   managed=false
   while IFS= read -r p; do
     [ -n "$p" ] || continue
@@ -49,7 +52,7 @@ for file in $(git ls-files 2>/dev/null || find . -type f | sed 's|^\./||'); do
   done <<< "$patterns"
   [ "$managed" = true ] || continue
 
-  annotated=$(grep -c "$ANNOTATION" "$file" || true)
+  annotated=$(ANN=$ANNOTATION awk 'index($0, ENVIRON["ANN"]) { n++ } END { print n + 0 }' "$file")
   matched=0
   while IFS= read -r re; do
     [ -n "$re" ] || continue
@@ -78,7 +81,7 @@ while IFS= read -r cmd; do
 done < <(json '.. | select(tag == "!!map" and has("postUpgradeTasks")) | .postUpgradeTasks.commands[]')
 
 # ─── an issue event still has to come from the dashboard's author ───────────
-yq '.jobs[].if // ""' "$WORKFLOW" | grep -qF "$AUTHOR_CHECK" \
+yq '.jobs[].if // ""' "$WORKFLOW" | WANT=$AUTHOR_CHECK awk 'index($0, ENVIRON["WANT"]) { found = 1 } END { exit !found }' \
   || report "$WORKFLOW: no job checks '$AUTHOR_CHECK' — any issue titled Dependency Dashboard could start a run"
 
 # ─── a run that abandons the repository still fails the job ─────────────────
@@ -90,7 +93,7 @@ exit_code=$(yq ".jobs[].steps[] | select(.uses // \"\" | test(\"^renovatebot/git
 excluded=$(yq '.changelog.exclude.labels[]' "$RELEASE_NOTES")
 while IFS= read -r label; do
   [ -n "$label" ] || continue
-  grep -qxF "$label" <<< "$excluded" || report "$RELEASE_NOTES: label '$label' from $CONFIG is not excluded from the release notes"
+  WANT=$label awk '$0 == ENVIRON["WANT"] { found = 1 } END { exit !found }' <<< "$excluded" || report "$RELEASE_NOTES: label '$label' from $CONFIG is not excluded from the release notes"
 done < <(json '.labels[]')
 
 exit "$found"
