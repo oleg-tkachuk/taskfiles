@@ -50,6 +50,7 @@ workspace — tasks then read `security:<task>`.
 | `GO_TOOL_MODFILE` | — | a `go.mod` whose `tool` directives pin govulncheck, golangci-lint and gosec, when a module's own does not; relative to the include's directory |
 | `GOLANGCI_LINT_MODFILE` | — | a `go.mod` that pins golangci-lint alone, when it is kept apart from the other tools; relative to the include's directory |
 | `GO_TOOLS_PINNED` | `0` | `1`: a Go tool no `tool` directive pins is not there, and `PATH` is never asked |
+| `GOVULNCHECK_IGNORE` | — | vulnerability IDs `vuln` passes over in every module, as govulncheck prints them and separated by spaces; one no module reports any longer fails the task |
 | `BASE` | `main` | branch the new-findings and breaking gates compare against |
 
 Every tool takes a FLAGS input, appended rather than replacing the invocation:
@@ -138,6 +139,13 @@ than better: `pip-audit` reads a project only when it declares PEP 621
 `pnpm-lock.yaml` likewise. So `trivy` is the dependency scan for everything
 that is not Go, and `vuln` is the one for Go, where govulncheck's reachability
 analysis says something trivy cannot.
+
+A finding with no fixed version would keep `vuln` red until upstream ships
+one. `GOVULNCHECK_IGNORE` names the IDs to pass over, in every module; the
+[`go`](../go/README.md#a-finding-nobody-can-fix-yet) module reads the same
+input and says what it does. Here the list is held against all the modules
+together: an entry is stale, and fails the task, only when none of them
+reports it.
 
 ## Two defaults chosen so the gates can pass
 

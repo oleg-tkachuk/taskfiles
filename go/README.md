@@ -53,6 +53,7 @@ workspace — tasks then read `go:<task>`.
 | `GO_TOOL_MODFILE` | — | a `go.mod` whose `tool` directives pin the tools, when they are not in this module's own |
 | `GOLANGCI_LINT_MODFILE` | — | a `go.mod` that pins golangci-lint alone, when it is kept apart from the other tools |
 | `GO_TOOLS_PINNED` | `0` | `1`: a tool no `tool` directive pins is not there, and `PATH` is never asked |
+| `GOVULNCHECK_IGNORE` | — | vulnerability IDs `vuln` passes over, as govulncheck prints them and separated by spaces; one it no longer reports fails the task |
 | `GO_FMT_GOIMPORTS` | runs it when it is found | `1`: `fmt` needs goimports and fails without it; `0`: `fmt` never runs it |
 | `GO_BENCH_PKG` | `GO_PKG` | packages to benchmark, space-separated like `GO_PKG` |
 | `GO_BENCH_FLAGS` | `-benchtime=1x` | flags for the benchmark run |
@@ -102,6 +103,39 @@ in CI: a step that fixes the drift and exits 0 hides it. Each has a half that
 only reports — `fmt:check`, `tidy:check`, `fix:check` — and fails with the
 diff. `tidy:check` needs Go 1.23 for `go mod tidy -diff`, `fix:check` Go 1.26
 for `go fix -diff`; an older go fails on the flag, and says so.
+
+## A finding nobody can fix yet
+
+govulncheck exits non-zero for as long as the code reaches a vulnerability,
+and some have no fixed version: `vuln` then stays red for as long as upstream
+takes, and a red gate hides the next finding, which may be one you can fix.
+Name what you have looked at and cannot act on, with the reason above it:
+
+```yaml
+go:
+  taskfile: '{{printf .TASKLIB "go"}}'
+  dir: .
+  vars:
+    # No fixed release of example.com/router v4, and nothing here serves
+    # through its proxy middleware.
+    GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002
+```
+
+```console
+$ task go:vuln
+◉ api · go · govulncheck
+…
+▲ api · go · passed over, by GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002
+```
+
+Any other finding fails the task as before, and so does a scan that did not
+run. The list cannot outlive its reason either: once a bump or a fix makes the
+scan stop reporting an ID, the task fails until the entry is dropped.
+
+Only what the code reaches is held against the list — the IDs under
+govulncheck's `Symbol Results` — which is also what decides its exit status.
+With `-format json`, or another output the IDs cannot be read from, the task
+fails rather than guess.
 
 ## gotestsum when there is one, `go test` when there is not
 

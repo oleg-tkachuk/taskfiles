@@ -24,6 +24,9 @@ version: "3"
 #                    is kept apart from the other tools  (default none)
 #   GO_TOOLS_PINNED  1: a tool no `tool` directive pins is not there, and
 #                    PATH is never asked                 (default 0)
+#   GOVULNCHECK_IGNORE  vulnerability IDs vuln passes over, "GO-2026-0001
+#                    GO-2026-0002"; one it no longer finds fails the task
+#                                                        (default none)
 #   GO_FMT_GOIMPORTS 1: fmt needs goimports and fails without it; 0: fmt
 #                    never runs it        (default: runs it when it is found)
 #   GO_TEST_TAGS     build tags for test:tagged:compile (default integration)
@@ -82,6 +85,10 @@ vars:
   _GO_PINNED_ON: "1"
   _GO_PINNED_OFF: "0"
   _GO_PINNED: '{{.GO_TOOLS_PINNED | default "0"}}'
+  _GO_VULN_IGNORE: '{{.GOVULNCHECK_IGNORE | default ""}}'
+  # What govulncheck exits with when the code reaches a vulnerability; any
+  # other failure is the scan itself not having run.
+  _GO_VULN_RC: "3"
   # What GO_FMT_GOIMPORTS may be, and what it is when unset.
   _GO_IMPORTS_ON: "1"
   _GO_IMPORTS_OFF: "0"
@@ -126,6 +133,7 @@ vars:
   _GO_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
   _GO_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
   _GO_ERR: '{{if .NO_COLOR}}✖{{else}}{{"\x1b[31m✖\x1b[0m"}}{{end}}'
+  _GO_WARN: '{{if .NO_COLOR}}▲{{else}}{{"\x1b[33m▲\x1b[0m"}}{{end}}'
 
 env:
   # "auto" hands go an empty GOWORK, which is go's own "find a go.work". An
@@ -322,7 +330,60 @@ tasks:
             printf '%s %s · go · govulncheck %s — go get -tool golang.org/x/vuln/cmd/govulncheck\n' "{{._GO_ERR}}" {{._GO_NAME | q}} "$absent" >&2
             exit 1
           fi
-          run_tool govulncheck {{._GO_PKGS}}
+          ignore={{._GO_VULN_IGNORE | q}}
+          if [ -z "$ignore" ]; then
+            run_tool govulncheck {{._GO_PKGS}}
+            exit
+          fi
+          # A finding with no fixed version keeps this gate red for as long
+          # as upstream takes, and a red gate hides the next finding. Named in
+          # GOVULNCHECK_IGNORE it is passed over, and said so on every run.
+          # The list cannot outlive its reason: an entry the scan no longer
+          # reports fails the task until it is dropped.
+          set -f
+          list=''
+          for id in $ignore; do
+            case "$id" in
+              GO-[0-9][0-9][0-9][0-9]-*[!0-9]* | GO-[0-9][0-9][0-9][0-9]-) ok=0 ;;
+              GO-[0-9][0-9][0-9][0-9]-*) ok=1 ;;
+              *) ok=0 ;;
+            esac
+            if [ "$ok" = 0 ]; then
+              printf '%s %s · go · GOVULNCHECK_IGNORE takes IDs as govulncheck prints them, GO-2026-0001, got: %s\n' "{{._GO_ERR}}" {{._GO_NAME | q}} "$id" >&2
+              exit 1
+            fi
+            list="$list $id"
+          done
+          out=$(mktemp)
+          trap 'rm -f "$out"' EXIT
+          rc=0
+          run_tool govulncheck {{._GO_PKGS}} > "$out" 2>&1 || rc=$?
+          cat "$out"
+          # Only what the code reaches counts, as it does for the exit status:
+          # under -show verbose the same heading lists what a required module
+          # merely contains.
+          case "$rc" in
+            0) found='' ;;
+            {{._GO_VULN_RC | q}})
+              found=$(awk '/^=== / { symbols = ($0 == "=== Symbol Results ===") } symbols && /^Vulnerability #[0-9]+: / { printf "%s ", $3 }' "$out")
+              if [ -z "$found" ]; then
+                printf '%s %s · go · govulncheck found vulnerabilities and named none under Symbol Results — GOVULNCHECK_IGNORE cannot be held against this output\n' "{{._GO_ERR}}" {{._GO_NAME | q}} >&2
+                exit 1
+              fi ;;
+            *) exit "$rc" ;;
+          esac
+          extra='' stale=''
+          for id in $found; do case " $list " in *" $id "*) ;; *) extra="$extra $id" ;; esac; done
+          for id in $list; do case " $found " in *" $id "*) ;; *) stale="$stale $id" ;; esac; done
+          if [ -n "$extra" ]; then
+            printf '%s %s · go · not in GOVULNCHECK_IGNORE:%s\n' "{{._GO_ERR}}" {{._GO_NAME | q}} "$extra" >&2
+            exit 1
+          fi
+          if [ -n "$stale" ]; then
+            printf '%s %s · go · GOVULNCHECK_IGNORE names what govulncheck no longer reports — drop the entry:%s\n' "{{._GO_ERR}}" {{._GO_NAME | q}} "$stale" >&2
+            exit 1
+          fi
+          printf '%s %s · go · passed over, by GOVULNCHECK_IGNORE:%s\n' "{{._GO_WARN}}" {{._GO_NAME | q}} "$list"
 
   deps:update:
     desc: "Bump the direct dependencies to the latest minor/patch, tidy, then prove it still builds"
