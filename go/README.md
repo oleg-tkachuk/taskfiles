@@ -53,7 +53,7 @@ workspace — tasks then read `go:<task>`.
 | `GO_TOOL_MODFILE` | — | a `go.mod` whose `tool` directives pin the tools, when they are not in this module's own |
 | `GOLANGCI_LINT_MODFILE` | — | a `go.mod` that pins golangci-lint alone, when it is kept apart from the other tools |
 | `GO_TOOLS_PINNED` | `0` | `1`: a tool no `tool` directive pins is not there, and `PATH` is never asked |
-| `GOVULNCHECK_IGNORE` | — | vulnerability IDs `vuln` passes over, as govulncheck prints them and separated by spaces; one it no longer reports fails the task |
+| `GOVULNCHECK_IGNORE` | — | list of the vulnerability IDs `vuln` passes over, as govulncheck prints them; one it no longer reports fails the task |
 | `GO_FMT_GOIMPORTS` | runs it when it is found | `1`: `fmt` needs goimports and fails without it; `0`: `fmt` never runs it |
 | `GO_BENCH_PKG` | `GO_PKG` | packages to benchmark, space-separated like `GO_PKG` |
 | `GO_BENCH_FLAGS` | `-benchtime=1x` | flags for the benchmark run |
@@ -118,8 +118,11 @@ go:
   vars:
     # No fixed release of example.com/router v4, and nothing here serves
     # through its proxy middleware.
-    GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002
+    GOVULNCHECK_IGNORE: [GO-2026-0001, GO-2026-0002]
 ```
+
+On the command line a variable is a string, so there the IDs are separated by
+spaces: `task go:vuln GOVULNCHECK_IGNORE="GO-2026-0001 GO-2026-0002"`.
 
 ```console
 $ task go:vuln

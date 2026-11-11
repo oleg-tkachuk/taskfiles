@@ -186,31 +186,37 @@ expect_status fail "ignore: without the input a finding fails, as before"
 refute_output "GOVULNCHECK_IGNORE" "ignore: without the input nothing is said of it"
 if [ -e "$found" ]; then fail "ignore: without the input a state file was written"; else pass "ignore: without the input no state is kept"; fi
 
-consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: 'GO-2026-0001 GO-2026-0002' }"
+consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: [GO-2026-0001, GO-2026-0002] }"
 only_shims security:vuln
 expect_status ok "ignore: each module's finding is named, and the scan passes"
 expect_output "passed over, by GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002" "ignore: the IDs passed over are printed"
 if [ -e "$found" ]; then fail "ignore: the state file was left behind"; else pass "ignore: the state file is removed"; fi
 
-consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: 'GO-2026-0001' }"
+consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: [GO-2026-0001] }"
 only_shims security:vuln
 expect_status fail "ignore: a finding that is not named fails its module"
 expect_output "web · not in GOVULNCHECK_IGNORE: GO-2026-0002" "ignore: the module and the unnamed finding are named"
 
-consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: 'GO-2026-0001 GO-2026-0002 GO-2026-0003' }"
+consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: [GO-2026-0001, GO-2026-0002, GO-2026-0003] }"
 only_shims security:vuln
 expect_status fail "ignore: an entry no module reports fails"
 expect_output "drop the entry: GO-2026-0003" "ignore: the stale entry is named"
 refute_output "drop the entry: GO-2026-0001" "ignore: an entry one module still reports is not stale"
 
 scan web 1 'govulncheck: loading packages: cache entry not found'
-consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: 'GO-2026-0001 GO-2026-0002' }"
+consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: [GO-2026-0001, GO-2026-0002] }"
 only_shims security:vuln
 expect_status fail "ignore: a scan that failed to run fails"
 refute_output "drop the entry" "ignore: a failed scan says nothing about stale entries"
 refute_output "passed over" "ignore: a failed scan passes nothing over"
 
-consumer security security "{ GO_MODULES: [api], GOVULNCHECK_IGNORE: 'GO-2026-0001 CVE-2026-1234' }"
+# On the command line the input is a string, with the IDs separated by spaces.
+consumer security security "{ GO_MODULES: [api] }"
+scan api "$REACHED" '=== Symbol Results ===' '' 'Vulnerability #1: GO-2026-0001' 'Vulnerability #2: GO-2026-0002'
+only_shims security:vuln "GOVULNCHECK_IGNORE=GO-2026-0001 GO-2026-0002"
+expect_status ok "ignore: a string of IDs on the command line passes them over"
+
+consumer security security "{ GO_MODULES: [api], GOVULNCHECK_IGNORE: [GO-2026-0001, CVE-2026-1234] }"
 reset_calls
 only_shims security:vuln
 expect_status fail "ignore: an entry that is not a Go vulnerability ID is refused"
