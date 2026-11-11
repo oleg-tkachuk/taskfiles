@@ -24,7 +24,7 @@ for file in "$@"; do
     [ -n "$name" ] || continue
     while IFS= read -r input; do
       [ -n "$input" ] || continue
-      if printf '%s' "$text" | grep -qE "(^|[^A-Za-z0-9_])\\.${input}([^A-Za-z0-9_]|\$)"; then
+      if printf '%s\n' "$text" | NAME=$input awk 'BEGIN { re = "(^|[^A-Za-z0-9_])\\." ENVIRON["NAME"] "([^A-Za-z0-9_]|$)" } $0 ~ re { found = 1 } END { exit !found }'; then
         printf '%s: var %s resolves %s, which a caller may pass on the call\n' "$file" "$name" "$input"
         found=1
       fi

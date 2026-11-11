@@ -30,7 +30,7 @@ for file in "$@"; do
                  | .value.vars // {} | to_entries[]
                  | $t + "\t" + .key + "\t" + ((select(.value | type == "!!str") | .value) // "")' "$file")
 
-  bare=$(printf '%s\n' "$top" | grep -vE "$prefixed" | grep . || true)
+  bare=$(printf '%s\n' "$top" | RE=$prefixed awk '$0 !~ ENVIRON["RE"] && /./')
   if [ -n "$bare" ]; then
     printf '%s: declares vars that are not <_PREFIX_>-scoped:\n' "$file"
     printf '    %s\n' $bare
@@ -40,7 +40,7 @@ for file in "$@"; do
   task_prefixed=""
   while IFS=$'\t' read -r task name value; do
     [ -n "$task" ] || continue
-    if printf '%s' "$name" | grep -qE "$prefixed"; then
+    if printf '%s\n' "$name" | RE=$prefixed awk '$0 ~ ENVIRON["RE"] { found = 1 } END { exit !found }'; then
       task_prefixed="$task_prefixed$name"$'\n'
       continue
     fi
@@ -52,8 +52,8 @@ for file in "$@"; do
     found=1
   done <<< "$tasks"
 
-  prefixes=$(printf '%s\n%s' "$top" "$task_prefixed" | sed -nE 's/^(_[A-Z0-9]+_).*/\1/p' | sort -u)
-  if [ "$(printf '%s\n' "$prefixes" | grep -c .)" -gt 1 ]; then
+  prefixes=$(printf '%s\n%s' "$top" "$task_prefixed" | awk 'match($0, /^_[A-Z0-9]+_/) { print substr($0, 1, RLENGTH) }' | sort -u)
+  if [ "$(printf '%s\n' "$prefixes" | awk '/./ { n++ } END { print n + 0 }')" -gt 1 ]; then
     printf '%s: mixes prefixes: %s\n' "$file" "$(printf '%s ' $prefixes)"
     found=1
   fi
@@ -73,22 +73,22 @@ trap 'rm -rf "$work"' EXIT
 # "<var>\t<file>" for every var a module declares, at the top or in a task.
 for file in "$@"; do
   yq -r '(.vars // {} | keys | .[]), (.tasks // {} | .[] | select(type == "!!map") | .vars // {} | keys | .[])' "$file" \
-    | sed "s|\$|	$file|"
+    | FILE=$file awk '{ print $0 "\t" ENVIRON["FILE"] }'
 done | sort -u > "$work/declared"
 
 for file in "$@"; do
   # Prefixed names this module's strings read: templates and ref: expressions.
-  reads=$(yq -r '.. | select(tag == "!!str")' "$file" | grep -oE '\._[A-Z0-9]+_[A-Z0-9_]*' | cut -c2- | sort -u || true)
+  reads=$(yq -r '.. | select(tag == "!!str")' "$file" | awk '{ s = $0; while (match(s, /\._[A-Z0-9]+_[A-Z0-9_]*/)) { print substr(s, RSTART + 1, RLENGTH - 1); s = substr(s, RSTART + RLENGTH) } }' | sort -u)
   for name in $reads; do
     owners=$(awk -F'\t' -v n="$name" '$1 == n { print $2 }' "$work/declared")
-    if printf '%s\n' "$owners" | grep -qxF -- "$file"; then continue; fi
+    if WANT=$file awk '$0 == ENVIRON["WANT"] { found = 1 } END { exit !found }' <<< "$owners"; then continue; fi
     if [ -z "$owners" ]; then
       printf '%s: reads %s, which no module declares\n' "$file" "$name"
       found=1
       continue
     fi
     for owner in $owners; do
-      exports=$(awk -F': ' '/^# exports: /{print $2}' "$owner" | tr '\n' ' ')
+      exports=$(awk -F': ' '/^# exports: / { printf "%s ", $2 }' "$owner")
       case " $exports " in
         *" $name "*) ;;
         *) printf '%s: reads %s from %s, which does not export it\n' "$file" "$name" "$owner"; found=1 ;;
