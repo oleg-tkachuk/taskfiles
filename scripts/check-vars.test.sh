@@ -99,6 +99,14 @@ version: "3"
 vars:
   _A_VERSION: "1"' "$READER"
 
+# The list may run over several comment lines.
+expect_pair clean exported-on-the-second-of-two-lines '# exports: _A_OTHER
+# exports: _A_VERSION
+version: "3"
+vars:
+  _A_OTHER: "0"
+  _A_VERSION: "1"' "$READER"
+
 expect_pair reported unexported-read 'version: "3"
 vars:
   _A_VERSION: "1"' "$READER"
