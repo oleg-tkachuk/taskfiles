@@ -85,7 +85,7 @@ tasks:
           bad() { say '{{._PY_ERR}}' "$1" >&2; fail=1; }
 
           command -v poetry >/dev/null 2>&1 \
-            && say '{{._PY_OK}}' "poetry $(poetry --version 2>/dev/null | sed 's/[^0-9.]*//;s/).*//')" \
+            && say '{{._PY_OK}}' "poetry $(poetry --version 2>/dev/null | awk '{ sub(/[^0-9.]*/, ""); sub(/\).*/, ""); print }')" \
             || bad "poetry is not installed — https://python-poetry.org/docs/#installation"
 
           # The interpreter by the name this module will hand poetry, not by

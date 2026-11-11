@@ -79,7 +79,7 @@ tasks:
           url=$(git remote get-url --push "$remote")
           path=${url%.git}; path=${path%/}
           name=${path##*/}; owner=${path%/*}; owner=${owner##*[/:]}
-          lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+          lower() { printf '%s' "$1" | awk '{ print tolower($0) }'; }
           if [ "$(lower "$owner/$name")" != "$(lower "$repo")" ]; then
             echo "✖ remote '$remote' is $url, not $repo — refusing to lift protection on one and push to the other." >&2
             echo "  Set GH_REMOTE to the remote for $repo, or GH_REPO to the repository '$remote' points at." >&2

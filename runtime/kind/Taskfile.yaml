@@ -64,7 +64,7 @@ tasks:
     preconditions:
       - sh: command -v kind >/dev/null
         msg: "kind is not installed — https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
-      - sh: kind get clusters 2>/dev/null | grep -qxF -- {{._RT_CLUSTER | q}}
+      - sh: kind get clusters 2>/dev/null | WANT={{._RT_CLUSTER | q}} awk '$0 == ENVIRON["WANT"] { found = 1 } END { exit !found }'
         msg: "no kind cluster named {{._RT_CLUSTER}} — `kind create cluster --name {{._RT_CLUSTER}}`, or set KIND_CLUSTER"
     cmds:
       - printf '%s %s · local · kind cluster present\n' "{{._RT_OK}}" {{._RT_SVC | q}}
