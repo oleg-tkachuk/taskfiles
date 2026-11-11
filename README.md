@@ -191,6 +191,7 @@ implementation; they are not the current one.
 | [`monorepo/`](monorepo/README.md) | `monorepo` | run one target across every component, registry preflight |
 | [`node/`](node/README.md) | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
 | [`pnpm/`](pnpm/README.md) | `pnpm` | keep the corepack pnpm pin current and agreed across a repo's apps |
+| [`pulumi/`](pulumi/README.md) | `pulumi` | preview, update and destroy one Pulumi project — the stack named on every call, the change shown before it is made |
 | [`python/*`](python/README.md) — poetry, uv | `python` | install/test/lint/format/typecheck/lock and dep bumps, one surface per manager |
 | [`release/`](release/README.md) | `release` | version derivation, image build/scan/push, chart lint/render/package/push, `deploy` |
 | [`runtime/*`](runtime/README.md) — docker, orbstack, minikube, kind, k3d | `local` | run a locally built image on a local cluster, no registry |

@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+# pulumi: the stack is named on every call and never taken from the workspace,
+# a change is shown before it is made, and a check that did not complete is
+# never the clean result.
+source "$(dirname "$0")/lib.sh"
+
+# Answers as the CLI does, by subcommand; a destroy is told from its preview
+# by --preview-only.
+shim pulumi '
+case " $* " in
+  *" preview "*) printf "%s\n" "~ one resource will change"; exit "${FAKE_PREVIEW:-0}" ;;
+  *" up "*) printf "%s\n" "updated"; exit "${FAKE_UP:-0}" ;;
+  *" destroy "*" --preview-only "*) printf "%s\n" "- one resource will go"; exit "${FAKE_DESTROY_PREVIEW:-0}" ;;
+  *" destroy "*) printf "%s\n" "destroyed"; exit "${FAKE_DESTROY:-0}" ;;
+esac'
+
+# called_before <a> <b> <case name> — the first call holding a came before the
+# first holding b.
+called_before() {
+  if A=$1 B=$2 awk 'index($0, ENVIRON["A"]) && !a { a = NR } index($0, ENVIRON["B"]) && !b { b = NR } END { exit !(a && b && a < b) }' "$CALLS"; then
+    pass "$3"
+  else
+    fail "$3: '$1' was not called before '$2'"; quoted '    > ' "$CALLS"
+  fi
+}
+
+URN_A='urn:pulumi:dev::app::kubernetes:helm.sh/v3:Release::traefik'
+URN_B='urn:pulumi:dev::app::random:index/randomString:RandomString::r'
+
+mkdir -p "$CONSUMER/infra"
+consumer pu pulumi '{ PULUMI_DIR: infra }'
+
+# ─── plan ────────────────────────────────────────────────────────────────────
+reset_calls
+run_task pu:plan STACK=dev
+expect_status ok "plan: a preview that completes passes"
+expect_call "pulumi --non-interactive --cwd infra preview --stack dev --diff" "plan: previews PULUMI_DIR for the stack named, without a terminal"
+expect_output "~ one resource will change" "plan: shows the preview"
+
+reset_calls
+run_task pu:plan
+expect_status fail "plan: no STACK is refused"
+refute_call "pulumi" "plan: nothing runs on the workspace's current stack"
+
+FAKE_PREVIEW=1 run_task pu:plan STACK=dev
+expect_status fail "plan: a preview that errors fails"
+
+consumer pu pulumi '{ PULUMI_DIR: infra, PULUMI_PLAN_FLAGS: "--policy-pack /p" }'
+reset_calls
+run_task pu:plan STACK=dev
+expect_call "preview --stack dev --policy-pack /p" "plan: PULUMI_PLAN_FLAGS are the preview's flags"
+refute_call "--diff" "plan: and replace the default one"
+consumer pu pulumi '{ PULUMI_DIR: infra }'
+
+# ─── TARGETS ─────────────────────────────────────────────────────────────────
+reset_calls
+run_task pu:plan STACK=dev TARGETS="$URN_A $URN_B"
+expect_call "--target $URN_A --target $URN_B" "TARGETS: each URN is a --target of its own, its \$ and colons intact"
+
+# A pattern that matches nothing is not an error to the CLI: it reports no
+# changes and exits 0. So only whole URNs are taken.
+reset_calls
+run_task pu:plan STACK=dev TARGETS='**::Release::traefik'
+expect_status fail "TARGETS: a pattern is refused"
+expect_output "is a pattern" "TARGETS: says why"
+refute_call "pulumi" "TARGETS: nothing runs on one"
+
+reset_calls
+run_task pu:plan STACK=dev TARGETS="$URN_A urn:pulumi:dev::app::x:y:Z::na?e"
+expect_status fail "TARGETS: one pattern among whole URNs is refused too"
+refute_call "pulumi" "TARGETS: and nothing runs"
+
+# A pattern is read as written, not as the files it happens to match here.
+reset_calls
+run_task pu:plan STACK=dev TARGETS='inf*'
+expect_status fail "TARGETS: a pattern that matches a file is still a pattern"
+refute_call "pulumi" "TARGETS: and is not run as that file's name"
+
+# ─── apply ───────────────────────────────────────────────────────────────────
+# The preview first, so the question is asked with the changes on screen.
+reset_calls
+run_task pu:apply STACK=dev
+expect_status ok "apply: an update that completes passes"
+expect_call "pulumi --non-interactive --cwd infra up --stack dev --yes" "apply: updates the stack named"
+called_before " preview " " up " "apply: the preview runs before the update"
+expect_output "~ one resource will change" "apply: shows the preview"
+
+reset_calls
+FAKE_PREVIEW=1 run_task pu:apply STACK=dev
+expect_status fail "apply: a preview that errors fails"
+refute_call " up " "apply: nothing is updated after it"
+
+FAKE_UP=1 run_task pu:apply STACK=dev
+expect_status fail "apply: an update that errors fails"
+
+reset_calls
+run_task pu:apply
+expect_status fail "apply: no STACK is refused"
+refute_call "pulumi" "apply: nothing runs without one"
+
+reset_calls
+run_task pu:apply STACK=dev TARGETS="$URN_A"
+expect_call "preview --stack dev --diff --target $URN_A" "apply: TARGETS narrow the preview"
+expect_call "up --stack dev --yes --target $URN_A" "apply: and the update to the same resources"
+
+# Called from a consumer's own task, as a repository looping over its layers
+# does: what that task passes is what both steps act on.
+cat >> "$CONSUMER/Taskfile.yaml" <<YAML
+tasks:
+  layer:
+    cmds:
+      - task: pu:apply
+        vars: { STACK: dev, TARGETS: '$URN_B' }
+YAML
+reset_calls
+run_task layer
+expect_status ok "apply: runs when a consumer's task calls it"
+expect_call "preview --stack dev --diff --target $URN_B" "apply: the preview takes the stack and targets that task passed"
+expect_call "up --stack dev --yes --target $URN_B" "apply: and so does the update"
+
+consumer pu pulumi '{ PULUMI_DIR: infra, PULUMI_UP_FLAGS: "--refresh --run-program" }'
+reset_calls
+run_task pu:apply STACK=dev
+expect_call "up --stack dev --yes --refresh --run-program" "apply: PULUMI_UP_FLAGS reach the update"
+refute_call "preview --stack dev --diff --refresh" "apply: and not the preview"
+consumer pu pulumi '{ PULUMI_DIR: infra }'
+
+# ─── destroy:plan ────────────────────────────────────────────────────────────
+reset_calls
+run_task pu:destroy:plan STACK=dev
+expect_status ok "destroy:plan: a preview that completes passes"
+expect_call "pulumi --non-interactive --cwd infra destroy --stack dev --preview-only" "destroy:plan: previews the destruction and destroys nothing"
+refute_call "--yes" "destroy:plan: approves nothing"
+expect_output "- one resource will go" "destroy:plan: shows what would go"
+
+# ─── destroy ─────────────────────────────────────────────────────────────────
+# CONFIRM repeats the stack: under --yes there is no question, and a second
+# word that must agree is what stands between a wrong STACK and its loss.
+reset_calls
+run_task pu:destroy STACK=dev
+expect_status fail "destroy: no CONFIRM is refused"
+refute_call "pulumi" "destroy: nothing runs without one"
+
+reset_calls
+run_task pu:destroy STACK=prod CONFIRM=dev
+expect_status fail "destroy: CONFIRM naming another stack is refused"
+expect_output "CONFIRM does not name" "destroy: says so"
+refute_call "--yes" "destroy: nothing is destroyed on a refused CONFIRM"
+
+reset_calls
+run_task pu:destroy STACK=dev CONFIRM=dev
+expect_status ok "destroy: CONFIRM naming the stack passes"
+expect_call "pulumi --non-interactive --cwd infra destroy --stack dev --yes" "destroy: destroys the stack named"
+called_before "--preview-only" "destroy --stack dev --yes" "destroy: the preview runs before the destruction"
+expect_output "- one resource will go" "destroy: shows what goes"
+
+reset_calls
+FAKE_DESTROY_PREVIEW=1 run_task pu:destroy STACK=dev CONFIRM=dev
+expect_status fail "destroy: a preview that errors fails"
+refute_call "--yes" "destroy: nothing is destroyed after it"
+
+FAKE_DESTROY=1 run_task pu:destroy STACK=dev CONFIRM=dev
+expect_status fail "destroy: a destruction that errors fails"
+
+consumer pu pulumi '{ PULUMI_DIR: infra, PULUMI_DESTROY_FLAGS: "--ignore-protect" }'
+reset_calls
+run_task pu:destroy STACK=dev CONFIRM=dev TARGETS="$URN_A"
+expect_call "destroy --stack dev --preview-only --ignore-protect --target $URN_A" "destroy: PULUMI_DESTROY_FLAGS and TARGETS shape the preview"
+expect_call "destroy --stack dev --yes --ignore-protect --target $URN_A" "destroy: and the destruction the same way"
+consumer pu pulumi '{ PULUMI_DIR: infra }'
+
+# ─── unchanged ───────────────────────────────────────────────────────────────
+reset_calls
+run_task pu:unchanged STACK=dev
+expect_status ok "unchanged: a preview with no changes passes"
+expect_call "pulumi --non-interactive --cwd infra preview --stack dev --diff --expect-no-changes" "unchanged: asks the CLI to fail on a change"
+expect_output "no changes" "unchanged: says so"
+
+# 7 is the CLI's own "changes were proposed".
+FAKE_PREVIEW=7 run_task pu:unchanged STACK=dev
+expect_status fail "unchanged: proposed changes fail"
+expect_output "~ one resource will change" "unchanged: shows them"
+expect_output "would change" "unchanged: says the stack would change"
+
+# Any other code is a preview that did not finish: a program that would not
+# run, a stack that is not there. It is not a change, and never "no changes".
+for code in 1 6; do
+  FAKE_PREVIEW=$code run_task pu:unchanged STACK=dev
+  expect_status fail "unchanged: a preview that exits $code fails"
+  expect_output "did not complete" "unchanged: exit $code is reported as an error"
+  refute_output "no changes" "unchanged: exit $code is never the clean result"
+  refute_output "would change" "unchanged: exit $code is not reported as a change"
+done
+
+# ─── the directory ───────────────────────────────────────────────────────────
+consumer pu pulumi
+reset_calls
+run_task pu:plan STACK=dev
+expect_call "pulumi --non-interactive --cwd . preview" "PULUMI_DIR: defaults to the include's directory"
+
+consumer pu pulumi '{ PULUMI_DIR: nowhere }'
+reset_calls
+run_task pu:plan STACK=dev
+expect_status fail "PULUMI_DIR: a directory that does not exist is refused"
+expect_output "nowhere" "PULUMI_DIR: names it"
+refute_call "pulumi" "PULUMI_DIR: nothing runs"
+
+finish

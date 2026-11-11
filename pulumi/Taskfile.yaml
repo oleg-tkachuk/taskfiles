@@ -1,0 +1,184 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# pulumi — preview, update and destroy one Pulumi project, with the stack named
+# on every call and the change shown before it is made.
+#
+#   includes:
+#     pulumi:
+#       taskfile: '{{printf .TASKLIB "pulumi"}}'
+#       dir: .
+#       vars: { PULUMI_DIR: infra }
+#
+#   task pulumi:plan STACK=dev
+#
+# One include is one project: one directory holding a Pulumi.yaml. A
+# repository with several — layers applied in order — includes this once per
+# project, or calls these tasks in the order it owns; the order is not
+# something this module can know.
+#
+# The CLI is never left to pick a stack. Its "current stack" is state on disk
+# that nobody re-reads before typing a command, so every call here passes
+# --stack, and a call without STACK is refused.
+#
+# Logging in, the backend, the passphrase or token, and creating the stack are
+# the repository's own: this module runs the CLI in the environment it is
+# given.
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
+#   PULUMI_DIR            the project's directory                  (default .)
+#   PULUMI_PLAN_FLAGS     flags for every preview of an update  (default --diff)
+#   PULUMI_UP_FLAGS       extra flags for the update — --refresh --run-program
+#   PULUMI_DESTROY_FLAGS  extra flags for a destruction and its preview alike
+#                         — --ignore-protect, an --exclude
+#
+# And on the call itself:
+#
+#   STACK                 required by every task: the stack to act on
+#   TARGETS               whole URNs, separated by spaces, to narrow the call to
+#   CONFIRM               required by destroy: the stack's name again
+# ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _PU_SH _PU_PLAN_FLAGS _PU_UP_FLAGS _PU_DESTROY_FLAGS PULUMI_PLAN_FLAGS PULUMI_UP_FLAGS PULUMI_DESTROY_FLAGS
+
+silent: true
+
+vars:
+  _PU_DIR: '{{.PULUMI_DIR | default "."}}'
+  _PU_PLAN_FLAGS: '{{.PULUMI_PLAN_FLAGS | default "--diff"}}'
+  _PU_UP_FLAGS: '{{.PULUMI_UP_FLAGS | default ""}}'
+  _PU_DESTROY_FLAGS: '{{.PULUMI_DESTROY_FLAGS | default ""}}'
+  # `preview --expect-no-changes` exits with this when changes were proposed.
+  # Any other non-zero code is a preview that did not finish. The CLI has had
+  # distinct codes since 3.227.0; before that, both were 255.
+  _PU_CHANGED: "7"
+  # Status markers. The shape carries the meaning, so a line still reads in
+  # a monochrome log; the colour sits on top and drops out under NO_COLOR.
+  _PU_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
+  _PU_ERR: '{{if .NO_COLOR}}✖{{else}}{{"\x1b[31m✖\x1b[0m"}}{{end}}'
+  # Interpolated by every task below.
+  #
+  # `pu <targets> <arguments…>` runs the CLI on PULUMI_DIR with no terminal
+  # assumed, and a --target for each word of <targets>.
+  #
+  # Only whole URNs are taken. A pattern that matches nothing is not an error
+  # to the CLI: `preview --target '**::Release::no-such'` reports no changes
+  # and exits 0, so a typo reads as "nothing to do". Resolving a name to the
+  # URNs it means, and refusing one that means none, is the caller's to do
+  # before the call. Globbing is off while the words are read, so a pattern
+  # is seen as written and not as the files it happens to match.
+  _PU_SH: |
+    pu() {
+      targets=$1
+      shift
+      set -f
+      for target in $targets; do
+        case "$target" in
+          *[*?]*)
+            printf '%s pulumi · %s is a pattern, and one that matches nothing passes in silence — give TARGETS whole URNs\n' "{{._PU_ERR}}" "$target" >&2
+            return 1 ;;
+        esac
+        set -- "$@" --target "$target"
+      done
+      set +f
+      pulumi --non-interactive --cwd {{._PU_DIR | q}} "$@"
+    }
+
+tasks:
+
+  _ready:
+    internal: true
+    preconditions:
+      - sh: command -v pulumi >/dev/null
+        msg: "pulumi is not installed — https://www.pulumi.com/docs/install/"
+      - sh: test -d {{._PU_DIR | q}}
+        msg: "PULUMI_DIR is {{._PU_DIR}}, which is not a directory"
+
+  plan:
+    desc: "Preview the update of STACK; changes nothing"
+    requires:
+      vars: [STACK]
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._PU_SH}}
+          pu {{.TARGETS | default "" | q}} preview --stack {{.STACK | q}} {{._PU_PLAN_FLAGS}}
+
+  apply:
+    desc: "Update STACK, after showing the preview — asks first"
+    # Task runs a task's deps, then asks its prompt: the preview is on screen
+    # when the question is. There is no saved plan behind it — the CLI's plan
+    # files are a preview feature, and constrain a second run of the program
+    # rather than replay the first — so what is approved is what was just
+    # shown, and the update computes it again.
+    requires:
+      vars: [STACK]
+    deps:
+      - task: plan
+        vars: { STACK: "{{.STACK}}", TARGETS: "{{.TARGETS}}" }
+    prompt: "Update the stack {{.STACK}} of {{._PU_DIR}} as previewed above. Continue?"
+    cmds:
+      - cmd: |
+          set -eu
+          {{._PU_SH}}
+          pu {{.TARGETS | default "" | q}} up --stack {{.STACK | q}} --yes {{._PU_UP_FLAGS}}
+
+  destroy:plan:
+    desc: "Preview the destruction of STACK; changes nothing"
+    requires:
+      vars: [STACK]
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._PU_SH}}
+          pu {{.TARGETS | default "" | q}} destroy --stack {{.STACK | q}} --preview-only {{._PU_DESTROY_FLAGS}}
+
+  destroy:
+    desc: "Destroy what STACK holds, after showing the preview — needs CONFIRM, asks first"
+    # CONFIRM repeats the stack. The prompt guards a run at a terminal; under
+    # --yes there is no prompt, and a second word that has to agree is what
+    # stands between a wrong STACK and its loss.
+    requires:
+      vars: [STACK, CONFIRM]
+    deps:
+      - task: destroy:plan
+        vars: { STACK: "{{.STACK}}", TARGETS: "{{.TARGETS}}" }
+    preconditions:
+      - sh: test {{.CONFIRM | q}} = {{.STACK | q}}
+        msg: "CONFIRM does not name the stack this would destroy — it must repeat STACK"
+    prompt: "Destroy what the stack {{.STACK}} of {{._PU_DIR}} holds, as previewed above. This cannot be undone. Continue?"
+    cmds:
+      - cmd: |
+          set -eu
+          {{._PU_SH}}
+          pu {{.TARGETS | default "" | q}} destroy --stack {{.STACK | q}} --yes {{._PU_DESTROY_FLAGS}}
+
+  unchanged:
+    desc: "Fail when an update of STACK would change anything; changes nothing"
+    # Read by the CLI's exit code, and only 0 is "no changes": a preview that
+    # errored proved nothing. It sees what an update would do — a change the
+    # program makes, or one made behind the state when the flags refresh — and
+    # not a change in the stack's outputs alone, which the CLI does not count.
+    requires:
+      vars: [STACK]
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._PU_SH}}
+          status=0
+          pu {{.TARGETS | default "" | q}} preview --stack {{.STACK | q}} {{._PU_PLAN_FLAGS}} --expect-no-changes || status=$?
+          case "$status" in
+            0) printf '%s pulumi · no changes to the stack %s of %s\n' "{{._PU_OK}}" {{.STACK | q}} {{._PU_DIR | q}} ;;
+            {{._PU_CHANGED | q}})
+              printf '%s pulumi · the stack %s of %s would change — the preview above lists how\n' "{{._PU_ERR}}" {{.STACK | q}} {{._PU_DIR | q}} >&2
+              exit 1 ;;
+            *)
+              printf '%s pulumi · the preview did not complete (exit %s) — that is an error, and says nothing about the stack\n' "{{._PU_ERR}}" "$status" >&2
+              exit 1 ;;
+          esac
