@@ -464,13 +464,13 @@ tasks:
     desc: "List dependencies with a newer version available (read-only)"
     cmds:
       # Capturing to a variable first, rather than piping go list straight
-      # into grep, is what makes a genuine go list failure (module
+      # into awk, is what makes a genuine go list failure (module
       # unresolvable, no network) abort here instead of reading as "every
       # dependency current" — the same conclusion an empty match gives.
       - cmd: |-
           set -eu
           out=$(go list -u -m all)
-          printf '%s\n' "$out" | grep '\[' || printf '%s %s · go · every dependency current\n' "{{._GO_OK}}" {{._GO_NAME | q}}
+          printf '%s\n' "$out" | awk '/\[/ { print; found = 1 } END { exit !found }' || printf '%s %s · go · every dependency current\n' "{{._GO_OK}}" {{._GO_NAME | q}}
 
   bench:
     desc: "Run the benchmarks — no unit tests, just the measurements"

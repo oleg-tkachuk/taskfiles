@@ -674,7 +674,7 @@ hook that may go online clears them first:
 
 ```yaml
 # lefthook.yml
-run: env $(git rev-parse --local-env-vars | sed 's/^/-u /') task lint
+run: env $(git rev-parse --local-env-vars | awk '{ print "-u " $0 }') task lint
 ```
 
 ### Idempotency

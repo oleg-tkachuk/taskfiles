@@ -386,7 +386,7 @@ tasks:
           printf '%s' {{._SEC_DOCKERFILES | join " " | q}}
           {{- else -}}
           find . -name "Dockerfile*" -not -name "*.dockerignore" \
-            {{._SEC_PRUNE}} 2>/dev/null | sort | tr "\n" " "
+            {{._SEC_PRUNE}} 2>/dev/null | sort | awk '{ printf "%s ", $0 }'
           {{- end -}}
     cmds:
       # A scan that found nothing and a scan that ran on nothing print the same
