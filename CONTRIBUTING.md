@@ -41,9 +41,9 @@ task contracts
 ```
 
 The behaviour tests in `task lint` shim every tool. `task contracts` runs the
-gates that read a tool's exit code or output — `security`, `checkov` and
-`terraform` — against trivy, hadolint, gitleaks, checkov, terraform and tofu
-themselves, from `tests/contracts/`. It is not part of the lint: it needs
+gates that read a tool's exit code or output — `security`, `checkov`,
+`terraform` and `pulumi` — against trivy, hadolint, gitleaks, checkov,
+terraform, tofu and pulumi themselves, from `tests/contracts/`. It is not part of the lint: it needs
 those tools, and trivy and the two Terraform CLIs fetch over the network. CI runs
 it on every pull request at the versions pinned in `ci.yml`. A change to how a
 gate reads a tool's exit code or output comes with a case there.

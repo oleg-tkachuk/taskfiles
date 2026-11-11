@@ -15,6 +15,7 @@ const VERSIONS = {
   CHECKOV_VERSION: "3.0.0",
   TERRAFORM_VERSION: "1.0.0",
   OPENTOFU_VERSION: "1.0.0",
+  PULUMI_VERSION: "3.0.0",
 };
 
 test("a wrapper runs the pinned image as the runner's user, in the working directory, with its own entrypoint", () => {
@@ -25,6 +26,16 @@ test("a wrapper runs the pinned image as the runner's user, in the working direc
   assert.match(script, /--user "\$\(id -u\):\$\(id -g\)"/);
   assert.match(script, /-v "\$PWD:\$PWD" -w "\$PWD"/);
   assert.match(script, / --entrypoint checkov bridgecrew\/checkov:3\.0\.0 "\$@"\n$/);
+});
+
+test("a wrapper passes the variables its tool is configured through, by name and without their values", () => {
+  const pulumi = TOOLS.find((tool) => tool.name === "pulumi");
+  assert.ok(pulumi);
+  const script = wrapper(pulumi, "3.0.0");
+  assert.match(script, / -e HOME=\/tmp -e USER -e PULUMI_HOME -e PULUMI_BACKEND_URL -e PULUMI_CONFIG_PASSPHRASE -e PULUMI_SKIP_UPDATE_CHECK -v /);
+  const checkov = TOOLS.find((tool) => tool.name === "checkov");
+  assert.ok(checkov);
+  assert.match(wrapper(checkov, "3.0.0"), / -e HOME=\/tmp -v /);
 });
 
 test("install writes an executable wrapper per tool at the version pinned for it", () => {
