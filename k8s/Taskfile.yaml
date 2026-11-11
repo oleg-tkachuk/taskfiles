@@ -204,6 +204,7 @@ tasks:
           match={{.ROLLOUT_MATCH | default ._K8S_MATCH_IMAGE | q}}
           selector={{.ROLLOUT_SELECTOR | default "" | q}}
           timeout={{.ROLLOUT_TIMEOUT | default "2m" | q}}
+          min={{.ROLLOUT_MIN | default "1" | q}}
           poll={{._K8S_POLL_SECONDS | q}}
           svc={{._K8S_SVC | q}}
           target=$selector
@@ -223,6 +224,13 @@ tasks:
           esac
           deadline=$(($(date +%s) + count))
 
+          # A selector matches what exists, and a first install creates the
+          # Deployments one after another: without a count to reach, the wait
+          # is over as soon as the first of them is there and has rolled.
+          case "$min" in
+            '' | *[!0-9]* | 0) printf '%s %s · k8s · ROLLOUT_MIN must be a whole number from 1, got: %s\n' "{{._K8S_ERR}}" "$svc" "$min" >&2; exit 1 ;;
+          esac
+
           # A chart label cannot hold a "+": helm's own scaffold writes "_".
           if [ "$match" = {{._K8S_MATCH_CHART | q}} ]; then
             want="-$(printf '%s' "$version" | tr + _)"
@@ -239,6 +247,11 @@ tasks:
             fi
             behind=''
             [ -n "$names" ] || behind="    $target is not there yet$nl"
+            if [ -n "$selector" ] && [ -n "$names" ]; then
+              # shellcheck disable=SC2086 # one name per word, by construction
+              set -- $names
+              [ "$#" -ge "$min" ] || behind="    $target matches $# Deployment(s), ROLLOUT_MIN asks for $min$nl"
+            fi
             for d in $names; do
               if [ "$match" = {{._K8S_MATCH_CHART | q}} ]; then
                 have=$({{._K8S_KUBECTL}} -n "$ns" get "$d" -o jsonpath={{._K8S_CHART_PATH | q}})
