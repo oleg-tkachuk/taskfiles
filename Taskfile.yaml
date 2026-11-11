@@ -296,7 +296,7 @@ tasks:
       - bash scripts/check-api.test.sh >/dev/null
       - cmd: |-
           set -eu
-          base=$(git describe --tags --abbrev=0 --match 'v[0-9]*' HEAD 2>/dev/null) || {
+          base=$(bash scripts/api-base.sh) || {
             printf '%s\n' "{{._LIB_ERR}} taskfiles · no release tag in this clone to compare the API against — git fetch --tags" >&2
             exit 1
           }

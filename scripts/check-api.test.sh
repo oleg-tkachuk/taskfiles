@@ -155,4 +155,37 @@ else
   failures=$((failures + 1))
 fi
 
+# api-base.sh: which release a tree is compared against. On a commit after a
+# tag it is that tag; on the tag itself it is the release before, or a release
+# would be compared with itself and every allowlist entry it carries would
+# read as shipped.
+tags="$work/tags"
+git init -q --initial-branch=main "$tags"
+commit() { git -C "$tags" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m "$1"; }
+
+# base_is <want, or - for a failure> <name>
+base_is() {
+  want=$1 name=$2
+  got=$(cd "$tags" && bash "$here/api-base.sh" 2>/dev/null) || got=-
+  if [ "$got" = "$want" ]; then
+    printf '%s\n' "✔ $name: $got"
+  else
+    printf '%s\n' "✖ $name: want $want, got $got" >&2
+    failures=$((failures + 1))
+  fi
+}
+
+commit first
+base_is - base-with-no-release-tag
+git -C "$tags" tag v1.0.0
+base_is v1.0.0 base-on-the-first-release-is-itself
+commit second
+base_is v1.0.0 base-after-a-release-is-that-release
+git -C "$tags" tag not-a-release
+base_is v1.0.0 base-ignores-a-tag-that-is-not-a-release
+git -C "$tags" tag v1.1.0
+base_is v1.0.0 base-on-a-release-tag-is-the-release-before
+commit third
+base_is v1.1.0 base-after-the-next-release-is-that-release
+
 [ "$failures" = 0 ] || exit 1
