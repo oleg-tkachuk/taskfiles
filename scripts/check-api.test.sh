@@ -53,6 +53,15 @@ expect() {
   fi
 }
 
+# said <text> <case name> — the last run's report holds the text.
+said() {
+  if TEXT=$1 awk 'index($0, ENVIRON["TEXT"]) { found = 1 } END { exit !found }' "$work/out"; then
+    printf '%s\n' "✔ $2"
+  else
+    printf '%s\n' "✖ $2: the report lacks: $1" >&2; cat "$work/out" >&2; failures=$((failures + 1))
+  fi
+}
+
 expect clean unchanged '' "$BASE"
 
 expect clean task-renamed-keeping-its-old-name-as-an-alias '' "${BASE/  build:
@@ -75,6 +84,14 @@ expect clean input-renamed-keeping-its-old-name '' "${BASE/.PORT | default \"80\
 
 expect reported input-dropped '' "${BASE/.PORT | default \"80\" | q/\"80\"}"
 
+# `.CFG.PORT` reads CFG: PORT is a field of it, and the input PORT is gone.
+expect reported input-left-only-as-a-field-of-another '' "${BASE/.PORT | default \"80\" | q/.CFG.PORT | q}"
+said "PORT is in v1.0.0 and gone now" "input-left-only-as-a-field-of-another: PORT is reported gone"
+
+# An input removed on purpose is named once: its default, gone with it, is
+# not a second finding.
+expect clean input-with-a-default-removed-and-named 'm:PORT' "${BASE/.PORT | default \"80\" | q/\"80\"}"
+
 expect clean internal-task-renamed '' "${BASE//_run/_go}"
 
 expect clean parameter-between-tasks-renamed '' "${BASE//REF/TARGET}"
@@ -91,6 +108,7 @@ vars:
   _PORTS:
     ref: 'default (list \"80\") .PORT'"
 expect reported input-moved-into-a-list-ref '' "$moved"
+said 'PORT defaulted to "80" in v1.0.0 and to (list "80") now' "input-moved-into-a-list-ref: the default a ref gives is read"
 defaults_changed='m:PORT' expect clean input-moved-into-a-list-ref-and-named '' "$moved"
 
 expect reported default-changed '' "${BASE/default \"80\"/default \"8080\"}"
@@ -100,6 +118,20 @@ else
   printf '%s\n' "✖ default-changed: the report does not name both defaults" >&2; cat "$work/out" >&2; failures=$((failures + 1))
 fi
 defaults_changed='m:PORT' expect clean default-changed-and-named '' "${BASE/default \"80\"/default \"8080\"}"
+# A quote escaped inside the default is part of it.
+expect reported default-holding-an-escaped-quote '' "${BASE/default \"80\"/default \"8\\\"0 x\"}"
+said 'and to "8\"0 x" now' "default-holding-an-escaped-quote: the whole string is the default"
+# `default` is the function by that name: a longer word that ends in it is
+# not, and neither is a name that merely starts with the input's.
+expect clean a-word-ending-in-default-is-not-default '' "${BASE/.REF | q/.REF | q}
+      - echo {{.REF | undefault \"81\" .PORT}}"
+expect clean a-longer-name-is-not-the-input '' "$BASE
+vars:
+  _M_OTHER:
+    ref: 'default \"81\" .PORTable'"
+# A field of another input, read with a default of its own, is not PORT's.
+expect clean default-of-a-field-is-not-the-input-s '' "${BASE/.REF | q/.REF | q}
+      - echo {{.CFG.PORT | default \"81\" | q}}"
 defaults_changed='m:PORT' expect reported stale-default-entry '' "$BASE"
 # An input that gains a default asks nothing of anyone; one that loses its
 # default now has to be set.

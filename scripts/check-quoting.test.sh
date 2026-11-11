@@ -90,6 +90,15 @@ tasks:
     cmds:
       - "{{._KUBECTL}} get pods {{.FLAGS}}"'
 
+# The list may run over several comment lines.
+expect clean declared-verbatim-on-two-lines '# shell-verbatim: _KUBECTL
+# shell-verbatim: FLAGS
+version: "3"
+tasks:
+  t:
+    cmds:
+      - "{{._KUBECTL}} get pods {{.FLAGS}}"'
+
 expect reported only-declared-verbatim-is-exempt '# shell-verbatim: _KUBECTL
 version: "3"
 tasks:
