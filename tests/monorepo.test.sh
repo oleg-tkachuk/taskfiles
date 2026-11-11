@@ -110,6 +110,29 @@ expect_status ok "doctor: one value in every component passes"
 expect_output "no top-level var can reach one component from another" "doctor: a pool with one value per name says so"
 refute_output "is declared at the top level" "doctor: nothing is reported for it"
 
+# A directory include reads the file Task itself reads there: Taskfile.yml
+# before Taskfile.yaml, and either before a .dist one. The other file's vars
+# reach no pool.
+STRAY='version: "3"
+vars:
+  PORT: "9999"'
+printf '%s\n' "$STRAY" > "$CONSUMER/a/Taskfile.dist.yaml"
+run_task mono:doctor
+expect_output "no top-level var can reach one component from another" "doctor: a Taskfile.dist.yaml beside a Taskfile.yaml is not the one read"
+rm -f "$CONSUMER/a/Taskfile.dist.yaml"
+
+printf '%s\n' "$STRAY" > "$CONSUMER/c/Taskfile.yaml"
+run_task mono:doctor
+expect_output "no top-level var can reach one component from another" "doctor: a Taskfile.yaml beside a Taskfile.yml is not the one read"
+rm -f "$CONSUMER/c/Taskfile.yaml"
+
+mv "$CONSUMER/c/Taskfile.yml" "$CONSUMER/c/Taskfile.dist.yml"
+printf '%s\n' "$STRAY" > "$CONSUMER/c/Taskfile.dist.yaml"
+run_task mono:doctor
+expect_output "no top-level var can reach one component from another" "doctor: a Taskfile.dist.yaml beside a Taskfile.dist.yml is not the one read"
+rm -f "$CONSUMER/c/Taskfile.dist.yaml"
+mv "$CONSUMER/c/Taskfile.dist.yml" "$CONSUMER/c/Taskfile.yml"
+
 # Without yq the check cannot read the includes, and says so.
 shim yq 'exit 1'
 run_task mono:doctor
