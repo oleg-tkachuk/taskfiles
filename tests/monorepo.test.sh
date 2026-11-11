@@ -45,6 +45,17 @@ run_task mono:test
 expect_status fail "each: a directory with no Taskfile is refused"
 expect_output "docs(no Taskfile)" "each: names the directory with no Taskfile"
 
+# A component is a directory Task finds a Taskfile in, under any name it takes.
+for taskfile in Taskfile.dist.yml Taskfile.dist.yaml; do
+  mv "$CONSUMER/web/Taskfile.yaml" "$CONSUMER/web/$taskfile"
+  consumer mono monorepo '{ COMPONENTS: [api, web] }'
+  reset_calls
+  run_task mono:test
+  expect_status ok "each: a component holding only a $taskfile is one"
+  expect_call "ran test in web" "each: runs TARGET from a $taskfile"
+  mv "$CONSUMER/web/$taskfile" "$CONSUMER/web/Taskfile.yaml"
+done
+
 # registry:check: 200, 401 and 403 mean the registry answered.
 consumer mono monorepo '{ COMPONENTS: [api] }'
 for code in 200 401 403; do
