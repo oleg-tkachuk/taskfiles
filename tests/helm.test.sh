@@ -13,6 +13,7 @@ esac'
 # One release, web in ns1, until it is uninstalled. FAKE_UNINSTALL_FAIL makes
 # uninstall fail; FAKE_PAGED puts a second release past the first page, so it
 # is listed only once web is gone, and goes on the next uninstall.
+# FAKE_NAMED_ALL lists a second release whose name is the word `all`.
 shim helm '
 gone="$CALLS.gone"
 case "$1" in
@@ -23,7 +24,7 @@ case "$1" in
       exit 0
     fi
     case "$*" in
-      *" -q"*) echo web ;;
+      *" -q"*) echo web; [ -z "${FAKE_NAMED_ALL:-}" ] || echo all ;;
       *) printf "NAME\tNAMESPACE\tREVISION\nweb\tns1\t1\n" ;;
     esac ;;
   uninstall)
@@ -47,14 +48,38 @@ expect_call "helm list --kube-context prod --all-namespaces -a" "listing include
 run_task helm:uninstall RELEASE=web CONFIRM=staging
 expect_status fail "pinned context: CONFIRM naming another context is refused"
 
+# web is listed again, so nothing but the context can refuse this.
 consumer helm helm '{ K8S_CONTEXT: missing }'
+rm -f "$CALLS.gone"
+reset_calls
 run_task helm:uninstall RELEASE=web CONFIRM=missing
 expect_status fail "a pinned context the kubeconfig does not have is refused"
+expect_output "CONFIRM does not name the context this would empty" "a missing context is refused by the context lock"
+refute_call "helm uninstall" "nothing is uninstalled on a context the kubeconfig does not have"
 
 consumer helm helm
 rm -f "$CALLS.gone"
 run_task helm:uninstall RELEASE=web CONFIRM=dev
 expect_status ok "unpinned: CONFIRM naming the current context passes"
+expect_output "    web" "the release about to go is listed, indented under its heading"
+
+# A named release that is not there is a typo, not a no-op.
+rm -f "$CALLS.gone"
+reset_calls
+run_task helm:uninstall RELEASE=wbe CONFIRM=dev
+expect_status fail "a named release that is not listed fails"
+expect_output "no release named wbe in scope" "the missing release is named"
+refute_call "helm uninstall" "nothing is uninstalled for a release that is not there"
+
+# RELEASE=all means every release, so a release called `all` is refused
+# rather than guessed at.
+export FAKE_NAMED_ALL=1
+reset_calls
+run_task helm:uninstall RELEASE=all CONFIRM=dev
+expect_status fail "all: a release named all is refused"
+expect_output "a release is named 'all'" "all: says a release carries the word"
+refute_call "helm uninstall" "all: nothing is uninstalled while it is ambiguous"
+unset FAKE_NAMED_ALL
 
 run_task helm:uninstall RELEASE=web CONFIRM=prod
 expect_status fail "unpinned: CONFIRM naming a context that is not current is refused"

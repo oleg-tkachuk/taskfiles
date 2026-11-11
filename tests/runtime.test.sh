@@ -111,4 +111,25 @@ run_task local:install
 expect_status fail "minikube: a profile that is not running is refused"
 refute_call "minikube image load" "minikube: nothing is loaded into a profile that is not running"
 
+# runtime/docker and runtime/orbstack: `check` passes only on a context the
+# kubeconfig has.
+shim docker 'exit 0'
+shim kubectl '
+case "$*" in
+  "config get-contexts -o name") printf "docker-desktop\norbstack\n" ;;
+  *) exit 1 ;;
+esac'
+for variant in docker orbstack; do
+  case "$variant" in docker) ctx=docker-desktop ready="Docker Desktop ready" ;; orbstack) ctx=orbstack ready="OrbStack ready" ;; esac
+  include_runtime "$variant" '{}'
+  run_task local:check
+  expect_status ok "$variant: check passes on its default context"
+  expect_output "$ready ($ctx)" "$variant: check names the context it found"
+
+  include_runtime "$variant" '{ K8S_CONTEXT: missing }'
+  run_task local:check
+  expect_status fail "$variant: a context the kubeconfig does not have is refused"
+  expect_output "there is no 'missing' kube context" "$variant: the missing context is named"
+done
+
 finish
