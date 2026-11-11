@@ -112,7 +112,7 @@ expect_status fail "minikube: a profile that is not running is refused"
 refute_call "minikube image load" "minikube: nothing is loaded into a profile that is not running"
 
 # runtime/docker and runtime/orbstack: `check` passes only on a context the
-# kubeconfig has.
+# kubeconfig has, by its exact name.
 shim docker 'exit 0'
 shim kubectl '
 case "$*" in
@@ -130,6 +130,11 @@ for variant in docker orbstack; do
   run_task local:check
   expect_status fail "$variant: a context the kubeconfig does not have is refused"
   expect_output "there is no 'missing' kube context" "$variant: the missing context is named"
+
+  # A name is compared as written: a dot in it is a dot, not any character.
+  include_runtime "$variant" '{ K8S_CONTEXT: docker.desktop }'
+  run_task local:check
+  expect_status fail "$variant: a context is matched by its exact name"
 done
 
 finish
