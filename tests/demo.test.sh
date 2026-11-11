@@ -70,7 +70,7 @@ unset FAKE_REGISTRY_DOWN
 reset_calls
 demo_task deploy APP_VERSION=1.0.0
 expect_status ok "deploy: builds, pushes and installs"
-loads=$(grep -c '^kind load docker-image' "$CALLS" || true)
+loads=$(awk '/^kind load docker-image/ { n++ } END { print n + 0 }' "$CALLS")
 if [ "$loads" = 1 ]; then pass "deploy: loads the image into kind once"; else fail "deploy: loaded the image $loads times"; fi
 expect_call "--set image.repository=localhost:5050/taskfiles-demo" "deploy: installs the chart against the registry the image went to"
 

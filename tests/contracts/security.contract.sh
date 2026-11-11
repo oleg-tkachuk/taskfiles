@@ -8,7 +8,7 @@ source "$(dirname "$0")/../lib.sh"
 # An AWS access key id shaped the way both scanners' rules match it, made up on
 # each run: a literal one would trip this repository's own pre-commit scan,
 # and the well-known example key is allowlisted by both scanners.
-key="AKIA$(LC_ALL=C tr -dc 'A-Z2-7' < /dev/urandom | head -c 16 || true)"
+key="AKIA$(awk 'BEGIN { srand(); set = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"; for (i = 0; i < 16; i++) printf "%s", substr(set, int(rand() * length(set)) + 1, 1) }')"
 
 consumer security security "{ TRIVY_SCANNERS: '--scanners secret' }"
 repo() { git -C "$CONSUMER" "$@"; }

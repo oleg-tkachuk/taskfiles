@@ -71,9 +71,23 @@ last_status() { cat "$WORK/last-status"; }
 
 pass() { printf '%s\n' "✔ $1"; }
 
+# holds <file> <fixed string> — whether a line of the file holds the string.
+# An empty string is held by any line, as it is for grep -F.
+holds() {
+  TEXT=$2 awk 'ENVIRON["TEXT"] == "" || index($0, ENVIRON["TEXT"]) { found = 1 } END { exit !found }' "$1" 2>/dev/null
+}
+
+# has_line <file> <line> — whether one of the file's lines is exactly that.
+has_line() {
+  LINE=$2 awk '$0 == ENVIRON["LINE"] { found = 1 } END { exit !found }' "$1" 2>/dev/null
+}
+
+# quoted <prefix> <file> — the file on stderr, each line behind the prefix.
+quoted() { PREFIX=$1 awk '{ print ENVIRON["PREFIX"] $0 }' "$2" >&2; }
+
 fail() {
   printf '%s\n' "✖ $1" >&2
-  sed 's/^/    | /' "$OUT" >&2
+  quoted '    | ' "$OUT"
   failures=$((failures + 1))
 }
 
@@ -87,22 +101,22 @@ expect_status() {
 
 # expect_output <fixed string> <case name>
 expect_output() {
-  if grep -qF -- "$1" "$OUT"; then pass "$2"; else fail "$2: output lacks '$1'"; fi
+  if holds "$OUT" "$1"; then pass "$2"; else fail "$2: output lacks '$1'"; fi
 }
 
 # refute_output <fixed string> <case name>
 refute_output() {
-  if grep -qF -- "$1" "$OUT"; then fail "$2: output has '$1'"; else pass "$2"; fi
+  if holds "$OUT" "$1"; then fail "$2: output has '$1'"; else pass "$2"; fi
 }
 
 # expect_call <fixed string> <case name> — some shim call contains the string.
 expect_call() {
-  if grep -qF -- "$1" "$CALLS"; then pass "$2"; else fail "$2: no call with '$1'"; sed 's/^/    > /' "$CALLS" >&2; fi
+  if holds "$CALLS" "$1"; then pass "$2"; else fail "$2: no call with '$1'"; quoted '    > ' "$CALLS"; fi
 }
 
 # refute_call <fixed string> <case name>
 refute_call() {
-  if grep -qF -- "$1" "$CALLS"; then fail "$2: a call has '$1'"; sed 's/^/    > /' "$CALLS" >&2; else pass "$2"; fi
+  if holds "$CALLS" "$1"; then fail "$2: a call has '$1'"; quoted '    > ' "$CALLS"; else pass "$2"; fi
 }
 
 reset_calls() { : > "$CALLS"; }
@@ -122,20 +136,26 @@ printf "%s|" go "$@" >> "$CALLS"; printf "\n" >> "$CALLS"
 shift
 case "${1-}" in -modfile=*) shift ;; esac
 [ "${1-}" = -n ] || exit 0
-grep -qxF -- "${2-}" "$PINNED" 2>/dev/null || { printf "go: no such tool \"%s\"\n" "${2-}" >&2; exit 2; }'
+WANT="${2-}" awk "\$0 == ENVIRON[\"WANT\"] { found = 1 } END { exit !found }" "$PINNED" 2>/dev/null || { printf "go: no such tool \"%s\"\n" "${2-}" >&2; exit 2; }'
 }
 
 # pin_tools [name...] — the tools `go tool -n` finds from here on; none clears.
 pin_tools() { printf '%s\n' "$@" > "$PINNED"; }
 
+# ran <name> — a call in the log starts with the name: the tool itself was
+# run, and it was not an argument of another's.
+ran() {
+  NAME=$1 awk 'index($0, ENVIRON["NAME"] "|") == 1 || index($0, ENVIRON["NAME"] " ") == 1 { found = 1 } END { exit !found }' "$CALLS" 2>/dev/null
+}
+
 # expect_run <name> <case name> — <name> itself was run, from PATH.
 expect_run() {
-  if grep -q -- "^$1[| ]" "$CALLS"; then pass "$2"; else fail "$2: $1 was not run from PATH"; sed 's/^/    > /' "$CALLS" >&2; fi
+  if ran "$1"; then pass "$2"; else fail "$2: $1 was not run from PATH"; quoted '    > ' "$CALLS"; fi
 }
 
 # refute_run <name> <case name>
 refute_run() {
-  if grep -q -- "^$1[| ]" "$CALLS"; then fail "$2: $1 was run from PATH"; sed 's/^/    > /' "$CALLS" >&2; else pass "$2"; fi
+  if ran "$1"; then fail "$2: $1 was run from PATH"; quoted '    > ' "$CALLS"; else pass "$2"; fi
 }
 
 # semver_cmp <a> <b> — prints -1, 0 or 1: a's precedence against b's, by
@@ -167,7 +187,7 @@ semver_cmp() {
       if ((10#$s < 10#$t)); then echo -1; else echo 1; fi
     elif [[ $s =~ ^[0-9]+$ ]]; then echo -1
     elif [[ $t =~ ^[0-9]+$ ]]; then echo 1
-    elif [[ $(printf '%s\n%s\n' "$s" "$t" | LC_ALL=C sort | head -1) == "$s" ]]; then echo -1
+    elif [[ $(printf '%s\n%s\n' "$s" "$t" | LC_ALL=C sort | awk 'NR == 1') == "$s" ]]; then echo -1
     else echo 1
     fi
     return

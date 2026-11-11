@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
-refs=$(sed -n "s/.*taskfiles\.git[^?]*?ref=\([^'"'"' ]*\).*/\1/p" "$file" | sort -u)
+refs=$(awk "{ ref = \"\"; while (match(\$0, /taskfiles\\.git[^?]*[?]ref=[^\\047\" ]*/)) { ref = substr(\$0, RSTART, RLENGTH); \$0 = substr(\$0, RSTART + RLENGTH) } if (ref != \"\") { sub(/.*ref=/, \"\", ref); print ref } }" "$file" | sort -u)
 if [ "$mode" = download ]; then
   left=$(cat "$FAILS" 2>/dev/null || printf 0)
   if [ "$left" -gt 0 ]; then printf "%s" $((left - 1)) > "$FAILS"; echo "failed to clone repository" >&2; exit 1; fi
@@ -78,7 +78,7 @@ fail_downloads() { printf '%s' "$1" > "$FAILS"; }
 
 expect_file() { if [ -e "$CONSUMER/$1" ]; then pass "$2"; else fail "$2: $1 is not there"; fi; }
 refute_file() { if [ -e "$CONSUMER/$1" ]; then fail "$2: $1 is there"; else pass "$2"; fi; }
-expect_pin() { if grep -qF -- "$PIN$2" "$CONSUMER/$1"; then pass "$3"; else fail "$3: $1 does not pin $2"; fi; }
+expect_pin() { if holds "$CONSUMER/$1" "$PIN$2"; then pass "$3"; else fail "$3: $1 does not pin $2"; fi; }
 
 git init -q "$CONSUMER"
 root
@@ -96,8 +96,8 @@ expect_status ok "bump: runs"
 expect_pin Taskfile.yaml "$NEW" "bump: moves the root pin"
 expect_pin Taskfile.dev.yaml "$NEW" "bump: moves a second entry point's pin"
 expect_pin api/Taskfile.yaml "$NEW" "bump: moves a component's pin"
-if grep -qxF -- "$EXAMPLE" "$CONSUMER/api/Taskfile.yaml"; then pass "bump: leaves a pin written in a comment alone"; else fail "bump: rewrote a pin written in a comment"; fi
-if grep -qF 'other.git//%s?ref=v9.9.9' "$CONSUMER/api/Taskfile.yaml"; then pass "bump: leaves another library's pin alone"; else fail "bump: rewrote another library's pin"; fi
+if has_line "$CONSUMER/api/Taskfile.yaml" "$EXAMPLE"; then pass "bump: leaves a pin written in a comment alone"; else fail "bump: rewrote a pin written in a comment"; fi
+if holds "$CONSUMER/api/Taskfile.yaml" 'other.git//%s?ref=v9.9.9'; then pass "bump: leaves another library's pin alone"; else fail "bump: rewrote another library's pin"; fi
 expect_file "$(lock_file "$NEW")" "bump: locks the root at the new ref"
 expect_file "api/$(lock_file "$NEW")" "bump: locks a component at the new ref"
 refute_file "$(lock_file "$OLD")" "bump: drops the lock the old ref left"
