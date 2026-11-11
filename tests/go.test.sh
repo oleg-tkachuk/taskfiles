@@ -251,4 +251,80 @@ for case in "default|off|" "auto|auto|GOWORK=auto" "empty|off|GOWORK=" "path|/w/
   expect_call "go GOWORK=[$expected]" "gowork: $label reaches go as [$expected]"
 done
 
+# ─── vuln: GOVULNCHECK_IGNORE ────────────────────────────────────────────────
+# What the scan prints and exits with is read from files, so each case says
+# what govulncheck found. PATH's govulncheck is the one run: nothing is pinned,
+# and go is the shim that knows which tools are.
+shim_go
+export VULN_OUT="$WORK/vuln.out" VULN_RC="$WORK/vuln.rc"
+# shellcheck disable=SC2016 # the shim's own variables, written literally
+shim govulncheck 'cat "$VULN_OUT" 2>/dev/null; exit "$(cat "$VULN_RC" 2>/dev/null || printf 0)"'
+pin_tools
+# scan <exit status> <line...> — what the next govulncheck run reports.
+scan() { printf '%s' "$1" > "$VULN_RC"; shift; printf '%s\n' "$@" > "$VULN_OUT"; }
+readonly REACHED=3
+two_reached() {
+  scan "$REACHED" '=== Symbol Results ===' '' 'Vulnerability #1: GO-2026-0001' '    Found in: example.com/a@v1.0.0' '    Fixed in: N/A' '' 'Vulnerability #2: GO-2026-0002' '' 'Your code is affected by 2 vulnerabilities from 1 module.'
+}
+
+two_reached
+only_shims go:vuln
+expect_status fail "ignore: without the input a finding fails, as before"
+refute_output "GOVULNCHECK_IGNORE" "ignore: without the input nothing is said of it"
+
+only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001 GO-2026-0002"
+expect_status ok "ignore: every finding named passes"
+expect_output "passed over, by GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002" "ignore: the IDs passed over are printed"
+expect_output "Vulnerability #1: GO-2026-0001" "ignore: the scan's own report is still shown"
+
+only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001"
+expect_status fail "ignore: a finding that is not named fails"
+expect_output "not in GOVULNCHECK_IGNORE: GO-2026-0002" "ignore: the unnamed finding is named"
+refute_output "passed over" "ignore: nothing is reported as passed over on a failure"
+
+only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001 GO-2026-0002 GO-2026-0003"
+expect_status fail "ignore: an entry the scan no longer reports fails"
+expect_output "drop the entry: GO-2026-0003" "ignore: the stale entry is named"
+
+scan 0 'No vulnerabilities found.'
+only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001"
+expect_status fail "ignore: a clean scan makes every entry stale"
+expect_output "drop the entry: GO-2026-0001" "ignore: says to drop it"
+
+# A scan that did not run is neither clean nor a finding.
+scan 1 'govulncheck: loading packages: cache entry not found'
+only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001"
+expect_status fail "ignore: a scan that failed to run fails"
+expect_output "loading packages" "ignore: its error is shown"
+refute_output "drop the entry" "ignore: a failed scan says nothing about stale entries"
+refute_output "passed over" "ignore: a failed scan passes nothing over"
+
+# -show verbose lists what a required module merely contains under the same
+# heading; only what the code reaches is held against the list.
+scan "$REACHED" '=== Symbol Results ===' '' 'Vulnerability #1: GO-2026-0001' '' '=== Package Results ===' '' '=== Module Results ===' '' 'Vulnerability #1: GO-2026-0009' '' 'Your code is affected by 1 vulnerability from 1 module.'
+only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001"
+expect_status ok "ignore: an ID under Module Results is not a finding"
+
+scan "$REACHED" '{"finding":{"osv":"GO-2026-0001"}}'
+only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001"
+expect_status fail "ignore: findings in a shape that cannot be read fail"
+expect_output "named none under Symbol Results" "ignore: says the output could not be held against the list"
+
+two_reached
+reset_calls
+only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001 CVE-2026-1234"
+expect_status fail "ignore: an entry that is not a Go vulnerability ID is refused"
+expect_output "got: CVE-2026-1234" "ignore: the refused entry is named"
+refute_run govulncheck "ignore: no scan runs on a refused list"
+only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-00x1"
+expect_status fail "ignore: an ID with a letter in its number is refused"
+
+# The pinned govulncheck is the one whose findings are read.
+pin_tools govulncheck
+reset_calls
+only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001"
+expect_call "go|tool|govulncheck|./...|" "ignore: a pinned govulncheck runs through go tool"
+expect_output "drop the entry: GO-2026-0001" "ignore: and its clean result is what the list is held against"
+pin_tools
+
 finish

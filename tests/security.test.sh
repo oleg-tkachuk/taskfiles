@@ -163,4 +163,58 @@ expect_status fail "dockerfile: a named Dockerfile that does not exist fails"
 expect_output "DOCKERFILES names docker/Dockerfil, which does not exist" "dockerfile: the missing file is named"
 rm -rf "$CONSUMER/docker"
 
+# ─── vuln: GOVULNCHECK_IGNORE ────────────────────────────────────────────────
+# One list for every module: a finding is passed over wherever it turns up,
+# and an entry is stale only when no module reports it. What each module's
+# scan prints and exits with is read from files named after the module.
+export VULN_STATE="$WORK/vuln"
+mkdir -p "$VULN_STATE" "$CONSUMER/web"
+printf 'module example.com/web\n' > "$CONSUMER/web/go.mod"
+# shellcheck disable=SC2016 # the shim's own variables, written literally
+shim govulncheck 'm=$(basename "$PWD"); cat "$VULN_STATE/$m.out" 2>/dev/null; exit "$(cat "$VULN_STATE/$m.rc" 2>/dev/null || printf 0)"'
+pin_tools
+readonly REACHED=3
+# scan <module> <exit status> <line...> — what govulncheck reports there.
+scan() { m=$1; printf '%s' "$2" > "$VULN_STATE/$m.rc"; shift 2; printf '%s\n' "$@" > "$VULN_STATE/$m.out"; }
+scan api "$REACHED" '=== Symbol Results ===' '' 'Vulnerability #1: GO-2026-0001'
+scan web "$REACHED" '=== Symbol Results ===' '' 'Vulnerability #1: GO-2026-0002'
+found="$CONSUMER/.task/security/vuln-found"
+
+consumer security security "{ GO_MODULES: [api, web] }"
+only_shims security:vuln
+expect_status fail "ignore: without the input a finding fails, as before"
+refute_output "GOVULNCHECK_IGNORE" "ignore: without the input nothing is said of it"
+if [ -e "$found" ]; then fail "ignore: without the input a state file was written"; else pass "ignore: without the input no state is kept"; fi
+
+consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: 'GO-2026-0001 GO-2026-0002' }"
+only_shims security:vuln
+expect_status ok "ignore: each module's finding is named, and the scan passes"
+expect_output "passed over, by GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002" "ignore: the IDs passed over are printed"
+if [ -e "$found" ]; then fail "ignore: the state file was left behind"; else pass "ignore: the state file is removed"; fi
+
+consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: 'GO-2026-0001' }"
+only_shims security:vuln
+expect_status fail "ignore: a finding that is not named fails its module"
+expect_output "web · not in GOVULNCHECK_IGNORE: GO-2026-0002" "ignore: the module and the unnamed finding are named"
+
+consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: 'GO-2026-0001 GO-2026-0002 GO-2026-0003' }"
+only_shims security:vuln
+expect_status fail "ignore: an entry no module reports fails"
+expect_output "drop the entry: GO-2026-0003" "ignore: the stale entry is named"
+refute_output "drop the entry: GO-2026-0001" "ignore: an entry one module still reports is not stale"
+
+scan web 1 'govulncheck: loading packages: cache entry not found'
+consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: 'GO-2026-0001 GO-2026-0002' }"
+only_shims security:vuln
+expect_status fail "ignore: a scan that failed to run fails"
+refute_output "drop the entry" "ignore: a failed scan says nothing about stale entries"
+refute_output "passed over" "ignore: a failed scan passes nothing over"
+
+consumer security security "{ GO_MODULES: [api], GOVULNCHECK_IGNORE: 'GO-2026-0001 CVE-2026-1234' }"
+reset_calls
+only_shims security:vuln
+expect_status fail "ignore: an entry that is not a Go vulnerability ID is refused"
+expect_output "got: CVE-2026-1234" "ignore: the refused entry is named"
+refute_run govulncheck "ignore: no scan runs on a refused list"
+
 finish
