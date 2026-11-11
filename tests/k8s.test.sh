@@ -210,6 +210,24 @@ run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_SELECTOR=app.kubernetes.io/part-
 expect_status ok "rollout:wait: passes once every matched Deployment is on VERSION"
 expect_call "rollout status deployment.apps/worker" "rollout:wait: waits for each matched Deployment's roll"
 
+# ROLLOUT_MIN: a selector matches what exists, so a release that brings
+# three is not there while two are.
+reset_calls
+run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_SELECTOR=app.kubernetes.io/part-of=shop ROLLOUT_MIN=3 ROLLOUT_TIMEOUT=0s
+expect_status fail "rollout:wait: fewer Deployments than ROLLOUT_MIN is not arrived"
+expect_output "matches 2 Deployment(s), ROLLOUT_MIN asks for 3" "rollout:wait: says how many matched and how many were asked for"
+refute_call "rollout status" "rollout:wait: no roll is waited for while Deployments are missing"
+run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_SELECTOR=app.kubernetes.io/part-of=shop ROLLOUT_MIN=2
+expect_status ok "rollout:wait: as many Deployments as ROLLOUT_MIN passes"
+run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_SELECTOR=app.kubernetes.io/part-of=shop ROLLOUT_MIN=0
+expect_status fail "rollout:wait: a ROLLOUT_MIN of 0 is refused"
+expect_output "ROLLOUT_MIN must be a whole number from 1, got: 0" "rollout:wait: says what ROLLOUT_MIN takes"
+run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_SELECTOR=app.kubernetes.io/part-of=shop "ROLLOUT_MIN=2$INJECT"
+expect_status fail "rollout:wait: a ROLLOUT_MIN that is not a number is refused"
+expect_not_pwned "rollout:wait: ROLLOUT_MIN"
+run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_MIN=3
+expect_status ok "rollout:wait: without a selector ROLLOUT_MIN is not read"
+
 # Not there yet is waited for; refused, or stuck, is a failure.
 : > "$STATE/names"
 run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_TIMEOUT=0s
