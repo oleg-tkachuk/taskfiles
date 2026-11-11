@@ -3,8 +3,8 @@
 //
 // Usage: RUNNER_TEMP=… GITHUB_PATH=… TRIVY_VERSION=… HADOLINT_VERSION=…
 //        GITLEAKS_VERSION=… CHECKOV_VERSION=… TERRAFORM_VERSION=…
-//        OPENTOFU_VERSION=… KIND_VERSION=… KUBECTL_VERSION=…
-//        node contract-tools.ts
+//        OPENTOFU_VERSION=… PULUMI_VERSION=… KIND_VERSION=…
+//        KUBECTL_VERSION=… node contract-tools.ts
 //
 // Each scanner is its official image behind a wrapper on PATH, so a version
 // is one pin in the workflow that Renovate moves, and the bump's pull request
@@ -29,11 +29,15 @@ import { runMain } from "./lib/main.ts";
 
 // Tool is one wrapped tool: the command name the modules call, its image, the
 // entrypoint that runs it there, and the variable holding its pinned version.
+// env names the variables the tool is configured through, passed into the
+// container with the values they have where the wrapper runs; a tool that
+// reads none of its configuration from the environment has no such list.
 export interface Tool {
   name: string;
   image: string;
   entrypoint: string;
   versionEnv: string;
+  env?: readonly string[];
 }
 
 // TOOLS are the tools the contracts call. checkov's image entrypoint is the
@@ -45,6 +49,17 @@ export const TOOLS: readonly Tool[] = [
   { name: "checkov", image: "bridgecrew/checkov", entrypoint: "checkov", versionEnv: "CHECKOV_VERSION" },
   { name: "terraform", image: "hashicorp/terraform", entrypoint: "/bin/terraform", versionEnv: "TERRAFORM_VERSION" },
   { name: "tofu", image: "ghcr.io/opentofu/opentofu", entrypoint: "/usr/local/bin/tofu", versionEnv: "OPENTOFU_VERSION" },
+  {
+    name: "pulumi",
+    image: "pulumi/pulumi-base",
+    entrypoint: "pulumi",
+    versionEnv: "PULUMI_VERSION",
+    // Where its plugins and state live and what encrypts a stack's secrets:
+    // the pulumi contract sets all of them, to paths under the directory the
+    // wrapper mounts. USER because a file backend records who made a stack,
+    // and the runner's uid has no name inside the image to look up.
+    env: ["USER", "PULUMI_HOME", "PULUMI_BACKEND_URL", "PULUMI_CONFIG_PASSPHRASE", "PULUMI_SKIP_UPDATE_CHECK"],
+  },
 ];
 
 // TOOLS_DIR is where the wrappers go, under RUNNER_TEMP.
@@ -58,7 +73,7 @@ export function wrapper(tool: Tool, version: string): string {
     "#!/bin/sh",
     // HOME: the image's own is not writable by the runner's user, and trivy
     // keeps its cache there.
-    `exec docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:$PWD" -w "$PWD" --entrypoint ${tool.entrypoint} ${tool.image}:${version} "$@"`,
+    `exec docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp${(tool.env ?? []).map((name) => ` -e ${name}`).join("")} -v "$PWD:$PWD" -w "$PWD" --entrypoint ${tool.entrypoint} ${tool.image}:${version} "$@"`,
     "",
   ].join("\n");
 }
