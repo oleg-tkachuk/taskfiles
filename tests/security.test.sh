@@ -156,6 +156,14 @@ run_task security:dockerfile
 expect_status ok "dockerfile: a discovered Dockerfile is linted"
 expect_call "hadolint --failure-threshold error ./docker/Dockerfile" "dockerfile: hadolint runs on the discovered file"
 
+# Several are discovered in order, each an argument of its own.
+printf 'FROM scratch\n' > "$CONSUMER/docker/Dockerfile.dev"
+reset_calls
+run_task security:dockerfile
+expect_call "hadolint --failure-threshold error ./docker/Dockerfile.dev" "dockerfile: every discovered Dockerfile is linted, each as a path of its own"
+expect_output "./docker/Dockerfile clean" "dockerfile: the first of them is linted as well"
+rm -f "$CONSUMER/docker/Dockerfile.dev"
+
 consumer security security "{ DOCKERFILES: [docker/Dockerfile, docker/Dockerfil] }"
 reset_calls
 run_task security:dockerfile

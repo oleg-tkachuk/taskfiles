@@ -373,4 +373,17 @@ expect_status fail "deps:update: refuses a module with nothing to bump"
 expect_output "lists no direct requirement and no tool" "deps:update: says why"
 refute_call "go|get|" "deps:update: go get never runs without arguments"
 
+# ─── deps:outdated ───────────────────────────────────────────────────────────
+# go list marks a module with a newer version in brackets; those lines are the
+# report, and none of them is the all-current line.
+shim_go 'case "$*" in "list -u -m all") printf "%s\n" "example.com/a v1.0.0 [v1.1.0]" "example.com/b v2.0.0"; exit 0 ;; esac'
+run_task go:deps:outdated
+expect_status ok "deps:outdated: a module with an update is a report, not a failure"
+expect_output "example.com/a v1.0.0 [v1.1.0]" "deps:outdated: lists the module with a newer version"
+refute_output "example.com/b v2.0.0" "deps:outdated: leaves out the module that is current"
+refute_output "every dependency current" "deps:outdated: does not call a tree with an update current"
+shim_go
+run_task go:deps:outdated
+expect_output "every dependency current" "deps:outdated: says so when nothing has an update"
+
 finish

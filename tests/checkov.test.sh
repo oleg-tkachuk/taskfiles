@@ -4,11 +4,15 @@
 source "$(dirname "$0")/lib.sh"
 
 # A run that finds anything exits 1 whether or not it crashed, as checkov does.
+# The version ends in a carriage return, as it does from a Windows-built wheel.
 shim checkov '
 case "$*" in
-  --version) echo 3.2.0 ;;
+  --version) printf "3.2.0\r\n" ;;
   *--create-baseline*)
-    if [ -n "${FAKE_CRASH:-}" ]; then echo "Traceback: boom" >&2; exit 1; fi
+    if [ -n "${FAKE_CRASH:-}" ]; then
+      n=1; while [ "$n" -le "${FAKE_NOISE:-0}" ]; do echo "noise line $n."; n=$((n + 1)); done
+      echo "Traceback: boom" >&2; exit 1
+    fi
     dir=${FAKE_BASE_DIR:-.}; mkdir -p "$dir"
     printf "{\n    \"CKV_K8S_1\",\n    \"CKV_K8S_2\"\n}\n" > "$dir/.checkov.baseline"
     exit 1 ;;
@@ -24,6 +28,13 @@ expect_status fail "baseline: a crashed run fails the task"
 expect_output ".checkov.baseline was not written" "baseline: says the baseline was not written"
 expect_output "Traceback: boom" "baseline: shows what checkov printed"
 refute_output "baselined findings" "baseline: does not report a count it never produced"
+# The last 20 lines of what checkov printed, indented under the message.
+FAKE_NOISE=30 run_task checkov:baseline
+expect_output "    Traceback: boom" "baseline: checkov's output is shown indented"
+expect_output "    noise line 12." "baseline: the last lines of a long output are kept"
+refute_output "noise line 11." "baseline: the lines before them are left out"
+shown=$(awk '/^    / { n++ } END { print n + 0 }' "$OUT")
+if [ "$shown" = 20 ]; then pass "baseline: twenty lines are shown, each once"; else fail "baseline: $shown indented lines shown, want 20"; fi
 unset FAKE_CRASH
 
 run_task checkov:baseline
@@ -85,6 +96,19 @@ run_task checkov:triage
 expect_status fail "pinned: a version command that prints nothing fails"
 expect_output "CHECKOV_VERSION_CMD printed no version" "pinned: names the command that lost the pin"
 refute_call "--compact" "pinned: checkov does not run unpinned"
+
+# checkov exits 0 on a directory it could not open, having scanned nothing
+# there: the line it prints is the only sign, and the scan fails on it.
+shim checkov '
+case "$*" in --version) echo 3.2.0 ;; *) [ -z "${FAKE_SKIPPED:-}" ] || echo "Directory deploy does not exist; skipping it" >&2 ;; esac'
+consumer checkov checkov
+run_task checkov:scan
+expect_status ok "scan: a clean run passes"
+expect_output "no findings outside the baseline" "scan: says nothing was found"
+FAKE_SKIPPED=1 run_task checkov:scan
+expect_status fail "scan: a directory checkov skipped fails the scan"
+expect_output "part of the tree went unscanned" "scan: says a directory went unscanned"
+refute_output "no findings outside the baseline" "scan: a partial scan is not reported clean"
 
 # Findings make checkov exit 1 unless it is told to soft-fail, as checkov does.
 shim checkov '

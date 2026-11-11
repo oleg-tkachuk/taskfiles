@@ -8,6 +8,7 @@ source "$(dirname "$0")/lib.sh"
 shim kubectl '
 case "$*" in
   *" version "*) [ -z "${FAKE_UNREACHABLE:-}" ] ;;
+  *"config get-contexts -o name"*) printf "dev\nprod\n" ;;
   *"-o go-template="*) [ -n "${FAKE_NO_LABELS:-}" ] || printf "app=web," ;;
   *" get deploy/"*"--ignore-not-found"*)
     if [ -n "${FAKE_FORBIDDEN:-}" ]; then echo "Error from server (Forbidden)" >&2; exit 1; fi
@@ -111,6 +112,16 @@ FAKE_NO_LABELS=1 run_task k8s:status
 expect_status ok "status: a matchExpressions-only selector still reports"
 refute_call "get pods" "status: no pod list from an empty selector"
 expect_output "selects by matchExpressions only" "status: says why the pods are not listed"
+
+# ─── doctor: a pinned context has to be one the kubeconfig has ──────────────
+consumer k8s k8s '{ PROJECT_NAME: web, K8S_CONTEXT: dev }'
+run_task k8s:doctor
+expect_output "context dev (pinned)" "doctor: a pinned context the kubeconfig has is reported"
+refute_output "is not in the kubeconfig" "doctor: a context that is there is not reported missing"
+consumer k8s k8s '{ PROJECT_NAME: web, K8S_CONTEXT: de }'
+run_task k8s:doctor
+expect_status fail "doctor: a pinned context the kubeconfig does not have fails"
+expect_output "K8S_CONTEXT de is not in the kubeconfig" "doctor: the missing context is named, a prefix of a real one included"
 
 # ─── logs: LOG_TAIL, and the old TAIL refused ───────────────────────────────
 consumer k8s k8s '{ PROJECT_NAME: web, K8S_NAMESPACE: apps, K8S_CONTEXT: dev }'

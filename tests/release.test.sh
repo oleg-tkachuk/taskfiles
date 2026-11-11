@@ -299,4 +299,27 @@ printf 'kind: Secret\nstringData:\n  ca.crt: |\n    -----BEGIN CERTIFICATE-----\
 run_task release:chart:render
 expect_status ok "chart:render: a PEM block is not a glued separator"
 
+# CHART_MIN_RESOURCES: a chart that renders fewer resources than it ships is a
+# values file that switched something off, or a template that fell silent.
+consumer release release "{ PROJECT_NAME: app, APP_VERSION: $VERSION, CHART_MIN_RESOURCES: '3' }"
+# Two resources, and a nested `kind:` that is not a third.
+printf 'kind: ServiceAccount\n---\nkind: Deployment\nspec:\n  kind: nested\n' > "$WORK/render.src"
+run_task release:chart:render
+expect_status fail "chart:render: fewer resources than CHART_MIN_RESOURCES is refused"
+expect_output "rendered fewer than 3 resources" "chart:render: says how many it expected"
+printf 'kind: ServiceAccount\n---\nkind: Deployment\n---\nkind: Service\nmetadata:\n  kind: nested\n' > "$WORK/render.src"
+run_task release:chart:render
+expect_status ok "chart:render: as many resources as CHART_MIN_RESOURCES passes"
+expect_output "renders 3 resources cleanly" "chart:render: counts top-level kinds, not a nested key"
+
+# doctor reads the chart's name as YAML writes it, quoted or not.
+consumer release release "{ PROJECT_NAME: app, APP_VERSION: $VERSION }"
+printf 'apiVersion: v2\nname: "app"\n' > "$CONSUMER/deploy/chart/Chart.yaml"
+run_task release:doctor
+refute_output "chart name mismatch" "doctor: a double-quoted chart name is the name"
+printf "apiVersion: v2\nname: 'web'\n" > "$CONSUMER/deploy/chart/Chart.yaml"
+run_task release:doctor
+expect_output "Chart.yaml says 'web', this publishes as 'app'" "doctor: a single-quoted name is read without its quotes, and the mismatch named"
+printf 'name: app\n' > "$CONSUMER/deploy/chart/Chart.yaml"
+
 finish

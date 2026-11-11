@@ -153,12 +153,26 @@ pinned api/Taskfile.yaml "$OLD"
 run_task tasklib:check
 expect_status fail "check: pins that disagree are refused"
 expect_output "$OLD	api/Taskfile.yaml" "check: names the Taskfile on the other ref"
+expect_output "    $OLD	api/Taskfile.yaml" "check: the pins are listed indented under the message"
 
 pinned api/Taskfile.yaml "$NEW"
 rm -rf "$CONSUMER/api/.task"
 run_task tasklib:check
 expect_status fail "check: a Taskfile with no lock is refused"
 expect_output "api/Taskfile.yaml does not load from its lock" "check: names the Taskfile that does not load"
+
+# Tracked, and deleted from the working tree: git still lists it. Reading the
+# pins passes it by, and whether it loads is left to the load to say — here
+# the shimmed Task loads anything, with its lock back in place.
+mkdir -p "$CONSUMER/api/$LOCK"
+: > "$CONSUMER/api/$(lock_file "$NEW")"
+git -C "$CONSUMER" add api/Taskfile.yaml
+mv "$CONSUMER/api/Taskfile.yaml" "$WORK/api-Taskfile.yaml"
+run_task tasklib:check
+refute_output "open file" "check: reading the pins does not stop at a tracked Taskfile missing from the tree"
+refute_output "exit status 2" "check: the missing file is not what fails the check"
+mv "$WORK/api-Taskfile.yaml" "$CONSUMER/api/Taskfile.yaml"
+git -C "$CONSUMER" rm -q --cached api/Taskfile.yaml
 
 # ─── lock ────────────────────────────────────────────────────────────────────
 reset_calls
@@ -185,6 +199,7 @@ run_task tasklib:lock
 expect_status fail "lock: a download that keeps failing fails the task"
 expect_output "its lock is unchanged" "lock: says the lock was left alone"
 expect_output "failed to clone repository" "lock: shows what Task said"
+expect_output "    failed to clone repository" "lock: Task's own output is indented under the message"
 expect_file "$(lock_file "$OLD")" "lock: a failed download leaves the old lock in place"
 fail_downloads 0
 

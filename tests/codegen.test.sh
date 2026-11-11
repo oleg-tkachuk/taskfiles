@@ -184,6 +184,7 @@ shim sqlc 'printf "package gen // regenerated\n" > internal/a/gen/q.go'
 run_task codegen:sqlc:check
 expect_status fail "sqlc:check: stale output under a derived path fails"
 expect_output "internal/a/gen/q.go" "sqlc:check: names the file regeneration changed"
+expect_output "    internal/a/gen/q.go" "sqlc:check: the changed file is listed by its path alone, indented"
 shim sqlc ':'
 printf 'package gen\n' > "$CONSUMER/internal/a/gen/q.go"
 
@@ -228,5 +229,39 @@ expect_status fail "proto:lint: no buf anywhere fails"
 expect_output "buf is not installed — https://buf.build/docs/installation/" "proto:lint: says how to install buf"
 mv "$WORK/buf" "$BIN/"
 rm -rf "$CONSUMER/internal" "$CONSUMER/.git"
+
+# ─── checks over several out: paths ──────────────────────────────────────────
+# Every path a config names is watched, each as a pathspec of its own.
+shim sqlc ':'
+shim buf ':'
+pin_tools
+git -C "$CONSUMER" init -q
+mkdir -p "$CONSUMER/internal/a/gen" "$CONSUMER/internal/c/gen" "$CONSUMER/gen/a" "$CONSUMER/gen/b"
+printf 'package gen\n' > "$CONSUMER/internal/a/gen/q.go"
+printf 'package gen\n' > "$CONSUMER/internal/c/gen/r.go"
+printf 'package a\n' > "$CONSUMER/gen/a/a.pb.go"
+printf 'package b\n' > "$CONSUMER/gen/b/b.pb.go"
+git -C "$CONSUMER" add internal/a/gen/q.go internal/c/gen/r.go gen/a/a.pb.go gen/b/b.pb.go
+printf 'version: "2"\nsql:\n  - gen:\n      go:\n        out: internal/a/gen\n  - gen:\n      go:\n        out: internal/c/gen\n' > "$CONSUMER/sqlc.yaml"
+consumer codegen codegen
+run_task codegen:sqlc:check
+expect_status ok "sqlc:check: two out: paths are both watched"
+shim sqlc 'printf "package gen // regenerated\n" > internal/c/gen/r.go'
+run_task codegen:sqlc:check
+expect_status fail "sqlc:check: stale output under the second out: path fails"
+expect_output "    internal/c/gen/r.go" "sqlc:check: names the file under the second path"
+shim sqlc ':'
+printf 'package gen\n' > "$CONSUMER/internal/c/gen/r.go"
+rm -f "$CONSUMER/sqlc.yaml"
+
+printf 'version: v2\nplugins:\n  - local: protoc-gen-go\n    out: gen/a\n  - local: protoc-gen-connect-go\n    out: gen/b\n' > "$CONSUMER/buf.gen.yaml"
+run_task codegen:proto:check
+expect_status ok "proto:check: the out: paths of every plugin are watched"
+shim buf 'printf "package b // regenerated\n" > gen/b/b.pb.go'
+run_task codegen:proto:check
+expect_status fail "proto:check: stale output under the second out: path fails"
+expect_output "    gen/b/b.pb.go" "proto:check: names the file regeneration changed"
+shim buf ':'
+rm -rf "$CONSUMER/internal" "$CONSUMER/gen" "$CONSUMER/.git" "$CONSUMER/buf.gen.yaml"
 
 finish

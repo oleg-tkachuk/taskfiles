@@ -33,4 +33,15 @@ for case in "uv|uv sync|$CONSUMER/.venv" "poetry|poetry install|$WORK/poetry-ven
   expect_call "$call" "$variant: a removed environment is built again"
 done
 
+# doctor prints the version alone, out of the sentence poetry answers with.
+shim poetry '
+case "$*" in
+  --version) echo "Poetry (version 2.1.3)" ;;
+  "env info --path") exit 1 ;;
+esac'
+consumer python python/poetry
+run_task python:doctor
+expect_output "poetry 2.1.3" "poetry: doctor prints the version number alone"
+refute_output "Poetry (version" "poetry: doctor does not print poetry's own sentence"
+
 finish
