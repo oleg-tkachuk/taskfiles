@@ -25,18 +25,22 @@ vars:
   # not a module in it — its Taskfile owns bare var names the way a real
   # consumer's does, and has no README of its own to require.
   MODULES:
-    sh: ls -d */Taskfile.yaml 2>/dev/null | grep -v '^demo/' | sed "s|/Taskfile.yaml||" | sort | tr "\n" " "
+    sh: >-
+      ls -d */Taskfile.yaml 2>/dev/null | awk '!/^demo\// { sub(/\/Taskfile\.yaml$/, ""); print }' | sort | awk '{ printf "%s ", $0 }'
   # Everything that must parse, the runtime variants included.
   # Discovered, not listed: a hand-maintained list is one a new module can be
   # left out of, and a module outside it escapes the parse gate in silence.
   PARSE_MODULES:
-    sh: ls -d */Taskfile.yaml */*/Taskfile.yaml 2>/dev/null | grep -v '^demo/' | sed "s|/Taskfile.yaml||" | sort | tr "\n" " "
+    sh: >-
+      ls -d */Taskfile.yaml */*/Taskfile.yaml 2>/dev/null | awk '!/^demo\// { sub(/\/Taskfile\.yaml$/, ""); print }' | sort | awk '{ printf "%s ", $0 }'
   # Every YAML the modules are made of, for the file-level checks.
   MODULE_FILES:
-    sh: ls */Taskfile.yaml */*/Taskfile.yaml 2>/dev/null | grep -v '^demo/' | sort -u | tr '\n' ' '
+    sh: >-
+      ls */Taskfile.yaml */*/Taskfile.yaml 2>/dev/null | awk '!/^demo\//' | sort -u | awk '{ printf "%s ", $0 }'
   # runtime, python — the directories that hold variants rather than a module.
   FAMILIES:
-    sh: ls -d */*/Taskfile.yaml 2>/dev/null | grep -v '^demo/' | cut -d/ -f1 | sort -u | tr '\n' ' '
+    sh: >-
+      ls -d */*/Taskfile.yaml 2>/dev/null | awk -F/ '!/^demo\// { print $1 }' | sort -u | awk '{ printf "%s ", $0 }'
   # The CI scripts: one TypeScript command per workflow step, and their tests.
   _CI_DIR: .github/ci
   # Status markers. The shape carries the meaning, so a line still reads in
@@ -147,7 +151,7 @@ tasks:
           set -eu
           fail=0
           for f in {{.MODULE_FILES}}; do
-            grep -qE '^silent: true$' "$f" || { printf '%s\n' "{{._LIB_ERR}} taskfiles · $f does not declare 'silent: true'" >&2; fail=1; }
+            awk '/^silent: true$/ { found = 1 } END { exit !found }' "$f" || { printf '%s\n' "{{._LIB_ERR}} taskfiles · $f does not declare 'silent: true'" >&2; fail=1; }
           done
           [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every module runs quiet"
           exit "$fail"
@@ -178,7 +182,8 @@ tasks:
       - printf '%s\n' "{{._LIB_OK}} taskfiles · every module behaves as its tests say"
     vars:
       _BEHAVIOUR_TESTS:
-        sh: ls tests/*.test.sh 2>/dev/null | sort | tr '\n' ' '
+        sh: >-
+          ls tests/*.test.sh 2>/dev/null | sort | awk '{ printf "%s ", $0 }'
 
   contracts:
     desc: "Run the gates against the real tools they wrap — trivy, hadolint, gitleaks, checkov, and kubectl on a cluster"
@@ -198,7 +203,8 @@ tasks:
         msg: "the contracts need trivy, hadolint, gitleaks and checkov on PATH"
     vars:
       _CONTRACTS:
-        sh: ls tests/contracts/*.contract.sh 2>/dev/null | sort | tr '\n' ' '
+        sh: >-
+          ls tests/contracts/*.contract.sh 2>/dev/null | sort | awk '{ printf "%s ", $0 }'
     cmds:
       - for: { var: _CONTRACTS }
         cmd: bash {{.ITEM | q}} >/dev/null
@@ -256,17 +262,17 @@ tasks:
           fail=0
           for m in {{.MODULES}}; do
             [ -f "$m/README.md" ] || { printf '%s\n' "{{._LIB_ERR}} taskfiles · $m/ has no README.md" >&2; fail=1; }
-            grep -q "($m/README.md)" README.md || {
+            LINK="($m/README.md)" awk 'index($0, ENVIRON["LINK"]) { found = 1 } END { exit !found }' README.md || {
               printf '%s\n' "{{._LIB_ERR}} taskfiles · README.md does not link $m/README.md" >&2; fail=1; }
           done
           # A family shares one README for all its variants.
           for fam in {{.FAMILIES}}; do
             [ -f "$fam/README.md" ] || { printf '%s\n' "{{._LIB_ERR}} taskfiles · $fam/ has no README.md" >&2; fail=1; }
-            grep -q "($fam/README.md)" README.md || {
+            LINK="($fam/README.md)" awk 'index($0, ENVIRON["LINK"]) { found = 1 } END { exit !found }' README.md || {
               printf '%s\n' "{{._LIB_ERR}} taskfiles · README.md does not link $fam/README.md" >&2; fail=1; }
           done
           # And the reverse: a link to a README that is not on disk.
-          for f in $(grep -oE '\(([a-z0-9-]+/)+README\.md\)' README.md | tr -d '()' | sort -u); do
+          for f in $(awk '{ s = $0; while (match(s, /[(]([a-z0-9-]+\/)+README[.]md[)]/)) { print substr(s, RSTART + 1, RLENGTH - 2); s = substr(s, RSTART + RLENGTH) } }' README.md | sort -u); do
             [ -f "$f" ] || { printf '%s\n' "{{._LIB_ERR}} taskfiles · README.md links $f, which is not in the repo" >&2; fail=1; }
           done
           [ "$fail" = 0 ] && printf '%s\n' "{{._LIB_OK}} taskfiles · every module has a README and the index links it"
@@ -302,7 +308,7 @@ tasks:
           }
           # Every module in this tree and in the release, so a module removed
           # since is compared too.
-          files=$( { printf '%s\n' {{.MODULE_FILES}}; git ls-tree -r --name-only "$base" | grep -E '^[^/]+/([^/]+/)?Taskfile.yaml$' | grep -v '^demo/'; } | sort -u)
+          files=$( { printf '%s\n' {{.MODULE_FILES}}; git ls-tree -r --name-only "$base" | awk '/^[^\/]+\/([^\/]+\/)?Taskfile.yaml$/ && !/^demo\//'; } | sort -u)
           # shellcheck disable=SC2086 # one path per word, by construction
           API_DEFAULTS_CHANGED={{.API_DEFAULTS_CHANGED | q}} bash scripts/check-api.sh "$base" {{.API_REMOVED | q}} $files
           printf '%s\n' "{{._LIB_OK}} taskfiles · nothing $base offered is gone, and no default changed, without being named"
@@ -338,31 +344,31 @@ tasks:
           fail=0
           for fam in {{.FAMILIES}}; do
             first=""; base=""; basedeps=""
-            for v in $(ls -d "$fam"/*/Taskfile.yaml 2>/dev/null | sed "s|/Taskfile.yaml||"); do
+            for v in $(ls -d "$fam"/*/Taskfile.yaml 2>/dev/null | awk '{ sub(/\/Taskfile\.yaml$/, ""); print }'); do
               got=$(task -t "$v/Taskfile.yaml" --list-all --json | yq -p json -r '.tasks[] | [.name] + (.aliases // []) | .[]' | sort)
               # Drop the tasks this family is allowed to differ on.
               for e in {{.SURFACE_EXCEPT}}; do
                 case "$e" in
-                  "$fam":*) got=$(printf '%s\n' "$got" | grep -vxF "${e#*:}" || true) ;;
+                  "$fam":*) got=$(printf '%s\n' "$got" | DROP="${e#*:}" awk '$0 != ENVIRON["DROP"]') ;;
                 esac
               done
 
               deps=$(yq e '.tasks | to_entries | .[] | select(.value.deps != null) | .key' "$v/Taskfile.yaml" | sort)
               for e in {{.DEPS_EXCEPT}}; do
                 case "$e" in
-                  "$fam":*) deps=$(printf '%s\n' "$deps" | grep -vxF "${e#*:}" || true) ;;
+                  "$fam":*) deps=$(printf '%s\n' "$deps" | DROP="${e#*:}" awk '$0 != ENVIRON["DROP"]') ;;
                 esac
               done
 
               if [ -z "$first" ]; then first="$v"; base="$got"; basedeps="$deps"; continue; fi
               if [ "$got" != "$base" ]; then
                 printf '%s\n' "{{._LIB_ERR}} taskfiles · $v and $first do not expose the same tasks:" >&2
-                diff <(printf '%s\n' "$base") <(printf '%s\n' "$got") | sed 's/^/    /' >&2
+                diff <(printf '%s\n' "$base") <(printf '%s\n' "$got") | awk '{ print "    " $0 }' >&2
                 fail=1
               fi
               if [ "$deps" != "$basedeps" ]; then
                 printf '%s\n' "{{._LIB_ERR}} taskfiles · $v and $first disagree on which shared tasks declare deps::" >&2
-                diff <(printf '%s\n' "$basedeps") <(printf '%s\n' "$deps") | sed 's/^/    /' >&2
+                diff <(printf '%s\n' "$basedeps") <(printf '%s\n' "$deps") | awk '{ print "    " $0 }' >&2
                 fail=1
               fi
             done
@@ -394,7 +400,7 @@ tasks:
             if [ -z "$first" ]; then first="$f"; base="$shared"; continue; fi
             if [ "$shared" != "$base" ]; then
               printf '%s\n' "{{._LIB_ERR}} taskfiles · $f has drifted from $first outside its own cluster handling:" >&2
-              diff <(printf '%s\n' "$base") <(printf '%s\n' "$shared") | sed 's/^/    /' >&2
+              diff <(printf '%s\n' "$base") <(printf '%s\n' "$shared") | awk '{ print "    " $0 }' >&2
               fail=1
             fi
           done
@@ -413,17 +419,17 @@ tasks:
     vars:
       # Tasks that call nothing of the manager's but `run`.
       _PYTHON_SHARED: test lint fmt typecheck
-      _PYTHON_NORMALISE: 's/_(PY|UV)_/_X_/g; s/(poetry|uv) run/RUN/g; s/ · (py|uv) · / · X · /g'
+      _PYTHON_NORMALISE: '{ gsub(/_(PY|UV)_/, "_X_"); gsub(/(poetry|uv) run/, "RUN"); gsub(/ · (py|uv) · /, " · X · "); print }'
     cmds:
       - cmd: |-
           set -eu
           fail=0
           for t in {{._PYTHON_SHARED}}; do
-            a=$(yq ".tasks[\"$t\"] | ... comments=\"\"" python/poetry/Taskfile.yaml | sed -E {{._PYTHON_NORMALISE | q}})
-            b=$(yq ".tasks[\"$t\"] | ... comments=\"\"" python/uv/Taskfile.yaml | sed -E {{._PYTHON_NORMALISE | q}})
+            a=$(yq ".tasks[\"$t\"] | ... comments=\"\"" python/poetry/Taskfile.yaml | awk {{._PYTHON_NORMALISE | q}})
+            b=$(yq ".tasks[\"$t\"] | ... comments=\"\"" python/uv/Taskfile.yaml | awk {{._PYTHON_NORMALISE | q}})
             if [ "$a" != "$b" ]; then
               printf '%s\n' "{{._LIB_ERR}} taskfiles · python/uv's $t has drifted from python/poetry's:" >&2
-              diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | sed 's/^/    /' >&2
+              diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | awk '{ print "    " $0 }' >&2
               fail=1
             fi
           done
@@ -436,4 +442,4 @@ tasks:
     desc: "Print the task surface of every module — the library's public API"
     cmds:
       - for: { var: PARSE_MODULES }
-        cmd: printf '\n── %s\n' '{{.ITEM}}' && task -t {{.ITEM}}/Taskfile.yaml --list-all | tail -n +2
+        cmd: printf '\n── %s\n' '{{.ITEM}}' && task -t {{.ITEM}}/Taskfile.yaml --list-all | awk 'NR > 1'
