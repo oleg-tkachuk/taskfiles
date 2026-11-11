@@ -1,0 +1,180 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# terraform — the gates of a Terraform or OpenTofu configuration: formatting,
+# validity, a lock file that covers every platform, and drift.
+#
+#   includes:
+#     terraform:
+#       taskfile: '{{printf .TASKLIB "terraform"}}'
+#       dir: .
+#       vars: { TERRAFORM_DIR: infra }
+#
+# Nothing here changes infrastructure or state. `lock` writes the dependency
+# lock file; every other task only reads.
+#
+# The CLI's version is not an input: `required_version` in the configuration
+# already refuses a CLI outside it, on every command, and a second pin here
+# would be a second place to keep in step.
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
+#   TERRAFORM_DIR         the root module's directory            (default .)
+#   TERRAFORM_BIN         the CLI to run: terraform, or tofu     (default terraform)
+#   TERRAFORM_PLATFORMS   list of platforms the lock file must hold checksums
+#                         for            (default ["linux_amd64", "darwin_arm64"])
+#   TERRAFORM_PLAN_FLAGS  extra flags for the plan `drift` makes — a
+#                         -var-file, a -target
+# ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _TF_SH _TF_PLAN_FLAGS TERRAFORM_PLAN_FLAGS
+
+silent: true
+
+vars:
+  _TF_BIN: '{{.TERRAFORM_BIN | default "terraform"}}'
+  _TF_DIR: '{{.TERRAFORM_DIR | default "."}}'
+  # A list, kept one by `ref:` — interpolating it into a template flattens
+  # it to "[a b]", and the entries downstream become "[a" and "b]".
+  _TF_PLATFORMS:
+    ref: 'default (list "linux_amd64" "darwin_arm64") .TERRAFORM_PLATFORMS'
+  _TF_PLAN_FLAGS: '{{.TERRAFORM_PLAN_FLAGS | default ""}}'
+  # The one name the CLI reads and writes the dependency lock under.
+  _TF_LOCK_NAME: .terraform.lock.hcl
+  _TF_LOCK: '{{._TF_DIR}}/{{._TF_LOCK_NAME}}'
+  # `fmt -check` exits with this when a file is not formatted; any other
+  # non-zero code is a file it could not read.
+  _TF_UNFORMATTED: "3"
+  # `plan -detailed-exitcode` exits with this when the plan succeeded and
+  # holds changes; 1 is an error.
+  _TF_CHANGES: "2"
+  # Status markers. The shape carries the meaning, so a line still reads in
+  # a monochrome log; the colour sits on top and drops out under NO_COLOR.
+  _TF_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
+  _TF_ERR: '{{if .NO_COLOR}}✖{{else}}{{"\x1b[31m✖\x1b[0m"}}{{end}}'
+  # Interpolated by every task below. `tf` is the CLI on TERRAFORM_DIR, told
+  # it is not at a terminal; `tf_init` is an init that speaks only when it
+  # fails, with the lock file read and never rewritten.
+  _TF_SH: |
+    tf() { TF_IN_AUTOMATION=1 {{._TF_BIN | q}} -chdir={{._TF_DIR | q}} "$@"; }
+    tf_init() {
+      init_out=$(tf init "$@" -input=false -lockfile=readonly 2>&1) || {
+        printf '%s\n' "$init_out" >&2
+        printf '%s terraform · init failed in %s — the output above says why; a lock file that is missing or behind the configuration is written by the lock task\n' "{{._TF_ERR}}" {{._TF_DIR | q}} >&2
+        return 1
+      }
+    }
+
+tasks:
+
+  _ready:
+    internal: true
+    preconditions:
+      - sh: command -v {{._TF_BIN | q}} >/dev/null
+        msg: "{{._TF_BIN}} is not installed — set TERRAFORM_BIN to the CLI that is (terraform, tofu)"
+      - sh: test -d {{._TF_DIR | q}}
+        msg: "TERRAFORM_DIR is {{._TF_DIR}}, which is not a directory"
+
+  fmt:
+    desc: "Fail when a file under TERRAFORM_DIR is not in the canonical format"
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._TF_SH}}
+          status=0
+          tf fmt -check -recursive -diff || status=$?
+          case "$status" in
+            0) printf '%s terraform · every file under %s is formatted\n' "{{._TF_OK}}" {{._TF_DIR | q}} ;;
+            {{._TF_UNFORMATTED | q}})
+              printf '%s terraform · the files above are not formatted — %s fmt -recursive rewrites them\n' "{{._TF_ERR}}" {{._TF_BIN | q}} >&2
+              exit 1 ;;
+            *)
+              printf '%s terraform · a file under %s could not be read (fmt exited %s)\n' "{{._TF_ERR}}" {{._TF_DIR | q}} "$status" >&2
+              exit 1 ;;
+          esac
+
+  validate:
+    desc: "Validate the configuration, without its backend"
+    # `validate` needs the providers installed and nothing of the state, so the
+    # init leaves the backend alone: no credentials, and a later plan against
+    # an initialised backend still works.
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._TF_SH}}
+          tf_init -backend=false
+          tf validate
+          printf '%s terraform · %s is valid\n' "{{._TF_OK}}" {{._TF_DIR | q}}
+
+  lock:
+    desc: "Write the dependency lock file with checksums for every TERRAFORM_PLATFORMS entry"
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._TF_SH}}
+          tf providers lock {{range $p := ._TF_PLATFORMS}}-platform={{$p | q}} {{end}}
+
+  lock:check:
+    desc: "Fail when the lock file is absent, untracked, or lacks a platform's checksums"
+    # A lock written on one platform holds that platform's checksums only, and
+    # the first init anywhere else — CI, usually — refuses it. Which platforms
+    # a lock covers is not written in it in a form to read back, so the CLI is
+    # asked: `providers lock` leaves a complete file byte for byte as it was
+    # and rewrites an incomplete one. The file is put back either way.
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._TF_SH}}
+          lock={{._TF_LOCK | q}}
+          if [ ! -f "$lock" ]; then
+            printf '%s terraform · %s does not exist — the lock task writes it\n' "{{._TF_ERR}}" "$lock" >&2
+            exit 1
+          fi
+          # Outside a repository there is nothing to be tracked by.
+          if git -C {{._TF_DIR | q}} rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+            && ! git -C {{._TF_DIR | q}} ls-files --error-unmatch {{._TF_LOCK_NAME | q}} >/dev/null 2>&1; then
+            printf '%s terraform · %s is not tracked by git — commit it, or nobody else gets the versions it pins\n' "{{._TF_ERR}}" "$lock" >&2
+            exit 1
+          fi
+          kept=$(mktemp)
+          cp "$lock" "$kept"
+          trap 'cp "$kept" "$lock"; rm -f "$kept"' EXIT
+          out=$(tf providers lock {{range $p := ._TF_PLATFORMS}}-platform={{$p | q}} {{end}} 2>&1) || {
+            printf '%s\n' "$out" >&2
+            printf '%s terraform · the lock file could not be checked — the output above says why\n' "{{._TF_ERR}}" >&2
+            exit 1
+          }
+          if ! cmp -s "$lock" "$kept"; then
+            printf '%s terraform · %s lacks checksums for one of: %s — run the lock task and commit the result\n' "{{._TF_ERR}}" "$lock" {{._TF_PLATFORMS | join " " | q}} >&2
+            exit 1
+          fi
+          printf '%s terraform · %s covers %s\n' "{{._TF_OK}}" "$lock" {{._TF_PLATFORMS | join " " | q}}
+
+  drift:
+    desc: "Fail when the infrastructure differs from the configuration; changes nothing"
+    # A plan, read by its detailed exit code. Only 0 is "no drift": a plan that
+    # errored proved nothing, and reported as clean it would be the one result
+    # a drift check must never give.
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._TF_SH}}
+          tf_init
+          status=0
+          tf plan -input=false -detailed-exitcode {{._TF_PLAN_FLAGS}} || status=$?
+          case "$status" in
+            0) printf '%s terraform · no drift in %s\n' "{{._TF_OK}}" {{._TF_DIR | q}} ;;
+            {{._TF_CHANGES | q}})
+              printf '%s terraform · the infrastructure differs from the configuration in %s — the plan above lists how\n' "{{._TF_ERR}}" {{._TF_DIR | q}} >&2
+              exit 1 ;;
+            *)
+              printf '%s terraform · the plan did not complete (exit %s) — drift is unknown, not absent\n' "{{._TF_ERR}}" "$status" >&2
+              exit 1 ;;
+          esac

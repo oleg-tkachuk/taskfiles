@@ -39,6 +39,7 @@ export const INCLUDES: Includes = {
   helm: "helm",
   sealedsecrets: "sealed-secrets",
   tasklib: "tasklib",
+  terraform: "terraform",
   local: "runtime/orbstack",
   localdocker: "runtime/docker",
   localk3d: "runtime/k3d",
