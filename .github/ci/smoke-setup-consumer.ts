@@ -26,6 +26,7 @@ export const INCLUDES: Includes = {
   pythonuv: "python/uv",
   node: "node",
   pnpm: "pnpm",
+  pulumi: "pulumi",
   compose: "compose",
   security: "security",
   checkov: "checkov",
