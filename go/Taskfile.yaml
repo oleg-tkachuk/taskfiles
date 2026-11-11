@@ -24,9 +24,8 @@ version: "3"
 #                    is kept apart from the other tools  (default none)
 #   GO_TOOLS_PINNED  1: a tool no `tool` directive pins is not there, and
 #                    PATH is never asked                 (default 0)
-#   GOVULNCHECK_IGNORE  vulnerability IDs vuln passes over, "GO-2026-0001
-#                    GO-2026-0002"; one it no longer finds fails the task
-#                                                        (default none)
+#   GOVULNCHECK_IGNORE  list of vulnerability IDs vuln passes over; one it
+#                    no longer finds fails the task      (default none)
 #   GO_FMT_GOIMPORTS 1: fmt needs goimports and fails without it; 0: fmt
 #                    never runs it        (default: runs it when it is found)
 #   GO_TEST_TAGS     build tags for test:tagged:compile (default integration)
@@ -85,7 +84,9 @@ vars:
   _GO_PINNED_ON: "1"
   _GO_PINNED_OFF: "0"
   _GO_PINNED: '{{.GO_TOOLS_PINNED | default "0"}}'
-  _GO_VULN_IGNORE: '{{.GOVULNCHECK_IGNORE | default ""}}'
+  # A list, as an include writes it; on the command line a variable is a
+  # string, and the IDs are then separated by spaces.
+  _GO_VULN_IGNORE: '{{if kindIs "slice" .GOVULNCHECK_IGNORE}}{{join " " .GOVULNCHECK_IGNORE}}{{else}}{{.GOVULNCHECK_IGNORE | default ""}}{{end}}'
   # What govulncheck exits with when the code reaches a vulnerability; any
   # other failure is the scan itself not having run.
   _GO_VULN_RC: "3"

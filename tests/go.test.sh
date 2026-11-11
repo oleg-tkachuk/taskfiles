@@ -277,6 +277,22 @@ expect_status ok "ignore: every finding named passes"
 expect_output "passed over, by GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002" "ignore: the IDs passed over are printed"
 expect_output "Vulnerability #1: GO-2026-0001" "ignore: the scan's own report is still shown"
 
+# The input is a list where an include sets it; the cases around this one
+# pass it on the command line, where it can only be a string.
+consumer go go "{ GOVULNCHECK_IGNORE: [GO-2026-0001, GO-2026-0002] }"
+only_shims go:vuln
+expect_status ok "ignore: a list in the include's vars passes every finding it names"
+expect_output "passed over, by GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002" "ignore: each ID of the list is printed"
+consumer go go "{ GOVULNCHECK_IGNORE: [GO-2026-0001] }"
+only_shims go:vuln
+expect_status fail "ignore: a finding the list does not name fails"
+expect_output "not in GOVULNCHECK_IGNORE: GO-2026-0002" "ignore: the finding missing from the list is named"
+consumer go go "{ GOVULNCHECK_IGNORE: [] }"
+only_shims go:vuln
+expect_status fail "ignore: an empty list passes nothing over"
+refute_output "GOVULNCHECK_IGNORE" "ignore: an empty list is the input unset"
+consumer go go
+
 only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001"
 expect_status fail "ignore: a finding that is not named fails"
 expect_output "not in GOVULNCHECK_IGNORE: GO-2026-0002" "ignore: the unnamed finding is named"

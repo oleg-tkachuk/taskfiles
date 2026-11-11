@@ -50,7 +50,7 @@ workspace — tasks then read `security:<task>`.
 | `GO_TOOL_MODFILE` | — | a `go.mod` whose `tool` directives pin govulncheck, golangci-lint and gosec, when a module's own does not; relative to the include's directory |
 | `GOLANGCI_LINT_MODFILE` | — | a `go.mod` that pins golangci-lint alone, when it is kept apart from the other tools; relative to the include's directory |
 | `GO_TOOLS_PINNED` | `0` | `1`: a Go tool no `tool` directive pins is not there, and `PATH` is never asked |
-| `GOVULNCHECK_IGNORE` | — | vulnerability IDs `vuln` passes over in every module, as govulncheck prints them and separated by spaces; one no module reports any longer fails the task |
+| `GOVULNCHECK_IGNORE` | — | list of the vulnerability IDs `vuln` passes over in every module, as govulncheck prints them; one no module reports any longer fails the task |
 | `BASE` | `main` | branch the new-findings and breaking gates compare against |
 
 Every tool takes a FLAGS input, appended rather than replacing the invocation:

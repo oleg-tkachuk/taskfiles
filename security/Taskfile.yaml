@@ -32,9 +32,9 @@ version: "3"
 #   GO_TOOLS_PINNED    1: a Go tool no `tool` directive pins is not there,
 #                      and PATH is never asked               (default 0)
 #   GOVULNCHECK_FLAGS  extra govulncheck flags
-#   GOVULNCHECK_IGNORE vulnerability IDs vuln passes over, "GO-2026-0001
-#                      GO-2026-0002"; one no module reports any longer fails
-#                      the task                              (default none)
+#   GOVULNCHECK_IGNORE list of vulnerability IDs vuln passes over; one no
+#                      module reports any longer fails the task
+#                                                            (default none)
 #   GOLANGCI_FLAGS     extra golangci-lint flags
 #   GITLEAKS_FLAGS     extra gitleaks flags
 #   TRIVY_SCANNERS     default "--scanners vuln,secret"
@@ -83,7 +83,9 @@ vars:
   _SEC_VULN_HINT: go get -tool golang.org/x/vuln/cmd/govulncheck
   _SEC_LINT_HINT: https://golangci-lint.run/docs/welcome/install/
   _SEC_VULN_FLAGS: '{{.GOVULNCHECK_FLAGS | default ""}}'
-  _SEC_VULN_IGNORE: '{{.GOVULNCHECK_IGNORE | default ""}}'
+  # A list, as an include writes it; on the command line a variable is a
+  # string, and the IDs are then separated by spaces.
+  _SEC_VULN_IGNORE: '{{if kindIs "slice" .GOVULNCHECK_IGNORE}}{{join " " .GOVULNCHECK_IGNORE}}{{else}}{{.GOVULNCHECK_IGNORE | default ""}}{{end}}'
   # What govulncheck exits with when the code reaches a vulnerability; any
   # other failure is the scan itself not having run.
   _SEC_VULN_RC: "3"
