@@ -89,7 +89,7 @@ tasks:
         sh: |-
           {{range $c := ._MONO_COMPONENTS}}
           if [ ! -d {{$c | q}} ]; then printf ' %s(no such directory)' {{$c | q}}
-          elif ! ls {{$c | q}}/[Tt]askfile.y*ml >/dev/null 2>&1; then printf ' %s(no Taskfile)' {{$c | q}}
+          elif {{range $t := $._MONO_TASKFILES}}[ ! -f {{print $c "/" $t | q}} ] && {{end}}true; then printf ' %s(no Taskfile)' {{$c | q}}
           fi
           {{end}}
     cmds:
