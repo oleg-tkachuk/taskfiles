@@ -69,6 +69,52 @@ for cli in terraform tofu; do
   expect_status fail "$cli drift: a plan that errors fails"
   expect_output "did not complete" "$cli drift: and is not read as drift or as none"
   rm -f "$CONSUMER/$dir/bad.tf"
+
+  # ─── plan, apply ───────────────────────────────────────────────────────────
+  # The CLI still writes a plan where -chdir and -out put it, applies it from
+  # there, and refuses it once the state has moved on.
+  printf 'resource "terraform_data" "y" {\n  input = "b"\n}\n' > "$CONSUMER/$dir/more.tf"
+  run_task tf:apply
+  expect_status fail "$cli apply: no saved plan is refused"
+
+  run_task tf:plan
+  expect_status ok "$cli plan: saves a plan"
+  cp "$CONSUMER/$dir/.terraform/tfplan" "$WORK/$cli.tfplan"
+  run_task tf:drift
+  expect_status fail "$cli plan: changes nothing by itself"
+
+  run_task tf:apply
+  expect_status ok "$cli apply: applies the saved plan"
+  run_task tf:drift
+  expect_status ok "$cli apply: the configuration now matches its state"
+
+  cp "$WORK/$cli.tfplan" "$CONSUMER/$dir/.terraform/tfplan"
+  run_task tf:apply
+  expect_status fail "$cli apply: a plan the state has moved past is refused by the CLI"
+  expect_output "stale" "$cli apply: which still says the plan is stale"
+
+  # ─── destroy:plan, destroy ────────────────────────────────────────────────
+  run_task tf:destroy CONFIRM="$dir:default"
+  expect_status fail "$cli destroy: no saved destruction is refused"
+
+  run_task tf:destroy:plan
+  expect_status ok "$cli destroy:plan: saves a destruction"
+  run_task tf:drift
+  expect_status ok "$cli destroy:plan: destroys nothing by itself"
+
+  run_task tf:apply
+  expect_status fail "$cli destroy:plan: and leaves nothing for apply to run"
+
+  run_task tf:destroy CONFIRM="$dir:other"
+  expect_status fail "$cli destroy: CONFIRM naming another workspace is refused"
+  run_task tf:drift
+  expect_status ok "$cli destroy: and nothing was destroyed"
+
+  run_task tf:destroy CONFIRM="$dir:default"
+  expect_status ok "$cli destroy: CONFIRM naming the directory and the CLI's own workspace name passes"
+  run_task tf:drift
+  expect_status fail "$cli destroy: everything it managed is gone"
+  expect_output "differs from" "$cli destroy: so the configuration differs from the state again"
 done
 
 # ─── lock:check, with a provider ─────────────────────────────────────────────

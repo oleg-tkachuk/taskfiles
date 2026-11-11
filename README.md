@@ -196,7 +196,7 @@ implementation; they are not the current one.
 | [`runtime/*`](runtime/README.md) — docker, orbstack, minikube, kind, k3d | `local` | run a locally built image on a local cluster, no registry |
 | [`sealed-secrets/`](sealed-secrets/README.md) | `sealed-secrets` | seal a value into a committable SealedSecret, fetch the controller key |
 | [`security/`](security/README.md) | `security` | gitleaks, trivy, govulncheck, golangci-lint, gosec, hadolint, buf breaking |
-| [`terraform/`](terraform/README.md) | `terraform` | the gates of a Terraform or OpenTofu configuration: format, validity, a lock file covering every platform, drift |
+| [`terraform/`](terraform/README.md) | `terraform` | the gates of a Terraform or OpenTofu configuration — format, validity, a lock file covering every platform, drift — and plan, apply and destroy through a saved plan |
 | [`tasklib/`](tasklib/README.md) | `tasklib` | move every Taskfile's pin on this library and its lock together, and fail when they have come apart |
 
 ### Local clusters

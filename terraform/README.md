@@ -1,9 +1,9 @@
-# terraform — the gates of a configuration
+# terraform — gates, and changes only through a saved plan
 
 Four checks a Terraform or OpenTofu configuration should pass before anything
-is applied, and the task that writes its dependency lock. Nothing here changes
-infrastructure or state: `lock` writes the lock file, every other task only
-reads.
+is applied, the task that writes its dependency lock, and the three that
+change infrastructure. `apply` and `destroy` never use `-auto-approve`: each
+applies a plan file. `lock` writes the lock file; every other task only reads.
 
 ```yaml
 includes:
@@ -25,6 +25,10 @@ component's directory. Tasks then read `terraform:<task>`.
 | `lock` | Write the dependency lock file with checksums for every `TERRAFORM_PLATFORMS` entry |
 | `lock:check` | Fail when the lock file is absent, not tracked by git, or lacks a platform's checksums |
 | `drift` | Plan against the real backend and fail when the infrastructure differs from the configuration |
+| `plan` | Plan the changes and save the plan for `apply`; changes nothing |
+| `apply` | Apply the plan `plan` saved, and nothing else — asks first |
+| `destroy:plan` | Plan the destruction of everything `TERRAFORM_DIR` manages and save it for `destroy`; changes nothing |
+| `destroy` | Apply the destruction `destroy:plan` saved, and nothing else — needs `CONFIRM`, asks first |
 
 ## Inputs
 
@@ -33,7 +37,9 @@ component's directory. Tasks then read `terraform:<task>`.
 | `TERRAFORM_DIR` | `.` | The root module's directory |
 | `TERRAFORM_BIN` | `terraform` | The CLI to run — `terraform`, or `tofu` for OpenTofu |
 | `TERRAFORM_PLATFORMS` | `["linux_amd64", "darwin_arm64"]` | List of platforms the lock file must hold checksums for |
-| `TERRAFORM_PLAN_FLAGS` | — | Extra flags for the plan `drift` makes: a `-var-file`, a `-target` |
+| `TERRAFORM_PLAN_FLAGS` | — | Extra flags for every plan made here: a `-var-file`, a `-target` |
+| `TERRAFORM_PLAN_FILE` | `.terraform/tfplan` | Where `plan` saves and `apply` reads, relative to `TERRAFORM_DIR`; `destroy:plan` and `destroy` use the same name with `.destroy` appended |
+| `CONFIRM` | — | Required by `destroy`: `<TERRAFORM_DIR>:<workspace>` |
 
 Pass them at the include's own `vars:` — see
 [Variable scoping](../README.md#variable-scoping).
@@ -74,3 +80,38 @@ and not as drift.
 
 It initialises the real backend, so it needs the credentials a plan needs, and
 it takes the state lock a plan takes.
+
+## Plan, then apply
+
+```console
+$ task terraform:plan     # saves the plan and shows it
+$ task terraform:apply    # applies that file
+```
+
+What `apply` runs is the file `plan` wrote, so what was read is what happens.
+There is no plan made at apply time and no `-auto-approve`. The CLI itself
+refuses a saved plan the state has moved past, and `apply` removes the file
+once it has been tried — applied or refused, it is spent. A `plan` that fails
+removes the previous one, so an older plan is never applied as the new one.
+
+A plan file holds every value it will write, secrets included. The default
+location is the CLI's own `.terraform/` directory, which is not committed;
+keep a `TERRAFORM_PLAN_FILE` of your own out of the repository too. To plan
+in one pipeline job and apply in another, pass that file between them.
+
+## Destroy
+
+```console
+$ task terraform:destroy:plan                    # saves the destruction and shows it
+$ task terraform:destroy CONFIRM=infra:default   # applies that file
+```
+
+The same two steps, for the same reason: `destroy` makes no plan of its own,
+so the list of what goes is on screen before the question is asked, not after
+it is answered. The destruction is saved under a name of its own —
+`apply` never picks it up, and `destroy` never runs a plan made for `apply`.
+
+`CONFIRM` must name the directory and the workspace selected in it. The
+prompt guards against not meaning it; `CONFIRM` guards against meaning it in
+the wrong workspace, which is ambient state nobody re-reads before typing a
+command.

@@ -7,17 +7,27 @@ LOCK=.terraform.lock.hcl
 
 # Answers as the CLI does, by subcommand. FAKE_LOCK_ADDS is what `providers
 # lock` appends to the lock file, as it does for a platform it had no
-# checksums for.
+# checksums for. A plan given -out writes that file, under -chdir as the CLI
+# resolves it, and like the CLI makes no directory for it.
 CLI='
+dir=.; out=""
+for a in "$@"; do case "$a" in -chdir=*) dir=${a#-chdir=} ;; -out=*) out=${a#-out=} ;; esac; done
 case " $* " in
   *" fmt "*) [ -z "${FAKE_FMT_OUT:-}" ] || printf "%s\n" "$FAKE_FMT_OUT"; exit "${FAKE_FMT:-0}" ;;
   *" init "*) printf "%s\n" "init said something"; exit "${FAKE_INIT:-0}" ;;
   *" validate "*) exit "${FAKE_VALIDATE:-0}" ;;
   *" providers lock "*)
-    dir=.; for a in "$@"; do case "$a" in -chdir=*) dir=${a#-chdir=} ;; esac; done
     [ -z "${FAKE_LOCK_ADDS:-}" ] || printf "%s\n" "$FAKE_LOCK_ADDS" >> "$dir/'"$LOCK"'"
     exit "${FAKE_LOCK:-0}" ;;
-  *" plan "*) printf "%s\n" "~ one resource will change"; exit "${FAKE_PLAN:-0}" ;;
+  *" plan "*)
+    printf "%s\n" "~ one resource will change"
+    if [ -n "$out" ] && [ "${FAKE_PLAN:-0}" = 0 ]; then
+      [ -d "$dir/$(dirname "$out")" ] || { printf "%s\n" "Error: Failed to write plan file" >&2; exit 1; }
+      printf "%s\n" "$*" > "$dir/$out"
+    fi
+    exit "${FAKE_PLAN:-0}" ;;
+  *" workspace show "*) printf "%s\n" "${FAKE_WORKSPACE:-default}" ;;
+  *" apply "*) exit "${FAKE_APPLY:-0}" ;;
 esac'
 shim terraform "$CLI"
 shim tofu "$CLI"
@@ -137,6 +147,135 @@ consumer tf terraform '{ TERRAFORM_DIR: infra, TERRAFORM_PLAN_FLAGS: "-var-file=
 reset_calls
 run_task tf:drift
 expect_call "-detailed-exitcode -var-file=prod.tfvars" "drift: TERRAFORM_PLAN_FLAGS reach the plan"
+
+# ─── plan ────────────────────────────────────────────────────────────────────
+PLAN=infra/.terraform/tfplan
+consumer tf terraform '{ TERRAFORM_DIR: infra, TERRAFORM_PLAN_FLAGS: "-var-file=prod.tfvars" }'
+reset_calls
+run_task tf:plan
+expect_status ok "plan: a plan that completes passes"
+expect_call "terraform -chdir=infra init -input=false -lockfile=readonly" "plan: initialises the backend without moving the lock"
+expect_call "terraform -chdir=infra plan -input=false -out=.terraform/tfplan -var-file=prod.tfvars" "plan: saves the plan, with TERRAFORM_PLAN_FLAGS"
+expect_output "~ one resource will change" "plan: shows the plan"
+expect_output "saved to $PLAN" "plan: says where it was saved"
+
+# A plan that errored leaves nothing behind to apply, the last one included.
+FAKE_PLAN=1 run_task tf:plan
+expect_status fail "plan: a plan that errors fails"
+refute_output "saved to" "plan: and is not reported as saved"
+if [ -e "$CONSUMER/$PLAN" ]; then fail "plan: an earlier plan survived a failed one"; else pass "plan: no earlier plan is left to apply"; fi
+
+consumer tf terraform '{ TERRAFORM_DIR: infra, TERRAFORM_PLAN_FILE: out/reviewed.tfplan }'
+reset_calls
+run_task tf:plan
+expect_call "plan -input=false -out=out/reviewed.tfplan" "plan: TERRAFORM_PLAN_FILE names the file, under TERRAFORM_DIR"
+rm -rf "$CONSUMER/infra/out"
+consumer tf terraform '{ TERRAFORM_DIR: infra }'
+
+# ─── apply ───────────────────────────────────────────────────────────────────
+# Only a saved plan is applied: what runs is what was read.
+reset_calls
+run_task tf:apply
+expect_status fail "apply: no saved plan is refused"
+expect_output "$PLAN does not exist" "apply: names the plan it did not find"
+refute_call " apply " "apply: nothing is applied without one"
+
+run_task tf:plan
+reset_calls
+run_task tf:apply
+expect_status ok "apply: a saved plan is applied"
+expect_call "terraform -chdir=infra apply -input=false .terraform/tfplan" "apply: applies that file and nothing else"
+refute_call "auto-approve" "apply: never approves a plan nobody saw"
+if [ -e "$CONSUMER/$PLAN" ]; then fail "apply: the applied plan was left behind"; else pass "apply: an applied plan is removed"; fi
+
+# A plan the CLI refused, or that failed part way, is stale either way.
+run_task tf:plan
+FAKE_APPLY=1 run_task tf:apply
+expect_status fail "apply: a failed apply fails"
+if [ -e "$CONSUMER/$PLAN" ]; then fail "apply: a plan that failed to apply was left behind"; else pass "apply: a plan that failed to apply is removed"; fi
+
+# An init that failed applied nothing, so the plan is still the reviewed one.
+run_task tf:plan
+reset_calls
+FAKE_INIT=1 run_task tf:apply
+expect_status fail "apply: a failed init fails"
+refute_call " apply " "apply: nothing is applied after a failed init"
+if [ -e "$CONSUMER/$PLAN" ]; then pass "apply: the plan is kept when nothing was applied"; else fail "apply: the plan was removed though nothing was applied"; fi
+rm -f "$CONSUMER/$PLAN"
+
+# ─── destroy:plan ────────────────────────────────────────────────────────────
+# With no data directory yet, as after an init that had nothing to install.
+DESTROY_PLAN=$PLAN.destroy
+rm -rf "$CONSUMER/infra/.terraform"
+consumer tf terraform '{ TERRAFORM_DIR: infra, TERRAFORM_PLAN_FLAGS: "-var-file=prod.tfvars" }'
+reset_calls
+run_task tf:destroy:plan
+expect_status ok "destroy:plan: a plan that completes passes"
+expect_call "terraform -chdir=infra plan -destroy -input=false -out=.terraform/tfplan.destroy -var-file=prod.tfvars" "destroy:plan: plans the destruction into a file of its own, with TERRAFORM_PLAN_FLAGS"
+refute_call " apply " "destroy:plan: destroys nothing"
+expect_output "~ one resource will change" "destroy:plan: shows the plan"
+expect_output "saved to $DESTROY_PLAN" "destroy:plan: says where it was saved"
+if [ -e "$CONSUMER/$PLAN" ]; then fail "destroy:plan: wrote the file apply reads"; else pass "destroy:plan: apply has nothing to pick up"; fi
+
+FAKE_PLAN=1 run_task tf:destroy:plan
+expect_status fail "destroy:plan: a plan that errors fails"
+if [ -e "$CONSUMER/$DESTROY_PLAN" ]; then fail "destroy:plan: an earlier plan survived a failed one"; else pass "destroy:plan: no earlier plan is left to apply"; fi
+consumer tf terraform '{ TERRAFORM_DIR: infra }'
+
+# ─── destroy ─────────────────────────────────────────────────────────────────
+# Only the saved destruction is applied, and CONFIRM names what it destroys:
+# the directory and the workspace selected in it, which is ambient state
+# nobody re-reads before typing a command.
+reset_calls
+run_task tf:destroy CONFIRM=infra:default
+expect_status fail "destroy: no saved plan is refused"
+expect_output "$DESTROY_PLAN does not exist" "destroy: names the plan it did not find"
+refute_call " apply " "destroy: nothing is destroyed without one"
+
+# A plan apply could run is not a destruction somebody read.
+run_task tf:plan
+reset_calls
+run_task tf:destroy CONFIRM=infra:default
+expect_status fail "destroy: the plan saved for apply is not taken instead"
+refute_call " apply " "destroy: and nothing is applied"
+rm -f "$CONSUMER/$PLAN"
+
+run_task tf:destroy:plan
+reset_calls
+run_task tf:destroy
+expect_status fail "destroy: no CONFIRM is refused"
+refute_call "terraform" "destroy: nothing runs without one"
+
+reset_calls
+run_task tf:destroy CONFIRM=infra:prod
+expect_status fail "destroy: CONFIRM naming another workspace is refused"
+expect_output "CONFIRM does not name" "destroy: says so"
+refute_call " apply " "destroy: nothing is destroyed on a refused CONFIRM"
+
+reset_calls
+run_task tf:destroy CONFIRM=other:default
+expect_status fail "destroy: CONFIRM naming another directory is refused"
+refute_call " apply " "destroy: nothing is destroyed on it"
+if [ -e "$CONSUMER/$DESTROY_PLAN" ]; then pass "destroy: the plan is kept when nothing was applied"; else fail "destroy: the plan was removed though nothing was applied"; fi
+
+reset_calls
+run_task tf:destroy CONFIRM=infra:default
+expect_status ok "destroy: CONFIRM naming the directory and its workspace passes"
+expect_call "terraform -chdir=infra apply -input=false .terraform/tfplan.destroy" "destroy: applies the saved destruction and nothing else"
+refute_call " plan " "destroy: makes no plan of its own"
+refute_call "auto-approve" "destroy: never through auto-approve"
+if [ -e "$CONSUMER/$DESTROY_PLAN" ]; then fail "destroy: its plan was left behind"; else pass "destroy: an applied plan is removed"; fi
+
+run_task tf:destroy:plan
+FAKE_WORKSPACE=prod run_task tf:destroy CONFIRM=infra:default
+expect_status fail "destroy: the workspace is the one the CLI reports, not the default one"
+FAKE_WORKSPACE=prod run_task tf:destroy CONFIRM=infra:prod
+expect_status ok "destroy: and CONFIRM naming that one passes"
+
+run_task tf:destroy:plan
+FAKE_APPLY=1 run_task tf:destroy CONFIRM=infra:default
+expect_status fail "destroy: a failed apply fails"
+if [ -e "$CONSUMER/$DESTROY_PLAN" ]; then fail "destroy: a plan that failed to apply was left behind"; else pass "destroy: a plan that failed to apply is removed"; fi
 
 # ─── the CLI and the directory ───────────────────────────────────────────────
 consumer tf terraform '{ TERRAFORM_DIR: infra, TERRAFORM_BIN: tofu }'
