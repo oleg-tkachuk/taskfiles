@@ -26,6 +26,11 @@ version: "3"
 #   GO_TOOL_MODFILE    a go.mod whose `tool` directives pin govulncheck,
 #                      golangci-lint and gosec, when a module's own does not;
 #                      relative to the include's directory   (default none)
+#   GOLANGCI_LINT_MODFILE  a go.mod that pins golangci-lint alone, when it is
+#                      kept apart from the other tools; relative to the
+#                      include's directory                   (default none)
+#   GO_TOOLS_PINNED    1: a Go tool no `tool` directive pins is not there,
+#                      and PATH is never asked               (default 0)
 #   GOVULNCHECK_FLAGS  extra govulncheck flags
 #   GOLANGCI_FLAGS     extra golangci-lint flags
 #   GITLEAKS_FLAGS     extra gitleaks flags
@@ -65,6 +70,11 @@ vars:
   _SEC_BASE: '{{.BASE | default "main"}}'
   _SEC_GOSEC_FLAGS: '{{.GOSEC_FLAGS | default ""}}'
   _SEC_TOOL_MOD: '{{.GO_TOOL_MODFILE | default ""}}'
+  _SEC_LINT_MOD: '{{.GOLANGCI_LINT_MODFILE | default ""}}'
+  # What GO_TOOLS_PINNED may be, and what it is when unset.
+  _SEC_PINNED_ON: "1"
+  _SEC_PINNED_OFF: "0"
+  _SEC_PINNED: '{{.GO_TOOLS_PINNED | default "0"}}'
   # What to say when a Go tool is neither pinned nor on PATH.
   _SEC_GOSEC_HINT: go get -tool github.com/securego/gosec/v2/cmd/gosec
   _SEC_VULN_HINT: go get -tool golang.org/x/vuln/cmd/govulncheck
@@ -168,6 +178,8 @@ tasks:
           MODULE: "{{.ITEM}}"
           TOOL: golangci-lint
           HINT: "{{._SEC_LINT_HINT}}"
+          MODFILE: "{{._SEC_LINT_MOD}}"
+          MODFILE_INPUT: GOLANGCI_LINT_MODFILE
           CMD: "run --new-from-merge-base={{._SEC_BASE | q}} {{._SEC_LINT_FLAGS}} ./..."
           LABEL: "golangci-lint"
 
@@ -223,6 +235,9 @@ tasks:
   # `tool` directive pins — in the module's own go.mod, or in GO_TOOL_MODFILE —
   # and only then the one on PATH: the same rule the go module follows, so
   # `go:lint` and `security:lint` cannot run two versions of one linter.
+  # MODFILE, where a caller passes one, is the go.mod that pins this tool
+  # alone, and MODFILE_INPUT the input that named it. GO_TOOLS_PINNED=1 takes
+  # PATH out.
   _in-module:
     internal: true
     cmds:
@@ -230,13 +245,22 @@ tasks:
           set -eu
           # Made absolute before the cd below: the input is relative to the
           # include's directory, not to each module's.
-          modfile={{._SEC_TOOL_MOD | q}}
+          named={{._SEC_TOOL_MOD | q}} named_by=GO_TOOL_MODFILE
+          {{if .MODFILE}}named={{.MODFILE | q}} named_by={{.MODFILE_INPUT | q}}{{end}}
+          modfile=$named
           case "$modfile" in '' | /*) ;; *) modfile="$PWD/$modfile" ;; esac
+          case {{._SEC_PINNED | q}} in
+            {{._SEC_PINNED_ON | q}}) absent='is not pinned by a tool directive, and GO_TOOLS_PINNED='{{._SEC_PINNED_ON | q}}' leaves PATH out' ;;
+            {{._SEC_PINNED_OFF | q}}) absent='is not installed' ;;
+            *)
+              printf '%s sec · %s · GO_TOOLS_PINNED must be %s or %s, got: %s\n' "{{._SEC_ERR}}" {{.LABEL | q}} {{._SEC_PINNED_ON | q}} {{._SEC_PINNED_OFF | q}} {{._SEC_PINNED | q}} >&2
+              exit 1 ;;
+          esac
           # Refused when it is not there: `go tool -n` fails on it the way it
           # does on a tool nobody pinned, and the scan would carry on with
           # whatever PATH holds.
           if [ -n "$modfile" ] && [ ! -f "$modfile" ]; then
-            printf '%s sec · %s · GO_TOOL_MODFILE names %s, which does not exist\n' "{{._SEC_ERR}}" {{.LABEL | q}} {{._SEC_TOOL_MOD | q}} >&2
+            printf '%s sec · %s · %s names %s, which does not exist\n' "{{._SEC_ERR}}" {{.LABEL | q}} "$named_by" "$named" >&2
             exit 1
           fi
           go_tool() { if [ -n "$modfile" ]; then go tool -modfile="$modfile" "$@"; else go tool "$@"; fi; }
@@ -251,9 +275,9 @@ tasks:
           fi
           printf '%s sec · %s · %s\n' "{{._SEC_RUN}}" {{.LABEL | q}} {{.MODULE | q}}
           if go_tool -n {{.TOOL | q}} >/dev/null 2>&1; then set -- go_tool {{.TOOL | q}}
-          elif command -v {{.TOOL | q}} >/dev/null 2>&1; then set -- {{.TOOL | q}}
+          elif [ {{._SEC_PINNED | q}} = {{._SEC_PINNED_OFF | q}} ] && command -v {{.TOOL | q}} >/dev/null 2>&1; then set -- {{.TOOL | q}}
           else
-            printf '%s sec · %s is not installed — %s\n' "{{._SEC_ERR}}" {{.TOOL | q}} {{.HINT | q}} >&2
+            printf '%s sec · %s %s — %s\n' "{{._SEC_ERR}}" {{.TOOL | q}} "$absent" {{.HINT | q}} >&2
             exit 1
           fi
           "$@" {{.CMD}}

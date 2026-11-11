@@ -48,6 +48,8 @@ workspace — tasks then read `security:<task>`.
 | `GITLEAKS_BASELINE` | — | findings accepted as known, so the gate reports only new ones |
 | `GOSEC_FLAGS` | — | extra gosec flags |
 | `GO_TOOL_MODFILE` | — | a `go.mod` whose `tool` directives pin govulncheck, golangci-lint and gosec, when a module's own does not; relative to the include's directory |
+| `GOLANGCI_LINT_MODFILE` | — | a `go.mod` that pins golangci-lint alone, when it is kept apart from the other tools; relative to the include's directory |
+| `GO_TOOLS_PINNED` | `0` | `1`: a Go tool no `tool` directive pins is not there, and `PATH` is never asked |
 | `BASE` | `main` | branch the new-findings and breaking gates compare against |
 
 Every tool takes a FLAGS input, appended rather than replacing the invocation:
@@ -103,7 +105,10 @@ govulncheck, golangci-lint and gosec each run the one a `tool` directive pins
 — in the module's own `go.mod`, or in `GO_TOOL_MODFILE` — and only then the
 one on `PATH`. The [`go`](../go/README.md#a-pinned-tool-before-paths) module
 follows the same rule, so `go:lint` and `security:lint` cannot run two
-versions of one linter.
+versions of one linter. It reads the same two inputs beside it:
+`GOLANGCI_LINT_MODFILE`, a `go.mod` for golangci-lint alone, and
+`GO_TOOLS_PINNED: "1"`, under which a tool nobody pinned fails the scan
+whatever `PATH` holds.
 
 For gosec the pin is more than a version.
 Pin gosec in each Go module with `go get -tool github.com/securego/gosec/v2/cmd/gosec`.

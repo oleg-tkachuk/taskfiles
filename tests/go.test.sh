@@ -116,7 +116,33 @@ only_shims go:lint
 expect_status ok "lint: runs PATH's golangci-lint when none is pinned"
 expect_run golangci-lint "lint: PATH's golangci-lint is the one run"
 
+# GO_TOOLS_PINNED=1: PATH is asked for nothing. A gate fails on a tool nobody
+# pinned, and a tool a task can do without is done without.
+reset_calls
+only_shims go:lint GO_TOOLS_PINNED=1
+expect_status fail "pinned: an unpinned golangci-lint fails, though PATH has one"
+expect_output "golangci-lint is not pinned by a tool directive, and GO_TOOLS_PINNED=1 leaves PATH out" "pinned: says the tool is not pinned and why PATH does not count"
+refute_run golangci-lint "pinned: PATH's golangci-lint is not run"
+reset_calls
+only_shims go:vuln GO_TOOLS_PINNED=1
+expect_status fail "pinned: an unpinned govulncheck fails, though PATH has one"
+refute_run govulncheck "pinned: PATH's govulncheck is not run"
+reset_calls
+only_shims go:test GO_TOOLS_PINNED=1
+expect_status ok "pinned: test runs without the unpinned gotestsum"
+expect_call "go|test|-race|-short|./...|" "pinned: go test runs in its place"
+refute_run gotestsum "pinned: PATH's gotestsum is not run"
+reset_calls
+only_shims go:lint "GO_TOOLS_PINNED=yes"
+expect_status fail "pinned: a GO_TOOLS_PINNED that is neither 1 nor 0 is refused"
+expect_output "GO_TOOLS_PINNED must be 1 or 0, got: yes" "pinned: says what GO_TOOLS_PINNED takes"
+refute_call "golangci-lint" "pinned: no linter runs on a refused value"
+
 pin_tools golangci-lint gotestsum govulncheck goimports
+reset_calls
+only_shims go:lint GO_TOOLS_PINNED=1
+expect_status ok "pinned: a pinned golangci-lint runs"
+expect_call "go|tool|golangci-lint|run|./...|" "pinned: it runs through go tool"
 reset_calls
 only_shims go:lint "GOLANGCI_FLAGS=--timeout 5m"
 expect_call "go|tool|golangci-lint|run|--timeout|5m|./...|" "lint: a pinned golangci-lint runs through go tool, flags split"
@@ -147,6 +173,23 @@ only_shims go:lint "GO_TOOL_MODFILE=tools/go.mdo"
 expect_status fail "modfile: one that does not exist is refused"
 expect_output "GO_TOOL_MODFILE names tools/go.mdo, which does not exist" "modfile: the missing file is named"
 refute_call "golangci-lint" "modfile: no linter runs when the file is missing"
+
+# GOLANGCI_LINT_MODFILE: the linter's pin lives apart from the other tools'.
+mkdir -p "$CONSUMER/lint"
+printf 'module example.com/lint\n' > "$CONSUMER/lint/go.mod"
+reset_calls
+only_shims go:lint "GO_TOOL_MODFILE=tools/go.mod" "GOLANGCI_LINT_MODFILE=lint/go.mod"
+expect_status ok "lint modfile: runs with both set"
+expect_call "go|tool|-modfile=lint/go.mod|golangci-lint|run|./...|" "lint modfile: golangci-lint is asked of its own go.mod"
+refute_call "-modfile=tools/go.mod|golangci-lint" "lint modfile: not of GO_TOOL_MODFILE"
+reset_calls
+only_shims go:vuln "GO_TOOL_MODFILE=tools/go.mod" "GOLANGCI_LINT_MODFILE=lint/go.mod"
+expect_call "go|tool|-modfile=tools/go.mod|govulncheck|./...|" "lint modfile: every other tool is still asked of GO_TOOL_MODFILE"
+reset_calls
+only_shims go:lint "GOLANGCI_LINT_MODFILE=lint/go.mdo"
+expect_status fail "lint modfile: one that does not exist is refused"
+expect_output "GOLANGCI_LINT_MODFILE names lint/go.mdo" "lint modfile: the input and the missing file are named"
+refute_call "golangci-lint" "lint modfile: no linter runs when the file is missing"
 
 # Neither pinned nor on PATH: a gate fails and says what to install.
 pin_tools

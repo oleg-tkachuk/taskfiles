@@ -63,6 +63,25 @@ expect_status fail "modfile: one that does not exist is refused"
 expect_output "GO_TOOL_MODFILE names tools/go.mdo, which does not exist" "modfile: the missing file is named"
 refute_call "govulncheck" "modfile: no scan runs when the file is missing"
 
+# GOLANGCI_LINT_MODFILE: the linter's pin lives apart from the other tools'.
+mkdir -p "$CONSUMER/lint"
+printf 'module example.com/lint\n' > "$CONSUMER/lint/go.mod"
+consumer security security "{ GO_MODULES: [api], GO_TOOL_MODFILE: tools/go.mod, GOLANGCI_LINT_MODFILE: lint/go.mod }"
+reset_calls
+only_shims security:lint
+expect_status ok "lint modfile: runs with both set"
+expect_call "/consumer/lint/go.mod|golangci-lint|run|" "lint modfile: golangci-lint is asked of its own go.mod, absolute"
+refute_call "/consumer/tools/go.mod|golangci-lint" "lint modfile: not of GO_TOOL_MODFILE"
+reset_calls
+only_shims security:vuln
+expect_call "/consumer/tools/go.mod|govulncheck|./...|" "lint modfile: govulncheck is still asked of GO_TOOL_MODFILE"
+consumer security security "{ GO_MODULES: [api], GOLANGCI_LINT_MODFILE: lint/go.mdo }"
+reset_calls
+only_shims security:lint
+expect_status fail "lint modfile: one that does not exist is refused"
+expect_output "GOLANGCI_LINT_MODFILE names lint/go.mdo, which does not exist" "lint modfile: the input and the missing file are named"
+refute_call "golangci-lint" "lint modfile: no linter runs when the file is missing"
+
 # Neither pinned nor on PATH: a Go module fails the scan, a repository with
 # no Go module needs no Go tool at all.
 pin_tools
@@ -74,6 +93,26 @@ expect_output "govulncheck is not installed — go get -tool golang.org/x/vuln/c
 only_shims security:gosec
 expect_status fail "gosec: no gosec anywhere fails a Go module"
 expect_output "gosec is not installed — go get -tool github.com/securego/gosec/v2/cmd/gosec" "gosec: says how to pin gosec"
+
+# GO_TOOLS_PINNED=1: PATH is asked for nothing, so the golangci-lint it holds
+# does not count.
+consumer security security "{ GO_MODULES: [api], GO_TOOLS_PINNED: '1' }"
+reset_calls
+only_shims security:lint
+expect_status fail "pinned: an unpinned golangci-lint fails, though PATH has one"
+expect_output "golangci-lint is not pinned by a tool directive, and GO_TOOLS_PINNED=1 leaves PATH out" "pinned: says the tool is not pinned and why PATH does not count"
+refute_run golangci-lint "pinned: PATH's golangci-lint is not run"
+pin_tools golangci-lint
+reset_calls
+only_shims security:lint
+expect_status ok "pinned: a pinned golangci-lint runs"
+expect_call "go|tool|golangci-lint|run|" "pinned: it runs through go tool"
+pin_tools
+consumer security security "{ GO_MODULES: [api], GO_TOOLS_PINNED: 'yes' }"
+only_shims security:lint
+expect_status fail "pinned: a GO_TOOLS_PINNED that is neither 1 nor 0 is refused"
+expect_output "GO_TOOLS_PINNED must be 1 or 0, got: yes" "pinned: says what GO_TOOLS_PINNED takes"
+consumer security security "{ GO_MODULES: [api] }"
 consumer security security "{ GO_MODULES: [docs] }"
 only_shims security:vuln
 expect_status ok "vuln: a repository with no Go module passes without govulncheck"
