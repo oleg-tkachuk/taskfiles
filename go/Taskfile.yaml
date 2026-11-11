@@ -387,7 +387,7 @@ tasks:
           printf '%s %s · go · passed over, by GOVULNCHECK_IGNORE:%s\n' "{{._GO_WARN}}" {{._GO_NAME | q}} "$list"
 
   deps:update:
-    desc: "Bump the direct dependencies to the latest minor/patch, tidy, then prove it still builds"
+    desc: "Bump the direct dependencies and tools to the latest minor/patch, tidy, then prove it still builds"
     # Majors are deliberately not crossed: they need an import-path /vN edit and
     # a read of the upstream CHANGELOG.
     #
@@ -412,9 +412,17 @@ tasks:
     #
     # Direct requirements move here and the resolver picks the rest, so an
     # indirect module moves when its direct requirer does — which is when the
-    # train moves.
+    # train moves. That needs `<path>@upgrade` WITHOUT -u: -u also lifts every
+    # dependency of the named modules to its own latest, an indirect one
+    # included. Measured: pressly/goose v3.30.0 requires
+    # mfridman/interpolate v0.0.2; -u took interpolate to v0.2.0, whose API
+    # goose does not compile against.
+    #
+    # Tools too. A `tool` directive's module is marked // indirect when no
+    # package imports it, so a module of tools alone listed no direct
+    # requirement and nothing moved; `go list tool` names their packages.
     cmds:
-      - printf '%s %s · go · go get -u, direct requirements\n' "{{._GO_RUN}}" {{._GO_NAME | q}}
+      - printf '%s %s · go · go get @upgrade, direct requirements and tools\n' "{{._GO_RUN}}" {{._GO_NAME | q}}
       - cmd: |-
           set -euo pipefail
 
@@ -429,19 +437,25 @@ tasks:
           # wrong, so the module graph still loads. `.Main` is filtered
           # because `all` starts with the main module, and passing its own
           # path to go get is an error.
-          direct="$(go list -m -f '{{"{{"}}if and (not .Main) (not .Indirect){{"}}"}}{{"{{"}}.Path{{"}}"}}{{"{{"}}end{{"}}"}}' all | awk 'NF')"
+          # -mod=mod: a module that replaces a sibling by path takes the
+          # sibling's requirements, and an earlier module in the same run may
+          # just have raised them. Read-only, go list then refuses the graph
+          # ("updates to go.mod needed") before anything is bumped.
+          direct="$(go list -mod=mod -m -f '{{"{{"}}if and (not .Main) (not .Indirect){{"}}"}}{{"{{"}}.Path{{"}}"}}{{"{{"}}end{{"}}"}}' all | awk 'NF')"
+          tools="$(go list -mod=mod tool | awk 'NF')"
+          wanted="$(printf '%s\n%s\n' "${direct}" "${tools}" | awk 'NF { print $0 "@upgrade" }')"
 
-          if [ -z "${direct}" ]; then
-            printf '%s %s · go · go.mod lists no direct requirement — nothing to bump\n' "{{._GO_ERR}}" {{._GO_NAME | q}} >&2
+          if [ -z "${wanted}" ]; then
+            printf '%s %s · go · go.mod lists no direct requirement and no tool — nothing to bump\n' "{{._GO_ERR}}" {{._GO_NAME | q}} >&2
             exit 1
           fi
 
           # The guard above is not decoration: GNU xargs runs the command once
-          # with no arguments when its input is empty, and `go get -u` with no
+          # with no arguments when its input is empty, and `go get` with no
           # arguments acts on the current directory instead. BSD xargs runs
           # nothing, so without the guard this task would behave differently
           # on Linux and on macOS.
-          printf '%s\n' "${direct}" | xargs go get -u
+          printf '%s\n' "${wanted}" | xargs go get
       - go mod tidy
       - go build -o /dev/null {{._GO_PKGS}}
       - printf '%s %s · go · deps bumped — review git diff go.mod go.sum\n' "{{._GO_OK}}" {{._GO_NAME | q}}

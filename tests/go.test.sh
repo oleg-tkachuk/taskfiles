@@ -343,4 +343,34 @@ expect_call "go|tool|govulncheck|./...|" "ignore: a pinned govulncheck runs thro
 expect_output "drop the entry: GO-2026-0001" "ignore: and its clean result is what the list is held against"
 pin_tools
 
+# deps:update names each direct requirement and each tool at @upgrade, and no
+# -u: -u would lift their dependencies past what the requirers ask for.
+# LISTED and TOOLS are what `go list -m … all` and `go list tool` answer, and
+# only with -mod=mod: read-only, go list refuses a module whose replaced
+# sibling an earlier module in the same run has just raised.
+export LISTED="$WORK/listed" TOOLS="$WORK/tools"
+# shellcheck disable=SC2016 # the shim's own $1 and $2, written literally
+shim_go 'if [ "${1-} ${2-} ${3-}" = "list -mod=mod -m" ]; then cat "$LISTED"; exit 0; fi
+if [ "${1-} ${2-} ${3-}" = "list -mod=mod tool" ]; then cat "$TOOLS"; exit 0; fi'
+printf '%s\n' example.com/a example.com/b > "$LISTED"
+printf '%s\n' example.com/t/cmd/t > "$TOOLS"
+reset_calls
+run_task go:deps:update
+expect_status ok "deps:update: bumps a module with requirements and a tool"
+expect_call "go|get|example.com/a@upgrade|example.com/b@upgrade|example.com/t/cmd/t@upgrade|" "deps:update: each requirement and tool is one @upgrade argument"
+refute_call "go|get|-u|" "deps:update: dependencies are left to the resolver, not -u"
+
+: > "$LISTED"
+reset_calls
+run_task go:deps:update
+expect_status ok "deps:update: a module of tools alone still bumps them"
+expect_call "go|get|example.com/t/cmd/t@upgrade|" "deps:update: the tools are named when nothing is required directly"
+
+: > "$TOOLS"
+reset_calls
+run_task go:deps:update
+expect_status fail "deps:update: refuses a module with nothing to bump"
+expect_output "lists no direct requirement and no tool" "deps:update: says why"
+refute_call "go|get|" "deps:update: go get never runs without arguments"
+
 finish
