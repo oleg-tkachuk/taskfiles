@@ -8,7 +8,14 @@ import { BINARIES, TOOLS, expectedDigest, install, installBinary, releaseArch, w
 import { tempDir } from "./lib/temp-dir.ts";
 
 // VERSIONS pins every tool, as ci.yml does.
-const VERSIONS = { TRIVY_VERSION: "0.1.0", HADOLINT_VERSION: "v2.0.0", GITLEAKS_VERSION: "v8.0.0", CHECKOV_VERSION: "3.0.0" };
+const VERSIONS = {
+  TRIVY_VERSION: "0.1.0",
+  HADOLINT_VERSION: "v2.0.0",
+  GITLEAKS_VERSION: "v8.0.0",
+  CHECKOV_VERSION: "3.0.0",
+  TERRAFORM_VERSION: "1.0.0",
+  OPENTOFU_VERSION: "1.0.0",
+};
 
 test("a wrapper runs the pinned image as the runner's user, in the working directory, with its own entrypoint", () => {
   const checkov = TOOLS.find((tool) => tool.name === "checkov");

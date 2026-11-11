@@ -2,8 +2,9 @@
 // ci.yml pins.
 //
 // Usage: RUNNER_TEMP=… GITHUB_PATH=… TRIVY_VERSION=… HADOLINT_VERSION=…
-//        GITLEAKS_VERSION=… CHECKOV_VERSION=… KIND_VERSION=…
-//        KUBECTL_VERSION=… node contract-tools.ts
+//        GITLEAKS_VERSION=… CHECKOV_VERSION=… TERRAFORM_VERSION=…
+//        OPENTOFU_VERSION=… KIND_VERSION=… KUBECTL_VERSION=…
+//        node contract-tools.ts
 //
 // Each scanner is its official image behind a wrapper on PATH, so a version
 // is one pin in the workflow that Renovate moves, and the bump's pull request
@@ -42,6 +43,8 @@ export const TOOLS: readonly Tool[] = [
   { name: "hadolint", image: "hadolint/hadolint", entrypoint: "/bin/hadolint", versionEnv: "HADOLINT_VERSION" },
   { name: "gitleaks", image: "zricethezav/gitleaks", entrypoint: "gitleaks", versionEnv: "GITLEAKS_VERSION" },
   { name: "checkov", image: "bridgecrew/checkov", entrypoint: "checkov", versionEnv: "CHECKOV_VERSION" },
+  { name: "terraform", image: "hashicorp/terraform", entrypoint: "/bin/terraform", versionEnv: "TERRAFORM_VERSION" },
+  { name: "tofu", image: "ghcr.io/opentofu/opentofu", entrypoint: "/usr/local/bin/tofu", versionEnv: "OPENTOFU_VERSION" },
 ];
 
 // TOOLS_DIR is where the wrappers go, under RUNNER_TEMP.
