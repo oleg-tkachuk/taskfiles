@@ -2,7 +2,8 @@ version: "3"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # terraform — the gates of a Terraform or OpenTofu configuration: formatting,
-# validity, a lock file that covers every platform, and drift.
+# validity, a lock file that covers every platform, and drift; and changing
+# infrastructure only through a plan that was saved and read first.
 #
 #   includes:
 #     terraform:
@@ -10,8 +11,10 @@ version: "3"
 #       dir: .
 #       vars: { TERRAFORM_DIR: infra }
 #
-# Nothing here changes infrastructure or state. `lock` writes the dependency
-# lock file; every other task only reads.
+# `apply` and `destroy` change infrastructure, and neither uses -auto-approve:
+# each applies a plan file that `plan` or `destroy:plan` saved, so what runs is
+# what was read. `lock` writes the dependency lock file; every other task only
+# reads.
 #
 # The CLI's version is not an input: `required_version` in the configuration
 # already refuses a CLI outside it, on every command, and a second pin here
@@ -26,8 +29,13 @@ version: "3"
 #   TERRAFORM_BIN         the CLI to run: terraform, or tofu     (default terraform)
 #   TERRAFORM_PLATFORMS   list of platforms the lock file must hold checksums
 #                         for            (default ["linux_amd64", "darwin_arm64"])
-#   TERRAFORM_PLAN_FLAGS  extra flags for the plan `drift` makes — a
+#   TERRAFORM_PLAN_FLAGS  extra flags for every plan made here — a
 #                         -var-file, a -target
+#   TERRAFORM_PLAN_FILE   where `plan` saves and `apply` reads, relative to
+#                         TERRAFORM_DIR              (default .terraform/tfplan);
+#                         `destroy:plan` and `destroy` use the same name with
+#                         .destroy appended
+#   CONFIRM               required by destroy: <TERRAFORM_DIR>:<workspace>
 # ─────────────────────────────────────────────────────────────────────────────
 # shell-verbatim: _TF_SH _TF_PLAN_FLAGS TERRAFORM_PLAN_FLAGS
 
@@ -41,6 +49,15 @@ vars:
   _TF_PLATFORMS:
     ref: 'default (list "linux_amd64" "darwin_arm64") .TERRAFORM_PLATFORMS'
   _TF_PLAN_FLAGS: '{{.TERRAFORM_PLAN_FLAGS | default ""}}'
+  # Under TERRAFORM_DIR, as the CLI resolves a path given with -chdir. The
+  # default sits in the CLI's own data directory: a plan holds every value it
+  # will write, secrets included, and that directory is not committed.
+  _TF_PLAN: '{{.TERRAFORM_PLAN_FILE | default ".terraform/tfplan"}}'
+  # A destruction is a file of its own, so `apply` can never pick it up and
+  # `destroy` can never run a plan made for `apply`.
+  _TF_DESTROY_PLAN: '{{._TF_PLAN}}.destroy'
+  # What CONFIRM is compared with: the directory, then the selected workspace.
+  _TF_CONFIRM_SEP: ":"
   # The one name the CLI reads and writes the dependency lock under.
   _TF_LOCK_NAME: .terraform.lock.hcl
   _TF_LOCK: '{{._TF_DIR}}/{{._TF_LOCK_NAME}}'
@@ -57,6 +74,16 @@ vars:
   # Interpolated by every task below. `tf` is the CLI on TERRAFORM_DIR, told
   # it is not at a terminal; `tf_init` is an init that speaks only when it
   # fails, with the lock file read and never rewritten.
+  #
+  # `tf_save <file> [plan flags]` plans into <file>, a path under
+  # TERRAFORM_DIR. The last plan goes first: left in place by a plan that
+  # failed, it would be applied as if it were this one. The CLI makes no
+  # directory for a plan, and its own data directory is not there yet in a
+  # configuration with nothing to install.
+  #
+  # `tf_run_saved <file> <the task that saves it>` applies <file> and nothing
+  # else. Applied or refused, the file is spent — a partial apply has moved
+  # the state past it — so it is removed either way.
   _TF_SH: |
     tf() { TF_IN_AUTOMATION=1 {{._TF_BIN | q}} -chdir={{._TF_DIR | q}} "$@"; }
     tf_init() {
@@ -65,6 +92,28 @@ vars:
         printf '%s terraform · init failed in %s — the output above says why; a lock file that is missing or behind the configuration is written by the lock task\n' "{{._TF_ERR}}" {{._TF_DIR | q}} >&2
         return 1
       }
+    }
+    tf_save() {
+      file=$1
+      shift
+      saved={{._TF_DIR | q}}/$file
+      rm -f "$saved"
+      mkdir -p "$(dirname "$saved")"
+      tf plan "$@" -input=false -out="$file" {{._TF_PLAN_FLAGS}}
+      printf '%s terraform · plan saved to %s — read it before anything applies it\n' "{{._TF_OK}}" "$saved"
+    }
+    tf_saved() {
+      saved={{._TF_DIR | q}}/$1
+      if [ ! -f "$saved" ]; then
+        printf '%s terraform · %s does not exist — the %s task saves it\n' "{{._TF_ERR}}" "$saved" "$2" >&2
+        return 1
+      fi
+    }
+    tf_run_saved() {
+      status=0
+      tf apply -input=false "$1" || status=$?
+      rm -f {{._TF_DIR | q}}/"$1"
+      return "$status"
     }
 
 tasks:
@@ -178,3 +227,63 @@ tasks:
               printf '%s terraform · the plan did not complete (exit %s) — drift is unknown, not absent\n' "{{._TF_ERR}}" "$status" >&2
               exit 1 ;;
           esac
+
+  plan:
+    desc: "Plan the changes and save the plan for apply; changes nothing"
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._TF_SH}}
+          tf_init
+          tf_save {{._TF_PLAN | q}}
+
+  apply:
+    desc: "Apply the plan that plan saved, and nothing else"
+    # No -auto-approve and no plan made here: the only thing this applies is a
+    # file somebody could read first. The CLI itself refuses one that the
+    # state has moved past.
+    prompt: "Apply the saved plan {{._TF_DIR}}/{{._TF_PLAN}} to the infrastructure {{._TF_DIR}} manages. Continue?"
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._TF_SH}}
+          tf_saved {{._TF_PLAN | q}} plan
+          tf_init
+          tf_run_saved {{._TF_PLAN | q}}
+          printf '%s terraform · applied the saved plan in %s\n' "{{._TF_OK}}" {{._TF_DIR | q}}
+
+  destroy:plan:
+    desc: "Plan the destruction of everything TERRAFORM_DIR manages and save it for destroy; changes nothing"
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._TF_SH}}
+          tf_init
+          tf_save {{._TF_DESTROY_PLAN | q}} -destroy
+
+  destroy:
+    desc: "Apply the destruction that destroy:plan saved — needs CONFIRM"
+    # CONFIRM must name the directory and the workspace selected in it. A
+    # prompt alone guards against not meaning it; it does nothing about
+    # meaning it in the wrong workspace, and the selected workspace is ambient
+    # state nobody re-reads before typing a command.
+    requires:
+      vars: [CONFIRM]
+    prompt: "Apply the saved destruction {{._TF_DIR}}/{{._TF_DESTROY_PLAN}}: EVERY resource it lists, as CONFIRM={{.CONFIRM}} names them. This cannot be undone. Continue?"
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._TF_SH}}
+          tf_saved {{._TF_DESTROY_PLAN | q}} destroy:plan
+          tf_init
+          workspace=$(tf workspace show)
+          if [ {{.CONFIRM | q}} != {{print ._TF_DIR ._TF_CONFIRM_SEP | q}}"$workspace" ]; then
+            printf '%s terraform · CONFIRM does not name what this would destroy. It is <TERRAFORM_DIR>%s<workspace>: check which workspace is selected with %s workspace show\n' "{{._TF_ERR}}" {{._TF_CONFIRM_SEP | q}} {{._TF_BIN | q}} >&2
+            exit 1
+          fi
+          tf_run_saved {{._TF_DESTROY_PLAN | q}}
+          printf '%s terraform · destroyed what %s managed in the workspace %s\n' "{{._TF_OK}}" {{._TF_DIR | q}} "$workspace"
