@@ -43,6 +43,7 @@ workspace — tasks then read `k8s:<task>`.
 | `VERSION` | — | required by `rollout:wait`: the version to wait for |
 | `ROLLOUT_MATCH` | `image` | what says a Deployment runs `VERSION`: `image`, a container's image tag, or `chart`, its `helm.sh/chart` label |
 | `ROLLOUT_SELECTOR` | — | label selector: `rollout:wait` then waits for every Deployment it matches, not `K8S_DEPLOYMENT_NAME` alone |
+| `ROLLOUT_MIN` | `1` | with `ROLLOUT_SELECTOR`: how many Deployments it has to match before the wait can end |
 | `HELM_UPGRADE_FLAGS` | — | extra flags for `upgrade` |
 | `PORT` | `8080` | local port for `port-forward` |
 | `TARGET_PORT` | `PORT` | pod-side port for `port-forward`, when it differs |
@@ -137,6 +138,14 @@ the selector matches has to arrive:
 
 ```yaml
 vars: { ROLLOUT_SELECTOR: app.kubernetes.io/instance=core-api }
+```
+
+A selector matches what exists. On a first install the Deployments are created
+one after another, and the wait would end with the first of them: say how many
+the release brings, and it waits until that many are there.
+
+```yaml
+vars: { ROLLOUT_SELECTOR: app.kubernetes.io/instance=core-api, ROLLOUT_MIN: "3" }
 ```
 
 A wait that times out names what each Deployment runs instead. A Deployment
