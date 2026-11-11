@@ -112,11 +112,7 @@ said 'PORT defaulted to "80" in v1.0.0 and to (list "80") now' "input-moved-into
 defaults_changed='m:PORT' expect clean input-moved-into-a-list-ref-and-named '' "$moved"
 
 expect reported default-changed '' "${BASE/default \"80\"/default \"8080\"}"
-if grep -qF 'PORT defaulted to "80" in v1.0.0 and to "8080" now' "$work/out"; then
-  printf '%s\n' "✔ default-changed: names both defaults"
-else
-  printf '%s\n' "✖ default-changed: the report does not name both defaults" >&2; cat "$work/out" >&2; failures=$((failures + 1))
-fi
+said 'PORT defaulted to "80" in v1.0.0 and to "8080" now' "default-changed: names both defaults"
 defaults_changed='m:PORT' expect clean default-changed-and-named '' "${BASE/default \"80\"/default \"8080\"}"
 # A quote escaped inside the default is part of it.
 expect reported default-holding-an-escaped-quote '' "${BASE/default \"80\"/default \"8\\\"0 x\"}"
@@ -179,12 +175,8 @@ fi
 if (cd "$repo" && bash "$here/check-api.sh" v1.0.0 'gone:*' m/Taskfile.yaml) > "$work/out" 2>&1; then
   printf '%s\n' "✖ stale-entry-for-a-module-never-released: want reported, got clean" >&2
   failures=$((failures + 1))
-elif grep -qF 'API_REMOVED: gone:* is not in v1.0.0' "$work/out"; then
-  printf '%s\n' "✔ stale-entry-for-a-module-never-released: reported"
 else
-  printf '%s\n' "✖ stale-entry-for-a-module-never-released: failed without naming the entry" >&2
-  cat "$work/out" >&2
-  failures=$((failures + 1))
+  said 'API_REMOVED: gone:* is not in v1.0.0' "stale-entry-for-a-module-never-released: reported, naming the entry"
 fi
 
 # api-base.sh: which release a tree is compared against. On a commit after a

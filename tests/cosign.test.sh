@@ -60,7 +60,12 @@ touch "$CONSUMER/$key"
 # Set in the consumer's own vars: a CLI var does not reach the release
 # module's derived refs.
 cp "$CONSUMER/Taskfile.yaml" "$WORK/Taskfile.plain"
-sed -i.bak "s|^  PROJECT_NAME: app\$|  PROJECT_NAME: 'app$evil'|" "$CONSUMER/Taskfile.yaml"
+# name_line <awk program> — the consumer's Taskfile, rewritten around the line
+# that names the project. NEW is what the program prints there.
+name_line() {
+  awk "$1" "$WORK/Taskfile.plain" > "$CONSUMER/Taskfile.yaml"
+}
+NEW="  PROJECT_NAME: 'app$evil'" name_line '$0 == "  PROJECT_NAME: app" { print ENVIRON["NEW"]; next } { print }'
 reset_calls
 record "localhost:5000/app$evil"
 run_task cosign:sign "COSIGN_KEY=$key"
@@ -74,8 +79,7 @@ expect_call "--type spdxjson localhost:5000/app$evil@$DIGEST" "values: the SBOM 
 expect_output "app$evil · cosign · signed localhost:5000/app$evil@$DIGEST" "values: the log line prints the name and ref as data"
 
 touch "$CONSUMER/deploy/sigstore/cosign.pub"
-sed -i.bak "s|^  PROJECT_NAME: app\$|&\\
-  IMAGE_NAMESPACE: 'ns$evil'|" "$CONSUMER/Taskfile.yaml"
+NEW="  IMAGE_NAMESPACE: 'ns$evil'" name_line '{ print } $0 == "  PROJECT_NAME: app" { print ENVIRON["NEW"] }'
 reset_calls
 record "localhost:5000/ns$evil/app"
 run_task cosign:verify

@@ -173,7 +173,7 @@ expect_status ok "image:scan: a clean image passes"
 expect_call "[image][--quiet][--severity][HIGH,CRITICAL][--exit-code][0][--exit-code][1][localhost:5000/app:$VERSION]" "image:scan: flags split, the gate's exit code last, the image one argument"
 
 # line_of <fixed string> — the first line of the call log holding it.
-line_of() { grep -nF -- "$1" "$CALLS" | head -1 | cut -d: -f1; }
+line_of() { TEXT=$1 awk 'index($0, ENVIRON["TEXT"]) { print NR; exit }' "$CALLS"; }
 
 reset_calls
 run_task release:deploy

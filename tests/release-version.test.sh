@@ -155,7 +155,7 @@ expect_version '0.2.0-rc.1.dev.*.g*' "a prefix the exclude does not match: unaff
 expect_kind() {
   want=$1 name=$2; shift 2
   run_task release:metadata INFO_ENV_FILE=.task/info.env "$@"
-  if grep -qx "BUILD_KIND=$want" "$CONSUMER/.task/info.env"; then pass "$name"; else fail "$name: want BUILD_KIND=$want"; fi
+  if has_line "$CONSUMER/.task/info.env" "BUILD_KIND=$want"; then pass "$name"; else fail "$name: want BUILD_KIND=$want"; fi
 }
 
 expect_kind dev "kind: an untagged build is dev"

@@ -90,7 +90,7 @@ if [ -e "$pwned" ]; then fail "triage: a \$( ) in a framework ran"; else pass "t
 
 # A version command that prints nothing has lost the pin; running whatever is
 # on PATH instead would be the irreproducible result the pin exists to stop.
-consumer checkov checkov "{ CHECKOV_VERSION_CMD: 'grep -s nothing missing.yaml | cat' }"
+consumer checkov checkov "{ CHECKOV_VERSION_CMD: 'awk 0 missing.yaml 2>/dev/null | cat' }"
 reset_calls
 run_task checkov:triage
 expect_status fail "pinned: a version command that prints nothing fails"

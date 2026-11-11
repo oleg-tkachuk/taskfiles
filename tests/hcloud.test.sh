@@ -49,8 +49,8 @@ expect_call "hcloud server enable-protection web-1 delete rebuild" "protect: eac
 reset_calls
 run_task hcloud:shutdown HCLOUD_SELECTOR=role=web
 expect_status ok "shutdown: shuts down every matched server"
-listed=$(grep -n "^    web-2$" "$OUT" | cut -d: -f1 | head -1 || true)
-asked=$(grep -n "Send an ACPI shutdown" "$OUT" | cut -d: -f1 | head -1 || true)
+listed=$(awk '$0 == "    web-2" { print NR; exit }' "$OUT")
+asked=$(awk '/Send an ACPI shutdown/ { print NR; exit }' "$OUT")
 if [ -n "$listed" ] && [ -n "$asked" ] && [ "$listed" -lt "$asked" ]; then
   pass "prompt: the matched servers are listed before the question"
 else
