@@ -51,6 +51,8 @@ workspace — tasks then read `go:<task>`.
 | `GOLANGCI_FLAGS` | — | extra golangci-lint flags |
 | `GO_FIX_FLAGS` | — | extra `go fix` flags for `fix:check`, e.g. `-any=false` to switch an analyzer off |
 | `GO_TOOL_MODFILE` | — | a `go.mod` whose `tool` directives pin the tools, when they are not in this module's own |
+| `GOLANGCI_LINT_MODFILE` | — | a `go.mod` that pins golangci-lint alone, when it is kept apart from the other tools |
+| `GO_TOOLS_PINNED` | `0` | `1`: a tool no `tool` directive pins is not there, and `PATH` is never asked |
 | `GO_FMT_GOIMPORTS` | runs it when it is found | `1`: `fmt` needs goimports and fails without it; `0`: `fmt` never runs it |
 | `GO_BENCH_PKG` | `GO_PKG` | packages to benchmark, space-separated like `GO_PKG` |
 | `GO_BENCH_FLAGS` | `-benchtime=1x` | flags for the benchmark run |
@@ -132,6 +134,24 @@ go:
 
 A `GO_TOOL_MODFILE` that does not exist fails the task. Falling back to `PATH`
 there would drop the pin in silence.
+
+golangci-lint alone can outweigh every other tool together, and its
+requirements then decide what versions the others resolve to. It takes a
+`go.mod` of its own, and the rest stay where they were:
+
+```yaml
+vars: { GO_TOOL_MODFILE: tools/go.mod, GOLANGCI_LINT_MODFILE: tools/lint/go.mod }
+```
+
+With `PATH` as the fallback, a tool whose pin was lost still runs — from
+whatever is installed, at whatever version. `GO_TOOLS_PINNED: "1"` takes
+`PATH` out: `lint` and `vuln` fail on a tool nobody pinned, `fmt` and `test`
+do without goimports and gotestsum as they would if neither were installed.
+
+```console
+$ task go:lint
+✖ api · go · golangci-lint is not pinned by a tool directive, and GO_TOOLS_PINNED=1 leaves PATH out — https://golangci-lint.run/docs/welcome/install/
+```
 
 `fmt` is the one place a missing tool changes the result rather than the
 speed: with goimports it rewrites import blocks, without it it does not. A

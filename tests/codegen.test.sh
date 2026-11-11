@@ -132,6 +132,25 @@ only_shims codegen:generate
 expect_status ok "normalise: no goimports anywhere still generates"
 refute_call "goimports|-w" "normalise: no goimports, none run"
 mv "$WORK/buf" "$WORK/sqlc" "$WORK/goimports" "$BIN/"
+
+# GO_TOOLS_PINNED=1: PATH is asked for nothing. A generator nobody pinned
+# fails, and the unpinned goimports is passed by.
+reset_calls
+only_shims codegen:proto GO_TOOLS_PINNED=1
+expect_status fail "pinned: an unpinned buf fails, though PATH has one"
+expect_output "buf is not pinned by a tool directive, and GO_TOOLS_PINNED=1 leaves PATH out" "pinned: says the tool is not pinned and why PATH does not count"
+refute_run buf "pinned: PATH's buf is not run"
+pin_tools buf
+reset_calls
+only_shims codegen:proto GO_TOOLS_PINNED=1
+expect_status ok "pinned: a pinned buf generates"
+expect_call "go|tool|buf|generate|" "pinned: it runs through go tool"
+refute_run goimports "pinned: PATH's goimports does not normalise"
+reset_calls
+only_shims codegen:proto "GO_TOOLS_PINNED=yes"
+expect_status fail "pinned: a GO_TOOLS_PINNED that is neither 1 nor 0 is refused"
+expect_output "GO_TOOLS_PINNED must be 1 or 0, got: yes" "pinned: says what GO_TOOLS_PINNED takes"
+pin_tools
 rm -f "$CONSUMER/sqlc.yaml"
 consumer codegen codegen
 

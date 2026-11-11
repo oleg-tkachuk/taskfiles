@@ -52,6 +52,7 @@ component's directory.
 | `GOIMPORTS_FLAGS` | — | verbatim extra goimports flags |
 | `SQLC_MODULE` | — | run sqlc through `go run` at a pinned version instead of from PATH |
 | `GO_TOOL_MODFILE` | — | a `go.mod` whose `tool` directives pin buf, sqlc and goimports, when they are not in this module's own |
+| `GO_TOOLS_PINNED` | `0` | `1`: a tool no `tool` directive pins is not there, and `PATH` is never asked |
 | `MOCKS_PATHSPEC` | `internal` | git pathspec the mock gate watches |
 | `PROTO_PATHSPEC` | derived from the templates' `out:` | git pathspec the proto gate watches |
 | `SQLC_DIR` | derived from `sqlc.yaml`'s `out:` | git pathspec the sqlc gate watches; `sqlc:check` refuses one that names no tracked file |
@@ -111,7 +112,8 @@ and only then the one on PATH; `SQLC_MODULE`, where set, still decides sqlc.
 A generator a version apart rewrites every file it owns, and a goimports a
 version apart fails the drift gate on a tree that was just generated. The
 [`go`](../go/README.md#a-pinned-tool-before-paths) and `security` modules
-follow the same rule.
+follow the same rule. `GO_TOOLS_PINNED: "1"` takes PATH out of it: buf and
+sqlc fail when nobody pinned them, and an unpinned goimports is passed by.
 
 **goimports runs over `GENERATED_DIRS`.** A pre-commit hook usually runs it too,
 and the two disagree: generators emit one import grouping, goimports rewrites
