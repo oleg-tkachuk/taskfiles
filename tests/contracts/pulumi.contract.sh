@@ -12,7 +12,8 @@ export PULUMI_CONFIG_PASSPHRASE=contract
 export PULUMI_SKIP_UPDATE_CHECK=1
 mkdir -p "$PULUMI_HOME" "$CONSUMER/state" "$CONSUMER/infra"
 
-# program <value> — a project with no provider to fetch: one output.
+# program <value> — a project with no provider to fetch: one output in the
+# open and one marked secret.
 program() {
   cat > "$CONSUMER/infra/Pulumi.yaml" <<YAML
 name: contract
@@ -21,6 +22,8 @@ variables:
   v: $1
 outputs:
   out: \${v}
+  hidden:
+    fn::secret: \${v}-hidden
 YAML
 }
 
@@ -48,6 +51,31 @@ expect_status ok "apply: previews, then updates"
 run_task pu:unchanged STACK=dev
 expect_status ok "unchanged: a stack an update would not touch passes"
 expect_output "no changes" "unchanged: says so"
+
+# ─── output ──────────────────────────────────────────────────────────────────
+# The CLI still prints a bare value, masks a secret, and fails on a name the
+# stack does not have.
+run_task pu:output STACK=dev OUTPUT=out
+expect_status ok "output: reads an output"
+if [ "$(cat "$OUT")" = a ]; then pass "output: the value and nothing else"; else fail "output: printed more than the value"; quoted '    | ' "$OUT"; fi
+
+run_task pu:output STACK=dev OUTPUT=hidden
+expect_output "[secret]" "output: a secret is masked"
+refute_output "a-hidden" "output: and its value is not printed"
+
+run_task pu:output STACK=dev OUTPUT=hidden SHOW_SECRETS=1
+if [ "$(cat "$OUT")" = a-hidden ]; then pass "output: SHOW_SECRETS=1 prints the secret"; else fail "output: SHOW_SECRETS=1 did not print the secret"; fi
+
+run_task pu:output STACK=dev OUTPUT=no-such
+expect_status fail "output: a name the stack does not have fails"
+
+# ─── refresh ─────────────────────────────────────────────────────────────────
+run_task pu:refresh:plan STACK=dev
+expect_status ok "refresh:plan: previews a refresh"
+run_task pu:refresh STACK=dev
+expect_status ok "refresh: previews, then refreshes"
+run_task pu:unchanged STACK=dev
+expect_status ok "refresh: a state that already matched is left matching"
 
 # ─── a pattern that matches nothing ──────────────────────────────────────────
 # Why TARGETS refuses patterns: the CLI takes one that matches nothing, reports

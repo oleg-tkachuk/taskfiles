@@ -1,8 +1,9 @@
 version: "3"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# pulumi — preview, update and destroy one Pulumi project, with the stack named
-# on every call and the change shown before it is made.
+# pulumi — preview, update, refresh and destroy one Pulumi project, and read
+# its outputs, with the stack named on every call and the change shown before
+# it is made.
 #
 #   includes:
 #     pulumi:
@@ -35,14 +36,18 @@ version: "3"
 #   PULUMI_UP_FLAGS       extra flags for the update — --refresh --run-program
 #   PULUMI_DESTROY_FLAGS  extra flags for a destruction and its preview alike
 #                         — --ignore-protect, an --exclude
+#   PULUMI_REFRESH_FLAGS  flags for a refresh and its preview alike
+#                                                               (default --diff)
 #
 # And on the call itself:
 #
 #   STACK                 required by every task: the stack to act on
 #   TARGETS               whole URNs, separated by spaces, to narrow the call to
 #   CONFIRM               required by destroy: the stack's name again
+#   OUTPUT                required by output: the name of the output to print
+#   SHOW_SECRETS          1 for output to print a secret in plaintext (default 0)
 # ─────────────────────────────────────────────────────────────────────────────
-# shell-verbatim: _PU_SH _PU_PLAN_FLAGS _PU_UP_FLAGS _PU_DESTROY_FLAGS PULUMI_PLAN_FLAGS PULUMI_UP_FLAGS PULUMI_DESTROY_FLAGS
+# shell-verbatim: _PU_SH _PU_PLAN_FLAGS _PU_UP_FLAGS _PU_DESTROY_FLAGS _PU_REFRESH_FLAGS PULUMI_PLAN_FLAGS PULUMI_UP_FLAGS PULUMI_DESTROY_FLAGS PULUMI_REFRESH_FLAGS
 
 silent: true
 
@@ -51,6 +56,7 @@ vars:
   _PU_PLAN_FLAGS: '{{.PULUMI_PLAN_FLAGS | default "--diff"}}'
   _PU_UP_FLAGS: '{{.PULUMI_UP_FLAGS | default ""}}'
   _PU_DESTROY_FLAGS: '{{.PULUMI_DESTROY_FLAGS | default ""}}'
+  _PU_REFRESH_FLAGS: '{{.PULUMI_REFRESH_FLAGS | default "--diff"}}'
   # `preview --expect-no-changes` exits with this when changes were proposed.
   # Any other non-zero code is a preview that did not finish. The CLI has had
   # distinct codes since 3.227.0; before that, both were 255.
@@ -182,3 +188,48 @@ tasks:
               printf '%s pulumi · the preview did not complete (exit %s) — that is an error, and says nothing about the stack\n' "{{._PU_ERR}}" "$status" >&2
               exit 1 ;;
           esac
+
+  refresh:plan:
+    desc: "Preview what a refresh of STACK would write to its state; changes nothing"
+    requires:
+      vars: [STACK]
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._PU_SH}}
+          pu {{.TARGETS | default "" | q}} refresh --stack {{.STACK | q}} --preview-only {{._PU_REFRESH_FLAGS}}
+
+  refresh:
+    desc: "Bring the state of STACK in line with what exists, after showing the preview — asks first"
+    # No infrastructure changes, and the state does: a resource that is gone,
+    # or that the provider could not reach, leaves it. So it is shown and
+    # asked about as an update is.
+    requires:
+      vars: [STACK]
+    deps:
+      - task: refresh:plan
+        vars: { STACK: "{{.STACK}}", TARGETS: "{{.TARGETS}}" }
+    prompt: "Rewrite the state of the stack {{.STACK}} of {{._PU_DIR}} as previewed above. Continue?"
+    cmds:
+      - cmd: |
+          set -eu
+          {{._PU_SH}}
+          pu {{.TARGETS | default "" | q}} refresh --stack {{.STACK | q}} --yes {{._PU_REFRESH_FLAGS}}
+
+  output:
+    desc: "Print one output of STACK, and nothing else"
+    # One named output, so the value can be captured: `$(task pulumi:output …)`.
+    # Every output at once is not offered — it is where a secret gets printed
+    # by somebody who asked for something else.
+    requires:
+      vars: [STACK, OUTPUT]
+    preconditions:
+      - sh: 'case {{.SHOW_SECRETS | default "0" | q}} in 0|1) ;; *) exit 1 ;; esac'
+        msg: "SHOW_SECRETS is {{.SHOW_SECRETS}} — it is 1 to print a secret in plaintext, or 0"
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._PU_SH}}
+          pu "" stack output {{.OUTPUT | q}} --stack {{.STACK | q}}{{if eq (.SHOW_SECRETS | default "0" | toString) "1"}} --show-secrets{{end}}
