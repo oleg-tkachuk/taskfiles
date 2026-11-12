@@ -12,6 +12,9 @@ case " $* " in
   *" up "*) printf "%s\n" "updated"; exit "${FAKE_UP:-0}" ;;
   *" destroy "*" --preview-only "*) printf "%s\n" "- one resource will go"; exit "${FAKE_DESTROY_PREVIEW:-0}" ;;
   *" destroy "*) printf "%s\n" "destroyed"; exit "${FAKE_DESTROY:-0}" ;;
+  *" refresh "*" --preview-only "*) printf "%s\n" "~ one resource has drifted"; exit "${FAKE_REFRESH_PREVIEW:-0}" ;;
+  *" refresh "*) printf "%s\n" "refreshed"; exit "${FAKE_REFRESH:-0}" ;;
+  *" stack output "*) printf "%s\n" "the-value"; exit "${FAKE_OUTPUT:-0}" ;;
 esac'
 
 # called_before <a> <b> <case name> — the first call holding a came before the
@@ -191,6 +194,85 @@ for code in 1 6; do
   refute_output "no changes" "unchanged: exit $code is never the clean result"
   refute_output "would change" "unchanged: exit $code is not reported as a change"
 done
+
+# ─── refresh:plan ────────────────────────────────────────────────────────────
+reset_calls
+run_task pu:refresh:plan STACK=dev
+expect_status ok "refresh:plan: a preview that completes passes"
+expect_call "pulumi --non-interactive --cwd infra refresh --stack dev --preview-only --diff" "refresh:plan: previews the refresh and writes nothing"
+refute_call "--yes" "refresh:plan: approves nothing"
+expect_output "~ one resource has drifted" "refresh:plan: shows what the state no longer matches"
+
+reset_calls
+run_task pu:refresh:plan
+expect_status fail "refresh:plan: no STACK is refused"
+refute_call "pulumi" "refresh:plan: nothing runs without one"
+
+# ─── refresh ─────────────────────────────────────────────────────────────────
+# It rewrites the state to match what is there — a resource that is gone
+# leaves it — so it is shown first and asked about, as an update is.
+reset_calls
+run_task pu:refresh STACK=dev
+expect_status ok "refresh: a refresh that completes passes"
+expect_call "pulumi --non-interactive --cwd infra refresh --stack dev --yes --diff" "refresh: refreshes the stack named"
+called_before "--preview-only" "refresh --stack dev --yes" "refresh: the preview runs before the refresh"
+expect_output "~ one resource has drifted" "refresh: shows the preview"
+
+reset_calls
+FAKE_REFRESH_PREVIEW=1 run_task pu:refresh STACK=dev
+expect_status fail "refresh: a preview that errors fails"
+refute_call "--yes" "refresh: nothing is written after it"
+
+FAKE_REFRESH=1 run_task pu:refresh STACK=dev
+expect_status fail "refresh: a refresh that errors fails"
+
+reset_calls
+run_task pu:refresh
+expect_status fail "refresh: no STACK is refused"
+refute_call "pulumi" "refresh: nothing runs without one"
+
+consumer pu pulumi '{ PULUMI_DIR: infra, PULUMI_REFRESH_FLAGS: "--run-program" }'
+reset_calls
+run_task pu:refresh STACK=dev TARGETS="$URN_A"
+expect_call "refresh --stack dev --preview-only --run-program --target $URN_A" "refresh: PULUMI_REFRESH_FLAGS and TARGETS shape the preview"
+expect_call "refresh --stack dev --yes --run-program --target $URN_A" "refresh: and the refresh the same way"
+refute_call "--diff" "refresh: PULUMI_REFRESH_FLAGS replace the default one"
+consumer pu pulumi '{ PULUMI_DIR: infra }'
+
+# ─── output ──────────────────────────────────────────────────────────────────
+# The value and nothing else, so a caller can capture it.
+reset_calls
+run_task pu:output STACK=dev OUTPUT=url
+expect_status ok "output: an output that exists passes"
+expect_call "pulumi --non-interactive --cwd infra stack output url --stack dev" "output: reads one output of the stack named"
+refute_call "--show-secrets" "output: a secret stays masked unless asked for"
+if [ "$(cat "$OUT")" = the-value ]; then pass "output: prints the value and nothing else"; else fail "output: printed more than the value"; quoted '    | ' "$OUT"; fi
+
+reset_calls
+run_task pu:output STACK=dev OUTPUT=password SHOW_SECRETS=1
+expect_call "stack output password --stack dev --show-secrets" "output: SHOW_SECRETS=1 shows a secret in plaintext"
+
+reset_calls
+run_task pu:output STACK=dev OUTPUT=password SHOW_SECRETS=0
+refute_call "--show-secrets" "output: SHOW_SECRETS=0 does not"
+
+reset_calls
+run_task pu:output STACK=dev OUTPUT=password SHOW_SECRETS=yes
+expect_status fail "output: SHOW_SECRETS takes 0 or 1 and nothing else"
+refute_call "pulumi" "output: nothing is read on another value"
+
+reset_calls
+run_task pu:output STACK=dev
+expect_status fail "output: no OUTPUT is refused"
+refute_call "pulumi" "output: the whole set of outputs is not dumped instead"
+
+reset_calls
+run_task pu:output OUTPUT=url
+expect_status fail "output: no STACK is refused"
+refute_call "pulumi" "output: nothing runs without one"
+
+FAKE_OUTPUT=1 run_task pu:output STACK=dev OUTPUT=missing
+expect_status fail "output: an output the stack does not have fails"
 
 # ─── the directory ───────────────────────────────────────────────────────────
 consumer pu pulumi

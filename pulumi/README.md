@@ -1,8 +1,8 @@
 # pulumi — one project, the stack named every time
 
-Preview, update and destroy one Pulumi project. Two things are held to on
-every call: the stack is named, never taken from the workspace, and a change
-is shown before it is made.
+Preview, update, refresh and destroy one Pulumi project, and read its
+outputs. Two things are held to on every call: the stack is named, never taken
+from the workspace, and a change is shown before it is made.
 
 ```yaml
 includes:
@@ -28,6 +28,9 @@ component's directory. Tasks then read `pulumi:<task>`.
 | `destroy:plan` | Preview the destruction of `STACK`; changes nothing |
 | `destroy` | Show that preview, ask, then destroy what `STACK` holds — needs `CONFIRM` |
 | `unchanged` | Fail when an update of `STACK` would change anything; changes nothing |
+| `refresh:plan` | Preview what a refresh of `STACK` would write to its state; changes nothing |
+| `refresh` | Show that preview, ask, then bring the state of `STACK` in line with what exists |
+| `output` | Print one output of `STACK`, and nothing else |
 
 ## Inputs
 
@@ -40,6 +43,7 @@ At the include's own `vars:` — see
 | `PULUMI_PLAN_FLAGS` | `--diff` | Flags for every preview of an update |
 | `PULUMI_UP_FLAGS` | — | Extra flags for the update: `--refresh --run-program` |
 | `PULUMI_DESTROY_FLAGS` | — | Extra flags for a destruction and its preview alike: `--ignore-protect`, an `--exclude` |
+| `PULUMI_REFRESH_FLAGS` | `--diff` | Flags for a refresh and its preview alike: `--run-program` |
 
 On the call itself:
 
@@ -48,6 +52,8 @@ On the call itself:
 | `STACK` | Required by every task: the stack to act on |
 | `TARGETS` | Whole URNs, separated by spaces, to narrow the call to |
 | `CONFIRM` | Required by `destroy`: the stack's name again |
+| `OUTPUT` | Required by `output`: the name of the output to print |
+| `SHOW_SECRETS` | `1` for `output` to print a secret in plaintext; `0`, the default, leaves it masked |
 
 ## What stays with the repository
 
@@ -70,8 +76,8 @@ not have.
 ## Shown, then asked
 
 Task runs a task's dependencies and then asks its prompt, so `apply` previews
-first and the question arrives with the changes on screen; `destroy` does the
-same with the destruction's preview.
+first and the question arrives with the changes on screen; `destroy` and
+`refresh` do the same with their own previews.
 
 There is no saved plan behind that. The CLI's plan files are a preview
 feature, and one constrains a second run of the program rather than replaying
@@ -106,3 +112,22 @@ It answers "would an update change anything". Whether that includes changes
 made behind the state depends on the flags: add `--refresh` to
 `PULUMI_PLAN_FLAGS` for it. A change in the stack's outputs alone is not one
 the CLI counts.
+
+## Refresh
+
+A refresh changes no infrastructure and does change the state: a resource
+that is gone, or that its provider could not reach, leaves it, and the next
+update creates it again. So `refresh` is shown and asked about like an update,
+and `refresh:plan` is the same preview by itself — what the state no longer
+matches, for one stack, with nothing written.
+
+## Outputs
+
+```console
+$ url=$(task pulumi:output STACK=dev OUTPUT=url)
+```
+
+`output` prints the value and nothing else, so it can be captured. It takes
+one name: every output at once is where a secret gets printed by somebody who
+asked for something else. A secret output prints as `[secret]` unless
+`SHOW_SECRETS=1` is passed on that call.
