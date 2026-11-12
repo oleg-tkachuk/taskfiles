@@ -181,6 +181,8 @@ jobs:
       OPENTOFU_VERSION: 1.13.9
       # renovate: datasource=docker depName=pulumi/pulumi-base
       PULUMI_VERSION: 3.274.1
+      # renovate: datasource=docker depName=hashicorp/nomad
+      NOMAD_VERSION: 2.1.1
       # The cluster the k8s contract runs against, and the kubectl it uses.
       # renovate: datasource=github-releases depName=kubernetes-sigs/kind
       KIND_VERSION: v0.33.0

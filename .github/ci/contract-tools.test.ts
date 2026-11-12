@@ -16,6 +16,7 @@ const VERSIONS = {
   TERRAFORM_VERSION: "1.0.0",
   OPENTOFU_VERSION: "1.0.0",
   PULUMI_VERSION: "3.0.0",
+  NOMAD_VERSION: "2.0.0",
 };
 
 test("a wrapper runs the pinned image as the runner's user, in the working directory, with its own entrypoint", () => {
@@ -36,6 +37,15 @@ test("a wrapper passes the variables its tool is configured through, by name and
   const checkov = TOOLS.find((tool) => tool.name === "checkov");
   assert.ok(checkov);
   assert.match(wrapper(checkov, "3.0.0"), / -e HOME=\/tmp -v /);
+});
+
+test("a wrapper joins the runner's network only for a tool whose calls have to reach each other", () => {
+  const nomad = TOOLS.find((tool) => tool.name === "nomad");
+  assert.ok(nomad);
+  assert.match(wrapper(nomad, "2.0.0"), /^exec docker run --rm --network host --user /m);
+  const checkov = TOOLS.find((tool) => tool.name === "checkov");
+  assert.ok(checkov);
+  assert.doesNotMatch(wrapper(checkov, "3.0.0"), /--network/);
 });
 
 test("install writes an executable wrapper per tool at the version pinned for it", () => {
