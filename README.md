@@ -190,6 +190,7 @@ implementation; they are not the current one.
 | [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward, and waiting for a version to roll out |
 | [`monorepo/`](monorepo/README.md) | `monorepo` | run one target across every component, registry preflight |
 | [`node/`](node/README.md) | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
+| [`nomad/`](nomad/README.md) | `nomad` | the gates of a directory of Nomad job files — format, validity — and submitting a job only as a plan that was saved, held to the modify index it was read at; stopping a job named whole |
 | [`pnpm/`](pnpm/README.md) | `pnpm` | keep the corepack pnpm pin current and agreed across a repo's apps |
 | [`pulumi/`](pulumi/README.md) | `pulumi` | preview, update, refresh and destroy one Pulumi project, and read its outputs — the stack named on every call, the change shown before it is made |
 | [`python/*`](python/README.md) — poetry, uv | `python` | install/test/lint/format/typecheck/lock and dep bumps, one surface per manager |

@@ -1,0 +1,317 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# nomad — the gates of a directory of Nomad job files: formatting and
+# validity; and changing a cluster only by submitting a plan that was saved
+# and read first, or by stopping a job named twice.
+#
+#   includes:
+#     nomad:
+#       taskfile: '{{printf .TASKLIB "nomad"}}'
+#       dir: .
+#       vars: { NOMAD_DIR: jobs }
+#
+#   task nomad:plan FILE=web.nomad.hcl
+#
+# `apply` submits the job `plan` rendered and saved, with the modify index the
+# plan was made against: the server refuses it once the job has changed, so
+# what runs is what was read. `stop` stops a job. Every other task only reads.
+#
+# The CLI is never left to pick a cluster. With no NOMAD_ADDR it talks to
+# http://127.0.0.1:4646 — whatever answers there — so a task that asks a
+# server anything is refused without one. Only `validate` runs without: the
+# CLI asks an agent where it finds one, and otherwise checks the job itself
+# and says what it left unchecked.
+#
+# The address, the namespace, the region and the token are the environment's:
+# NOMAD_ADDR, NOMAD_NAMESPACE, NOMAD_REGION, NOMAD_TOKEN. This module runs the
+# CLI in the environment it is given.
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
+#   NOMAD_DIR         the directory holding the job files          (default .)
+#   NOMAD_JOB_FLAGS   flags for reading a job file, in validate and plan alike
+#                     — a -var, a -var-file; paths are relative to NOMAD_DIR
+#   NOMAD_RUN_FLAGS   extra flags for the submission — -detach
+#   NOMAD_STOP_FLAGS  extra flags for a stop — -purge, -detach
+#   NOMAD_PLAN_DIR    where `plan` saves and `apply` reads, relative to
+#                     NOMAD_DIR                           (default .nomad-plan)
+#
+# And on the call itself:
+#
+#   FILE              a job file, relative to NOMAD_DIR: required by plan and
+#                     apply; validate takes every job file without one
+#   JOB               required by stop and stop:plan: the job's ID, whole
+#   CONFIRM           required by stop: the job's ID again
+# ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _NM_SH _NM_JOB_FLAGS _NM_RUN_FLAGS _NM_STOP_FLAGS NOMAD_JOB_FLAGS NOMAD_RUN_FLAGS NOMAD_STOP_FLAGS
+
+silent: true
+
+vars:
+  _NM_DIR: '{{.NOMAD_DIR | default "."}}'
+  _NM_JOB_FLAGS: '{{.NOMAD_JOB_FLAGS | default ""}}'
+  _NM_RUN_FLAGS: '{{.NOMAD_RUN_FLAGS | default ""}}'
+  _NM_STOP_FLAGS: '{{.NOMAD_STOP_FLAGS | default ""}}'
+  # Under NOMAD_DIR. A saved plan is the job with every variable resolved,
+  # secrets among them, so the directory is given a .gitignore of its own.
+  _NM_PLAN_DIR: '{{.NOMAD_PLAN_DIR | default ".nomad-plan"}}'
+  _NM_IGNORE_NAME: .gitignore
+  _NM_IGNORE_ALL: "*"
+  # A saved plan is two files named after the job file: the rendered job, and
+  # the modify index with the address, namespace and region it was read from.
+  _NM_JOB_SUFFIX: .json
+  _NM_INDEX_SUFFIX: .index
+  # The two names a job file goes by. `fmt` takes any .hcl too, as the CLI
+  # does; `validate` cannot — a variables file is HCL and is not a job.
+  _NM_JOB_FILES: "*.nomad.hcl"
+  _NM_JOB_FILES_SHORT: "*.nomad"
+  # `job run` exits with this when the job was submitted and could not be
+  # placed; 1 is a job that was not submitted.
+  _NM_UNPLACED: "2"
+  # What the plan is asked to print in place of itself, for the index alone.
+  _NM_INDEX_TEMPLATE: '{{"{{.JobModifyIndex}}"}}'
+  # What `job inspect` is asked to print, for the ID a name resolves to.
+  _NM_ID_TEMPLATE: '{{"{{.ID}}"}}'
+  # The address the CLI uses when it is given none.
+  _NM_DEFAULT_ADDR: http://127.0.0.1:4646
+  # Status markers. The shape carries the meaning, so a line still reads in
+  # a monochrome log; the colour sits on top and drops out under NO_COLOR.
+  _NM_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
+  _NM_ERR: '{{if .NO_COLOR}}✖{{else}}{{"\x1b[31m✖\x1b[0m"}}{{end}}'
+  # Interpolated by the tasks below, each of which runs in NOMAD_DIR: the CLI
+  # has no flag for a working directory, and a job file's own relative paths —
+  # a file() it reads, a -var-file — resolve from where it runs.
+  #
+  # `nm_saved <file>` sets `saved` and `index` to the two files of <file>'s
+  # plan. A <file> that climbs out of NOMAD_DIR is refused: its plan would be
+  # written outside the directory that keeps plans out of git.
+  #
+  # `nm_whole <job>` fails unless <job> is the whole ID of a job. The CLI
+  # takes a prefix wherever it takes an ID, and acts on the one job the
+  # prefix matches: `job stop web` stops web-frontend where there is no web.
+  _NM_SH: |
+    nm_saved() {
+      case "/$1/" in
+        */../*)
+          printf '%s nomad · FILE is %s, which is outside %s — name a job file under NOMAD_DIR\n' "{{._NM_ERR}}" "$1" {{._NM_DIR | q}} >&2
+          return 1 ;;
+      esac
+      saved={{._NM_PLAN_DIR | q}}/$1{{._NM_JOB_SUFFIX | q}}
+      index={{._NM_PLAN_DIR | q}}/$1{{._NM_INDEX_SUFFIX | q}}
+    }
+    nm_whole() {
+      id=$(nomad job inspect -t {{._NM_ID_TEMPLATE | q}} "$1") || {
+        printf '%s nomad · no job %s at %s — the output above says why\n' "{{._NM_ERR}}" "$1" "$NOMAD_ADDR" >&2
+        return 1
+      }
+      if [ "$id" != "$1" ]; then
+        printf '%s nomad · %s is not a job: it is the start of %s, which the CLI would act on — name the job whole\n' "{{._NM_ERR}}" "$1" "$id" >&2
+        return 1
+      fi
+    }
+
+tasks:
+
+  _ready:
+    internal: true
+    preconditions:
+      - sh: command -v nomad >/dev/null
+        msg: "nomad is not installed — https://developer.hashicorp.com/nomad/install"
+      - sh: test -d {{._NM_DIR | q}}
+        msg: "NOMAD_DIR is {{._NM_DIR}}, which is not a directory"
+
+  _cluster:
+    internal: true
+    preconditions:
+      - sh: test -n "${NOMAD_ADDR:-}"
+        msg: "NOMAD_ADDR is not set — the CLI would talk to {{._NM_DEFAULT_ADDR}}, whatever answers there. Name the cluster."
+
+  fmt:
+    desc: "Fail when a file under NOMAD_DIR is not in the canonical format"
+    # The CLI has one exit code for a file that is not formatted and a file it
+    # could not parse; it lists the first and prints an error for the second.
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          cd {{._NM_DIR | q}}
+          if ! nomad fmt -check -recursive .; then
+            printf '%s nomad · the files above are not formatted, or do not parse — nomad fmt -recursive %s rewrites the ones it can\n' "{{._NM_ERR}}" {{._NM_DIR | q}} >&2
+            exit 1
+          fi
+          printf '%s nomad · every file under %s is formatted\n' "{{._NM_OK}}" {{._NM_DIR | q}}
+
+  validate:
+    desc: "Validate FILE, or every job file under NOMAD_DIR"
+    # Where the CLI finds no agent it validates the job itself and says that
+    # driver configuration went unchecked: enough for a gate, and the one task
+    # here that needs no cluster. Every file is validated before any failure
+    # is reported, so one run lists them all.
+    preconditions:
+      - sh: 'test -z {{.FILE | default "" | q}} || test -f {{._NM_DIR | q}}/{{.FILE | default "" | q}}'
+        msg: "FILE is {{.FILE}}, which is not a file under {{._NM_DIR}}"
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          cd {{._NM_DIR | q}}
+          files=$(mktemp)
+          trap 'rm -f "$files"' EXIT
+          if [ -n {{.FILE | default "" | q}} ]; then
+            printf '%s\n' {{.FILE | default "" | q}} > "$files"
+          else
+            find . -type f \( -name {{._NM_JOB_FILES | q}} -o -name {{._NM_JOB_FILES_SHORT | q}} \) | sort > "$files"
+          fi
+          if [ ! -s "$files" ]; then
+            printf '%s nomad · no job file under %s — a check that covers nothing would pass\n' "{{._NM_ERR}}" {{._NM_DIR | q}} >&2
+            exit 1
+          fi
+          failed=0
+          while IFS= read -r file; do
+            if ! nomad job validate {{._NM_JOB_FLAGS}} "$file"; then
+              printf '%s nomad · %s is not a valid job\n' "{{._NM_ERR}}" "$file" >&2
+              failed=1
+            fi
+          done < "$files"
+          [ "$failed" = 0 ] || exit 1
+          printf '%s nomad · every job validated under %s is valid\n' "{{._NM_OK}}" {{._NM_DIR | q}}
+
+  plan:
+    desc: "Plan FILE against the cluster and save the plan for apply; changes nothing"
+    # The job is rendered once, and that rendering is what is planned, saved
+    # and later submitted: a variable or a file that changes afterwards does
+    # not reach the cluster unread.
+    #
+    # The index is read before the plan is shown. A job that changes between
+    # the two is then shown as it is now and held to the index it had: the
+    # apply fails, where the other order would let an unread change through.
+    #
+    # The last plan goes first: left in place by a plan that failed, it would
+    # be submitted as if it were this one.
+    requires:
+      vars: [FILE]
+    cmds:
+      - task: _ready
+      - task: _cluster
+      - cmd: |
+          set -eu
+          {{._NM_SH}}
+          cd {{._NM_DIR | q}}
+          nm_saved {{.FILE | q}}
+          rm -f "$saved" "$index"
+          mkdir -p "$(dirname "$saved")"
+          ignore={{._NM_PLAN_DIR | q}}/{{._NM_IGNORE_NAME | q}}
+          [ -f "$ignore" ] || printf '%s\n' {{._NM_IGNORE_ALL | q}} > "$ignore"
+          nomad job run -output {{._NM_JOB_FLAGS}} {{.FILE | q}} > "$saved" || {
+            rm -f "$saved"
+            printf '%s nomad · %s could not be rendered — the output above says why\n' "{{._NM_ERR}}" {{.FILE | q}} >&2
+            exit 1
+          }
+          status=0
+          at=$(nomad job plan -json -t {{._NM_INDEX_TEMPLATE | q}} "$saved") || status=$?
+          if [ "$status" = 0 ] || [ "$status" = 1 ]; then
+            status=0
+            nomad job plan -json "$saved" || status=$?
+          else
+            printf '%s\n' "$at" >&2
+          fi
+          # 0 and 1 are both a plan that completed — allocations left alone,
+          # or created and destroyed — and 0 is not "no changes": an update in
+          # place exits 0 as well. Anything else, 255 by the CLI's own account,
+          # is a plan that did not complete.
+          case "$status" in
+            0 | 1) ;;
+            *)
+              rm -f "$saved"
+              printf '%s nomad · the plan of %s did not complete (exit %s) — nothing is saved\n' "{{._NM_ERR}}" {{.FILE | q}} "$status" >&2
+              exit 1 ;;
+          esac
+          case "$at" in
+            '' | *[!0-9]*)
+              rm -f "$saved"
+              printf '%s nomad · the plan of %s gave no modify index to hold the submission to — nothing is saved\n' "{{._NM_ERR}}" {{.FILE | q}} >&2
+              exit 1 ;;
+          esac
+          printf '%s\n' "$at" "$NOMAD_ADDR" "${NOMAD_NAMESPACE:-}" "${NOMAD_REGION:-}" > "$index"
+          printf '%s nomad · plan saved to %s — read it before anything submits it; it holds while the job stays at modify index %s\n' "{{._NM_OK}}" {{._NM_DIR | q}}/"$saved" "$at"
+
+  apply:
+    desc: "Submit the plan that plan saved for FILE, and nothing else"
+    # No job file is read here: the only thing this submits is the rendering
+    # somebody could read first, and only to the address, namespace and region
+    # it was planned against — an index means nothing anywhere else. Submitted
+    # or refused, the plan is spent: the job has moved past it, or the server
+    # has said it is behind.
+    requires:
+      vars: [FILE]
+    prompt: "Submit the saved plan of {{.FILE}} in {{._NM_DIR}} to the cluster NOMAD_ADDR names. Continue?"
+    cmds:
+      - task: _ready
+      - task: _cluster
+      - cmd: |
+          set -eu
+          {{._NM_SH}}
+          cd {{._NM_DIR | q}}
+          nm_saved {{.FILE | q}}
+          if [ ! -f "$saved" ] || [ ! -f "$index" ]; then
+            printf '%s nomad · %s has no saved plan — the plan task saves it\n' "{{._NM_ERR}}" {{.FILE | q}} >&2
+            exit 1
+          fi
+          { IFS= read -r at; IFS= read -r addr; IFS= read -r namespace; IFS= read -r region; } < "$index"
+          if [ "$addr" != "$NOMAD_ADDR" ] || [ "$namespace" != "${NOMAD_NAMESPACE:-}" ] || [ "$region" != "${NOMAD_REGION:-}" ]; then
+            printf '%s nomad · the plan of %s was made against %s (namespace "%s", region "%s"), and this would submit it to %s (namespace "%s", region "%s") — plan again there\n' \
+              "{{._NM_ERR}}" {{.FILE | q}} "$addr" "$namespace" "$region" "$NOMAD_ADDR" "${NOMAD_NAMESPACE:-}" "${NOMAD_REGION:-}" >&2
+            exit 1
+          fi
+          status=0
+          nomad job run -json -check-index "$at" {{._NM_RUN_FLAGS}} "$saved" || status=$?
+          rm -f "$saved" "$index"
+          case "$status" in
+            0) printf '%s nomad · submitted the saved plan of %s\n' "{{._NM_OK}}" {{.FILE | q}} ;;
+            {{._NM_UNPLACED | q}})
+              printf '%s nomad · %s was submitted and could not be placed — the output above says why\n' "{{._NM_ERR}}" {{.FILE | q}} >&2
+              exit 1 ;;
+            *)
+              printf '%s nomad · %s was not submitted (exit %s) — a job that moved on since the plan needs a new one\n' "{{._NM_ERR}}" {{.FILE | q}} "$status" >&2
+              exit 1 ;;
+          esac
+
+  stop:plan:
+    desc: "Show the job that stop would stop; changes nothing"
+    requires:
+      vars: [JOB]
+    cmds:
+      - task: _ready
+      - task: _cluster
+      - cmd: |
+          set -eu
+          {{._NM_SH}}
+          nm_whole {{.JOB | q}}
+          nomad job status -short {{.JOB | q}}
+
+  stop:
+    desc: "Stop JOB, after showing it — needs CONFIRM, asks first"
+    # CONFIRM repeats the job. The prompt guards a run at a terminal; under
+    # --yes there is no prompt, and a second word that has to agree is what
+    # stands between a wrong JOB and its allocations.
+    #
+    # -yes is not passed. The CLI asks before it stops a job it found by
+    # prefix; with nobody to answer, that question fails the call.
+    requires:
+      vars: [JOB, CONFIRM]
+    deps:
+      - task: stop:plan
+        vars: { JOB: "{{.JOB}}" }
+    preconditions:
+      - sh: test {{.CONFIRM | q}} = {{.JOB | q}}
+        msg: "CONFIRM does not name the job this would stop — it must repeat JOB"
+    prompt: "Stop the job {{.JOB}}, shown above, on the cluster NOMAD_ADDR names. Continue?"
+    cmds:
+      - cmd: |
+          set -eu
+          nomad job stop {{._NM_STOP_FLAGS}} {{.JOB | q}}
+          printf '%s nomad · stopped the job %s\n' "{{._NM_OK}}" {{.JOB | q}}
