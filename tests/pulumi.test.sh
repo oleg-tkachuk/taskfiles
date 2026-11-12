@@ -274,6 +274,44 @@ refute_call "pulumi" "output: nothing runs without one"
 FAKE_OUTPUT=1 run_task pu:output STACK=dev OUTPUT=missing
 expect_status fail "output: an output the stack does not have fails"
 
+# ─── nobody to answer ────────────────────────────────────────────────────────
+# Every case above runs under --yes, as a pipeline does. Without it, and with
+# no terminal to ask, Task cancels a task that has a prompt: the preview its
+# deps ran is on record and the change is not made.
+#
+# run_unanswered <args...> — run_task, with no --yes.
+run_unanswered() {
+  status=0
+  (cd "$CONSUMER" && task "$@") < /dev/null > "$OUT" 2>&1 || status=$?
+  printf '%s' "$status" > "$WORK/last-status"
+}
+
+reset_calls
+run_unanswered pu:apply STACK=dev
+expect_status fail "apply, unanswered: fails"
+expect_call "preview --stack dev" "apply, unanswered: the preview still ran"
+refute_call " up " "apply, unanswered: and nothing was updated"
+
+reset_calls
+run_unanswered pu:destroy STACK=dev CONFIRM=dev
+expect_status fail "destroy, unanswered: fails, CONFIRM or not"
+expect_call "destroy --stack dev --preview-only" "destroy, unanswered: the preview still ran"
+refute_call "destroy --stack dev --yes" "destroy, unanswered: and nothing was destroyed"
+
+reset_calls
+run_unanswered pu:refresh STACK=dev
+expect_status fail "refresh, unanswered: fails"
+expect_call "refresh --stack dev --preview-only" "refresh, unanswered: the preview still ran"
+refute_call "refresh --stack dev --yes" "refresh, unanswered: and the state was not rewritten"
+
+# The tasks that change nothing ask nothing.
+for quiet in plan destroy:plan refresh:plan unchanged; do
+  run_unanswered "pu:$quiet" STACK=dev
+  expect_status ok "$quiet, unanswered: runs, having nothing to ask"
+done
+run_unanswered pu:output STACK=dev OUTPUT=out
+expect_status ok "output, unanswered: runs, having nothing to ask"
+
 # ─── the directory ───────────────────────────────────────────────────────────
 consumer pu pulumi
 reset_calls

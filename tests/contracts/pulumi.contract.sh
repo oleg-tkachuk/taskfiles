@@ -118,4 +118,51 @@ run_task pu:unchanged STACK=dev
 expect_status fail "destroy: an update would now create it again"
 expect_output "would change" "destroy: which the CLI reports as a change"
 
+# ─── refresh, with something to find ─────────────────────────────────────────
+# A stack reference is the one resource the CLI reads back with no provider to
+# fetch: it holds the outputs of another stack, and that stack moving on is a
+# change made behind this one's state.
+mkdir -p "$CONSUMER/upstream" "$CONSUMER/reader"
+# upstream <value> — the stack that is read, updated to hold <value>.
+upstream() {
+  cat > "$CONSUMER/upstream/Pulumi.yaml" <<YAML
+name: upstream
+runtime: yaml
+outputs:
+  out: $1
+YAML
+  (cd "$CONSUMER" && pulumi --non-interactive --cwd upstream stack select dev --create >/dev/null)
+  (cd "$CONSUMER" && pulumi --non-interactive --cwd upstream up --stack dev --yes >/dev/null)
+}
+cat > "$CONSUMER/reader/Pulumi.yaml" <<'YAML'
+name: reader
+runtime: yaml
+resources:
+  ref:
+    type: pulumi:pulumi:StackReference
+    properties:
+      name: organization/upstream/dev
+YAML
+upstream before
+(cd "$CONSUMER" && pulumi --non-interactive --cwd reader stack init dev >/dev/null)
+consumer pu pulumi '{ PULUMI_DIR: reader }'
+run_task pu:apply STACK=dev
+expect_status ok "refresh: a stack that reads another is created"
+
+run_task pu:refresh:plan STACK=dev
+refute_output '=>' "refresh:plan: a state that matches shows no change"
+
+upstream after
+run_task pu:refresh:plan STACK=dev
+expect_status ok "refresh:plan: a state left behind is previewed"
+expect_output '"before" => "after"' "refresh:plan: and shows what a refresh would write"
+run_task pu:refresh:plan STACK=dev
+expect_output '"before" => "after"' "refresh:plan: having written nothing itself"
+
+run_task pu:refresh STACK=dev
+expect_status ok "refresh: brings the state up to what exists"
+expect_output '"before" => "after"' "refresh: showing the change before it is written"
+run_task pu:refresh:plan STACK=dev
+refute_output '"before"' "refresh: after which there is nothing left to write"
+
 finish
