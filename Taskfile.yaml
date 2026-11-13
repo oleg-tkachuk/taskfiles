@@ -68,6 +68,7 @@ tasks:
       - task: check:runtime
       - task: check:python
       - task: check:quoting
+      - task: check:markers
       - task: check:behaviour
       - task: check:ci-scripts
       - task: check:renovate
@@ -168,6 +169,19 @@ tasks:
           set -eu
           bash scripts/check-quoting.sh {{.MODULE_FILES}} demo/Taskfile.yaml
           printf '%s\n' "{{._LIB_OK}} taskfiles · every value reaches the shell quoted"
+
+  check:markers:
+    desc: "Refuse a status marker that is not the library's glyph, word and separator"
+    # A module cannot import another's variables, so each defines its own
+    # markers. This holds the copies to one spelling, and refuses a glyph typed
+    # into a line: it would carry no word, and follow no change made here.
+    # This file and demo/ are held to it too.
+    cmds:
+      - bash scripts/check-markers.test.sh >/dev/null
+      - cmd: |-
+          set -eu
+          bash scripts/check-markers.sh {{.MODULE_FILES}} Taskfile.yaml demo/Taskfile.yaml
+          printf '%s\n' "{{._LIB_OK}} taskfiles · every status marker is the library's own"
 
   check:behaviour:
     desc: "Run each module's behaviour tests against shimmed tools"

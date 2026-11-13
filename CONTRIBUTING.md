@@ -82,6 +82,11 @@ that is shell by contract — a command, verbatim flags — is declared on one
 line, `# shell-verbatim: _KUBECTL FLAGS`, and only those may go in unquoted.
 `check:quoting` holds every module to this.
 
+A status line starts with a marker variable — `_PREFIX_RUN`, `_OK`, `_SKIP`,
+`_WARN`, `_ERR` — inside quotes, since a marker holds spaces, and never with a
+glyph typed into it: see [Logging](README.md#logging). `check:markers` holds
+every module's definitions to one spelling.
+
 ## Commit messages
 
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/),
