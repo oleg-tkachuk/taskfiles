@@ -19,7 +19,9 @@ lock_file() { printf '%s/git.fake.%s.checksum' "$LOCK" "$1"; }
 # --download writes a module and its checksum per ref the Taskfile pins, after
 # failing FAIL_TIMES times; --offline succeeds when every module is there and,
 # as Task does under -v, names each lock file it reads — unless FAKE_SILENT is
-# set. Each faked call records whether git's GIT_DIR reached it.
+# set. Under FAKE_COLOR those lines are coloured as Task colours them in CI,
+# the colour starting each line and ending on the next, unless --color=false
+# is passed. Each faked call records whether git's GIT_DIR reached it.
 REAL_TASK=$(command -v task)
 export REAL_TASK
 export FAILS="$WORK/fails"
@@ -27,13 +29,15 @@ export FAILS="$WORK/fails"
 shim task '
 case " $* " in *" --remote-cache-dir "*) ;; *) exec "$REAL_TASK" "$@" ;; esac
 printf "GIT_DIR=%s\n" "${GIT_DIR-unset}" >> "$CALLS"
-mode="" file="" cache=""
+mode="" file="" cache="" on="" off=""
+if [ -n "${FAKE_COLOR:-}" ]; then on=$(printf "\\033[35m") off=$(printf "\\033[0m"); fi
 while [ $# -gt 0 ]; do
   case "$1" in
     -t) file=$2; shift ;;
     --remote-cache-dir) cache=$2; shift ;;
     --download) mode=download ;;
     --offline) mode=offline ;;
+    --color=false) on="" off="" ;;
   esac
   shift
 done
@@ -50,7 +54,7 @@ if [ "$mode" = download ]; then
 fi
 for r in $refs; do
   [ -f "$cache/remote/git.fake.$r.yaml" ] || { echo "not found in the cache" >&2; exit 1; }
-  [ -n "${FAKE_SILENT:-}" ] || printf "checking cache for \"https://example.invalid//m?ref=%s\" in \"%s/%s/remote/git.fake.%s.yaml\"\n" "$r" "$PWD" "$cache" "$r" >&2
+  [ -n "${FAKE_SILENT:-}" ] || printf "%schecking cache for \"https://example.invalid//m?ref=%s\" in \"%s/%s/remote/git.fake.%s.yaml\"\n%s" "$on" "$r" "$PWD" "$cache" "$r" "$off" >&2
 done'
 
 # What a comment showing how to pin looks like: not a pin.
@@ -143,6 +147,21 @@ FAKE_SILENT=1 run_task tasklib:check
 expect_status ok "check: passes when Task does not say which files it read"
 expect_output "files left by earlier refs are not checked" "check: says the leftover check was skipped"
 rm -f "$CONSUMER/api/$(lock_file "$OLD")"
+
+# A Task told by its environment to colour what it prints: CI=true is enough.
+# The lock files are still read out of what it says, so a leftover is still
+# found and a clean lock is checked rather than waved through.
+: > "$CONSUMER/api/$(lock_file "$OLD")"
+FAKE_COLOR=1 run_task tasklib:check
+expect_status fail "check: a leftover is still refused when Task would colour its output"
+expect_output "git.fake.$OLD.checksum is read by no Taskfile in api" "check: names the leftover when Task would colour its output"
+rm -f "$CONSUMER/api/$(lock_file "$OLD")"
+reset_calls
+FAKE_COLOR=1 run_task tasklib:check
+expect_status ok "check: a clean lock passes when Task would colour its output"
+refute_output "files left by earlier refs are not checked" "check: the leftover check is not skipped when Task would colour its output"
+expect_call "--color=false" "check: asks Task for output without colour"
+
 run_task tasklib:check
 expect_status ok "check: a restored lock passes again"
 refute_output "<tag>" "check: a pin written in a comment is not a pin"

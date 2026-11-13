@@ -156,11 +156,18 @@ tasks:
           # Each Taskfile is loaded offline, verbosely: Task then names every
           # lock file it reads, which is how the files nothing reads are told
           # apart without this module knowing how Task names one.
+          #
+          # Without colour, whatever the environment asks for: under CI=true,
+          # FORCE_COLOR or TASK_COLOR, Task colours those lines with no
+          # terminal there, each in three writes that the includes it reads
+          # together interleave. Most runs then show no line that reads as one
+          # and the lock goes unchecked; the rest show a few, and every file
+          # but those is reported as left by an earlier ref.
           fail=0
           : > "$work/used"
           for f in $files; do
             dir=$(dirname "$f")
-            if ! (cd "$dir" && task -v -t "$(basename "$f")" --offline --remote-cache-dir "$cache" --list-all) > "$work/log" 2>&1 < /dev/null; then
+            if ! (cd "$dir" && task -v -t "$(basename "$f")" --offline --remote-cache-dir "$cache" --color=false --list-all) > "$work/log" 2>&1 < /dev/null; then
               printf '%s tasklib · %s does not load from its lock:\n' "{{._TL_ERR}}" "$f" >&2
               awk '!/^(checking cache for|cache expired at|in offline mode)/ { print "    " $0 }' "$work/log" >&2
               fail=1
