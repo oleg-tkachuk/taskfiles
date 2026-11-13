@@ -40,7 +40,14 @@ is another, split into three entry points by who runs the command.
     - [Workflows are audited](#workflows-are-audited)
     - [How a module is written](#how-a-module-is-written)
 - [Modules](#modules)
-  - [Local clusters](#local-clusters)
+  - [Languages and code](#languages-and-code)
+  - [Scans](#scans)
+  - [Release](#release)
+  - [Kubernetes](#kubernetes)
+  - [Infrastructure](#infrastructure)
+  - [The repository itself](#the-repository-itself)
+  - [Local development](#local-development)
+    - [Local clusters](#local-clusters)
 - [Conventions](#conventions)
   - [Variable scoping](#variable-scoping)
   - [A monorepo runs its components, it does not include them](#a-monorepo-runs-its-components-it-does-not-include-them)
@@ -175,34 +182,66 @@ implementation; they are not the current one.
 
 ## Modules
 
+### Languages and code
+
 | Module | Namespace | What it covers |
 |---|---|---|
-| [`argocd/`](argocd/README.md) | `argocd` | hard-refresh the apps a deploy republished, and operate the Argo server |
-| [`auth/`](auth/README.md) | `auth` | mint a local-dev JWT |
-| [`github/`](github/README.md) | `github` | force-push a protected branch without leaving protection off |
-| [`checkov/`](checkov/README.md) | `checkov` | policy-scan manifests, charts, Dockerfiles and workflows |
-| [`codegen/`](codegen/README.md) | `codegen` | mocks, protobuf stubs, `go generate`, sqlc — the drift gates for them, and buf lint, format and dep update |
-| [`compose/`](compose/README.md) | `compose` | local stack up/down/reset/logs |
-| [`cosign/`](cosign/README.md) | `cosign` | sign the published image and chart, attest an SBOM, verify both |
 | [`go/`](go/README.md) | `go` | build, test (+coverage, +integration, +tagged-compile), lint, fmt, tidy, vuln, bench, dep bumps — and the fmt, tidy and fix gates that rewrite nothing |
-| [`hcloud/`](hcloud/README.md) | `hcloud` | what a project owns in Hetzner Cloud, the power state of its servers, restarts at three levels of force, SSH and a VNC console |
-| [`helm/`](helm/README.md) | `helm` | what is installed on a cluster, and removing it |
-| [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward, and waiting for a version to roll out |
-| [`monorepo/`](monorepo/README.md) | `monorepo` | run one target across every component, registry preflight |
 | [`node/`](node/README.md) | `node` | install, dev, build, lint, test, e2e, verify, generate, dep bumps |
-| [`nomad/`](nomad/README.md) | `nomad` | the gates of a directory of Nomad job files — format, validity — and submitting a job only as a plan that was saved, held to the modify index it was read at; stopping a job named whole |
-| [`packer/`](packer/README.md) | `packer` | the gates of one Packer template — format, validity — and building it only once it is valid, with every build named in `ONLY` held to a build the template has |
 | [`pnpm/`](pnpm/README.md) | `pnpm` | keep the corepack pnpm pin current and agreed across a repo's apps |
-| [`pulumi/`](pulumi/README.md) | `pulumi` | preview, update, refresh and destroy one Pulumi project, and read its outputs — the stack named on every call, the change shown before it is made |
 | [`python/*`](python/README.md) — poetry, uv | `python` | install/test/lint/format/typecheck/lock and dep bumps, one surface per manager |
-| [`release/`](release/README.md) | `release` | version derivation, image build/scan/push, chart lint/render/package/push, `deploy` |
-| [`runtime/*`](runtime/README.md) — docker, orbstack, minikube, kind, k3d | `local` | run a locally built image on a local cluster, no registry |
-| [`sealed-secrets/`](sealed-secrets/README.md) | `sealed-secrets` | seal a value into a committable SealedSecret, fetch the controller key |
+| [`codegen/`](codegen/README.md) | `codegen` | mocks, protobuf stubs, `go generate`, sqlc — the drift gates for them, and buf lint, format and dep update |
+
+### Scans
+
+| Module | Namespace | What it covers |
+|---|---|---|
 | [`security/`](security/README.md) | `security` | gitleaks, trivy, govulncheck, golangci-lint, gosec, hadolint, buf breaking |
+| [`checkov/`](checkov/README.md) | `checkov` | policy-scan manifests, charts, Dockerfiles and workflows |
+
+### Release
+
+| Module | Namespace | What it covers |
+|---|---|---|
+| [`release/`](release/README.md) | `release` | version derivation, image build/scan/push, chart lint/render/package/push, `deploy` |
+| [`cosign/`](cosign/README.md) | `cosign` | sign the published image and chart, attest an SBOM, verify both |
+
+### Kubernetes
+
+| Module | Namespace | What it covers |
+|---|---|---|
+| [`k8s/`](k8s/README.md) | `k8s` | restart, logs, status, `helm upgrade --install`, port-forward, and waiting for a version to roll out |
+| [`helm/`](helm/README.md) | `helm` | what is installed on a cluster, and removing it |
+| [`argocd/`](argocd/README.md) | `argocd` | hard-refresh the apps a deploy republished, and operate the Argo server |
+| [`sealed-secrets/`](sealed-secrets/README.md) | `sealed-secrets` | seal a value into a committable SealedSecret, fetch the controller key |
+
+### Infrastructure
+
+| Module | Namespace | What it covers |
+|---|---|---|
 | [`terraform/`](terraform/README.md) | `terraform` | the gates of a Terraform or OpenTofu configuration — format, validity, a lock file covering every platform, drift — and plan, apply and destroy through a saved plan |
+| [`pulumi/`](pulumi/README.md) | `pulumi` | preview, update, refresh and destroy one Pulumi project, and read its outputs — the stack named on every call, the change shown before it is made |
+| [`packer/`](packer/README.md) | `packer` | the gates of one Packer template — format, validity — and building it only once it is valid, with every build named in `ONLY` held to a build the template has |
+| [`nomad/`](nomad/README.md) | `nomad` | the gates of a directory of Nomad job files — format, validity — and submitting a job only as a plan that was saved, held to the modify index it was read at; stopping a job named whole |
+| [`hcloud/`](hcloud/README.md) | `hcloud` | what a project owns in Hetzner Cloud, the power state of its servers, restarts at three levels of force, SSH and a VNC console |
+
+### The repository itself
+
+| Module | Namespace | What it covers |
+|---|---|---|
+| [`monorepo/`](monorepo/README.md) | `monorepo` | run one target across every component, registry preflight |
+| [`github/`](github/README.md) | `github` | force-push a protected branch without leaving protection off |
 | [`tasklib/`](tasklib/README.md) | `tasklib` | move every Taskfile's pin on this library and its lock together, and fail when they have come apart |
 
-### Local clusters
+### Local development
+
+| Module | Namespace | What it covers |
+|---|---|---|
+| [`compose/`](compose/README.md) | `compose` | local stack up/down/reset/logs |
+| [`runtime/*`](runtime/README.md) — docker, orbstack, minikube, kind, k3d | `local` | run a locally built image on a local cluster, no registry |
+| [`auth/`](auth/README.md) | `auth` | mint a local-dev JWT |
+
+#### Local clusters
 
 `release:image:build` writes to whatever Docker daemon the host talks to. Whether
 that image is then visible to your cluster depends on the cluster: OrbStack and
