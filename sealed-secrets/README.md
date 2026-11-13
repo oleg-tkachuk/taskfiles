@@ -45,7 +45,7 @@ includes:
 $ task sealed-secrets:seal SECRET_NAMESPACE=orders SECRET_NAME=api-keys \
     SECRET_KEY=STRIPE_KEY SECRET_VALUE=sk_test_123 \
     SECRET_OUTPUT=deploy/secrets/orders-api-keys.yaml
-✔ sealed-secrets · orders/api-keys → deploy/secrets/orders-api-keys.yaml
+✔ ok    · sealed-secrets · orders/api-keys → deploy/secrets/orders-api-keys.yaml
 
 $ task sealed-secrets:seal:file SECRET_NAMESPACE=orders SECRET_NAME=api-env \
     SECRET_FILE=.env.production SECRET_OUTPUT=deploy/secrets/orders-env.yaml

@@ -54,8 +54,8 @@ vars:
   _RT_CTX: '{{.K8S_CONTEXT | default ._RT_PROFILE}}'
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
-  _RT_RUN: '{{if .NO_COLOR}}◉{{else}}{{"\x1b[36m◉\x1b[0m"}}{{end}}'
-  _RT_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
+  _RT_RUN: '{{if .NO_COLOR}}◉ start ·{{else}}{{"\x1b[36m◉ start\x1b[0m ·"}}{{end}}'
+  _RT_OK: '{{if .NO_COLOR}}✔ ok    ·{{else}}{{"\x1b[32m✔ ok\x1b[0m    ·"}}{{end}}'
 
 tasks:
 

@@ -126,9 +126,9 @@ spaces: `task go:vuln GOVULNCHECK_IGNORE="GO-2026-0001 GO-2026-0002"`.
 
 ```console
 $ task go:vuln
-◉ api · go · govulncheck
+◉ start · api · go · govulncheck
 …
-▲ api · go · passed over, by GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002
+▲ warn  · api · go · passed over, by GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002
 ```
 
 Any other finding fails the task as before, and so does a scan that did not
@@ -187,7 +187,7 @@ do without goimports and gotestsum as they would if neither were installed.
 
 ```console
 $ task go:lint
-✖ api · go · golangci-lint is not pinned by a tool directive, and GO_TOOLS_PINNED=1 leaves PATH out — https://golangci-lint.run/docs/welcome/install/
+✖ fail  · api · go · golangci-lint is not pinned by a tool directive, and GO_TOOLS_PINNED=1 leaves PATH out — https://golangci-lint.run/docs/welcome/install/
 ```
 
 `fmt` is the one place a missing tool changes the result rather than the

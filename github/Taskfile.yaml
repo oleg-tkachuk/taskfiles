@@ -43,6 +43,13 @@ version: "3"
 
 silent: true
 
+vars:
+  # Status markers. The shape carries the meaning, so a line still reads in
+  # a monochrome log; the colour sits on top and drops out under NO_COLOR.
+  _GH_OK: '{{if .NO_COLOR}}✔ ok    ·{{else}}{{"\x1b[32m✔ ok\x1b[0m    ·"}}{{end}}'
+  _GH_WARN: '{{if .NO_COLOR}}▲ warn  ·{{else}}{{"\x1b[33m▲ warn\x1b[0m  ·"}}{{end}}'
+  _GH_ERR: '{{if .NO_COLOR}}✖ fail  ·{{else}}{{"\x1b[31m✖ fail\x1b[0m  ·"}}{{end}}'
+
 tasks:
 
   force-push:
@@ -81,7 +88,7 @@ tasks:
           name=${path##*/}; owner=${path%/*}; owner=${owner##*[/:]}
           lower() { printf '%s' "$1" | awk '{ print tolower($0) }'; }
           if [ "$(lower "$owner/$name")" != "$(lower "$repo")" ]; then
-            echo "✖ remote '$remote' is $url, not $repo — refusing to lift protection on one and push to the other." >&2
+            printf '%s\n' "{{._GH_ERR}} github · remote '$remote' is $url, not $repo — refusing to lift protection on one and push to the other." >&2
             echo "  Set GH_REMOTE to the remote for $repo, or GH_REPO to the repository '$remote' points at." >&2
             exit 1
           fi
@@ -111,15 +118,15 @@ tasks:
             [ "$restored" = 0 ] || return 0
             restored=1
             if gh api -X POST "$api" >/dev/null 2>&1; then
-              echo "✔ enforce_admins restored on $repo@$branch"
+              printf '%s\n' "{{._GH_OK}} github · enforce_admins restored on $repo@$branch"
             else
-              echo "✖ COULD NOT RESTORE enforce_admins on $repo@$branch — run the line above NOW" >&2
+              printf '%s\n' "{{._GH_ERR}} github · COULD NOT RESTORE enforce_admins on $repo@$branch — run the line above NOW" >&2
               return 1
             fi
           }
           trap restore EXIT
 
-          printf '▲ lifting enforce_admins on %s@%s — %s\n' "$repo" "$branch" {{.REASON | q}}
+          printf '%s github · lifting enforce_admins on %s@%s — %s\n' "{{._GH_WARN}}" "$repo" "$branch" {{.REASON | q}}
           gh api -X DELETE "$api" >/dev/null
           pushed=0
           git push --force-with-lease "$remote" {{.REF | q}}:"$branch" || pushed=$?

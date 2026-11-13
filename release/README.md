@@ -94,19 +94,19 @@ tasks:
 
 ```console
 $ task deploy
-◉ core-api · version 1.4.0 → ./deploy/info.env
-◉ core-api · image · build registry.example.com/acme/core-api:1.4.0
-✔ core-api · chart · renders 10 resources cleanly
-✔ core-api · image · pushed 1.4.0
-✔ core-api · chart · pushed 1.4.0
+◉ start · core-api · version 1.4.0 → ./deploy/info.env
+◉ start · core-api · image · build registry.example.com/acme/core-api:1.4.0
+✔ ok    · core-api · chart · renders 10 resources cleanly
+✔ ok    · core-api · image · pushed 1.4.0
+✔ ok    · core-api · chart · pushed 1.4.0
 ```
 
 Run it again on the same commit and it does nothing:
 
 ```console
 $ task deploy
-○ core-api · image · 1.4.0 already built — skipping
-○ core-api · chart · 1.4.0 already in the registry — skipping
+○ skip  · core-api · image · 1.4.0 already built — skipping
+○ skip  · core-api · chart · 1.4.0 already in the registry — skipping
 ```
 
 ### A component whose image comes from upstream
@@ -207,12 +207,12 @@ and the registry. It is a report, not a gate: it prints every problem instead of
 stopping at the first, then exits non-zero if any of them is fatal.
 
 ```
-✔ orders-api · doctor · version 0.1.0-dev.1788728844.g6ec96167
-✔ orders-api · doctor · chart ./deploy/chart → oci://registry.example.com/acme/charts/orders-api
-✔ orders-api · doctor · image registry.example.com/acme/orders-api from ./deploy/Dockerfile (context .)
-✔ orders-api · doctor · build context proto is passed
-✔ orders-api · doctor · registry registry.example.com answers
-✔ orders-api · doctor · ready to publish
+✔ ok    · orders-api · doctor · version 0.1.0-dev.1788728844.g6ec96167
+✔ ok    · orders-api · doctor · chart ./deploy/chart → oci://registry.example.com/acme/charts/orders-api
+✔ ok    · orders-api · doctor · image registry.example.com/acme/orders-api from ./deploy/Dockerfile (context .)
+✔ ok    · orders-api · doctor · build context proto is passed
+✔ ok    · orders-api · doctor · registry registry.example.com answers
+✔ ok    · orders-api · doctor · ready to publish
 ```
 
 It checks the mistakes that have actually happened here:

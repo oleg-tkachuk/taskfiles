@@ -45,8 +45,8 @@ includes:
 
 ```console
 $ task compose:up
-◉ acme · compose · up (docker-compose.dev.yaml)
-✔ acme · compose · stack healthy
+◉ start · acme · compose · up (docker-compose.dev.yaml)
+✔ ok    · acme · compose · stack healthy
 
 $ task compose:logs SERVICE=postgres
 $ task compose:reset          # asks first: this deletes the volumes
