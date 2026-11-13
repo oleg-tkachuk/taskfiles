@@ -76,6 +76,15 @@ export const TOOLS: readonly Tool[] = [
     // talking to that agent on the address it listens at.
     hostNetwork: true,
   },
+  {
+    name: "packer",
+    image: "hashicorp/packer",
+    entrypoint: "/bin/packer",
+    versionEnv: "PACKER_VERSION",
+    // Plain output, and no call home to ask about a newer version: the
+    // packer contract sets both.
+    env: ["PACKER_NO_COLOR", "CHECKPOINT_DISABLE"],
+  },
 ];
 
 // TOOLS_DIR is where the wrappers go, under RUNNER_TEMP.

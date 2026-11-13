@@ -42,8 +42,8 @@ task contracts
 
 The behaviour tests in `task lint` shim every tool. `task contracts` runs the
 gates that read a tool's exit code or output — `security`, `checkov`,
-`terraform`, `pulumi` and `nomad` — against trivy, hadolint, gitleaks, checkov,
-terraform, tofu, pulumi and nomad themselves, from `tests/contracts/`. It is not part of the lint: it needs
+`terraform`, `pulumi`, `nomad` and `packer` — against trivy, hadolint, gitleaks, checkov,
+terraform, tofu, pulumi, nomad and packer themselves, from `tests/contracts/`. It is not part of the lint: it needs
 those tools, and trivy and the two Terraform CLIs fetch over the network. CI runs
 it on every pull request at the versions pinned in `ci.yml`. A change to how a
 gate reads a tool's exit code or output comes with a case there.
@@ -57,6 +57,9 @@ it made.
 
 The `nomad` contract starts a development agent of its own on `127.0.0.1`, on
 ports of its own, and stops it. It never uses the CLI's default address.
+
+The `packer` contract builds with the `null` and `file` builders alone: no
+plugin is installed, and nothing is made outside its own directory.
 
 ## How a module is written
 
