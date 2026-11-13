@@ -77,6 +77,24 @@ tasks:
     cmds:
       - printf "%s\n" "{{._K8S_OK}} done"'
 
+expect clean glyph-constant-in-single-quotes 'version: "3"
+tasks:
+  t:
+    cmds:
+      - say '\''{{._LIB_OK}}'\'' done'
+
+expect reported glyph-constant-outside-quotes 'version: "3"
+tasks:
+  t:
+    cmds:
+      - printf "%s\n" {{._LIB_OK}}'
+
+expect reported glyph-constant-in-a-command-substitution 'version: "3"
+tasks:
+  t:
+    cmds:
+      - x="$(printf "%s" {{._LIB_OK}})"'
+
 expect clean control-actions 'version: "3"
 tasks:
   t:

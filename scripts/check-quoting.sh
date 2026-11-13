@@ -3,8 +3,8 @@
 #
 # A value interpolated into a shell script is code unless it goes through
 # `q` (shellQuote): inside double quotes a $(...) in it runs, and bare it is
-# word-split and parsed. The library's own glyph constants and the inputs a
-# module declares as shell on purpose are exempt; everything else that is not
+# word-split and parsed. The library's own glyph constants, inside quotes, and
+# the inputs a module declares as shell on purpose are exempt; everything else that is not
 # a template control action must be quoted — by `q` outside any quotes,
 # since the quotes `q` adds mean nothing inside someone else's.
 #
@@ -18,7 +18,9 @@ set -euo pipefail
 
 command -v yq >/dev/null || { printf '%s\n' "yq is not installed — https://github.com/mikefarah/yq#install" >&2; exit 2; }
 
-# Glyph constants: status markers built from NO_COLOR, never from input.
+# Glyph constants: status markers built from NO_COLOR, never from input. One
+# holds spaces — a glyph, a word, a separator — so it is exempt only inside
+# quotes: bare, it is three words.
 readonly glyph='^\._[A-Z0-9]+_(OK|ERR|RUN|SKIP|WARN|INFO)$'
 
 # Ends each shell text: ASCII record separator, which no Taskfile contains.
@@ -111,6 +113,7 @@ for file in "$@"; do
           rest = substr(rest, RSTART + RLENGTH)
           sub(/^[^.$]/, "", name)
           if (name ~ /^\$/ || !(name ~ glyph || (name in allowed))) { report(action); break }
+          if (name ~ glyph && !(depth && stack[depth] != "c")) { report(action " outside quotes"); break }
         }
       }
     }
