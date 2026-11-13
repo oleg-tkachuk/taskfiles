@@ -69,16 +69,16 @@ tasks:
 
 ```console
 $ task cosign:keygen              # once, then commit cosign.pub only
-✔ orders · cosign · wrote deploy/sigstore/cosign.key, deploy/sigstore/cosign.pub and deploy/sigstore/signing-config.json
-▲ orders · cosign · commit cosign.pub, keep cosign.key out of the repo
+✔ ok    · orders · cosign · wrote deploy/sigstore/cosign.key, deploy/sigstore/cosign.pub and deploy/sigstore/signing-config.json
+▲ warn  · orders · cosign · commit cosign.pub, keep cosign.key out of the repo
 
 $ task deploy
-✔ orders · cosign · signed registry.example.com/acme/orders:1.4.0
-✔ orders · cosign · signed registry.example.com/acme/charts/orders:1.4.0
-✔ orders · cosign · SBOM attested to registry.example.com/acme/orders:1.4.0
+✔ ok    · orders · cosign · signed registry.example.com/acme/orders:1.4.0
+✔ ok    · orders · cosign · signed registry.example.com/acme/charts/orders:1.4.0
+✔ ok    · orders · cosign · SBOM attested to registry.example.com/acme/orders:1.4.0
 
 $ task cosign:verify
-✔ orders · cosign · verified registry.example.com/acme/orders:1.4.0
+✔ ok    · orders · cosign · verified registry.example.com/acme/orders:1.4.0
 ```
 
 Publishing unsigned on purpose, for one run:

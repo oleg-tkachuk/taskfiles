@@ -80,8 +80,8 @@ vars:
   _NM_DEFAULT_ADDR: http://127.0.0.1:4646
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
-  _NM_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
-  _NM_ERR: '{{if .NO_COLOR}}✖{{else}}{{"\x1b[31m✖\x1b[0m"}}{{end}}'
+  _NM_OK: '{{if .NO_COLOR}}✔ ok    ·{{else}}{{"\x1b[32m✔ ok\x1b[0m    ·"}}{{end}}'
+  _NM_ERR: '{{if .NO_COLOR}}✖ fail  ·{{else}}{{"\x1b[31m✖ fail\x1b[0m  ·"}}{{end}}'
   # Interpolated by the tasks below, each of which runs in NOMAD_DIR: the CLI
   # has no flag for a working directory, and a job file's own relative paths —
   # a file() it reads, a -var-file — resolve from where it runs.

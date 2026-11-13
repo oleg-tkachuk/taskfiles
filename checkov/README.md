@@ -41,7 +41,7 @@ includes:
 
 ```console
 $ task checkov:scan
-✔ checkov · no findings outside the baseline
+✔ ok    · checkov · no findings outside the baseline
 
 $ task checkov:triage       # everything, baselined findings included
 $ task checkov:baseline     # after fixing some, accept what is left
@@ -63,7 +63,7 @@ count is the only thing that tells them apart.
 
 ```console
 $ task checkov:baseline
-◉ checkov · baselined findings: 41 → 38
+◉ start · checkov · baselined findings: 41 → 38
 ```
 
 A number that went up is reported as a warning: something new was accepted
@@ -84,8 +84,8 @@ The count was always printed. It was printed the same way either direction, so
 `177 → 5` read like `12 → 5`:
 
 ```console
-◉ checkov · baselined findings: 177 → 5
-▲ checkov · the baseline LOST most of itself — 177 accepted findings became 5, 172 gone.
+◉ start · checkov · baselined findings: 177 → 5
+▲ warn  · checkov · the baseline LOST most of itself — 177 accepted findings became 5, 172 gone.
          Findings the current scan cannot see are not in the new file. If the
          config or the framework list has narrowed since it was written, those
          records were decisions, not noise: git diff .checkov.baseline before

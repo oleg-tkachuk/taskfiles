@@ -88,8 +88,8 @@ each var several declare with different values:
 
 ```console
 $ task monorepo:doctor
-▲ monorepo · DOCKERFILE is declared at the top level of api only — every other component reads that value; move it into the vars: of the include that reads it
-▲ monorepo · PROJECT_NAME is declared at the top level of api web with different values — which one a module reads is not stable, in the declaring components too; move it into the vars: of the include that reads it
+▲ warn  · monorepo · DOCKERFILE is declared at the top level of api only — every other component reads that value; move it into the vars: of the include that reads it
+▲ warn  · monorepo · PROJECT_NAME is declared at the top level of api web with different values — which one a module reads is not stable, in the declaring components too; move it into the vars: of the include that reads it
 ```
 
 The second is the quieter one. Each component declares its own name, so

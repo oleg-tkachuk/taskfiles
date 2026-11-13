@@ -79,11 +79,11 @@ tasks:
 
 ```console
 $ task deploy:local
-◉ core-api · image · build registry.example.com/acme/core-api:0.1.0-dev....
-✔ core-api · local · minikube running
-◉ core-api · local · minikube image load registry.example.com/acme/core-api:0.1.0-dev....
-◉ core-api · local · helm upgrade --install into minikube/acme
-✔ core-api · local · 0.1.0-dev.... installed into minikube
+◉ start · core-api · image · build registry.example.com/acme/core-api:0.1.0-dev....
+✔ ok    · core-api · local · minikube running
+◉ start · core-api · local · minikube image load registry.example.com/acme/core-api:0.1.0-dev....
+◉ start · core-api · local · helm upgrade --install into minikube/acme
+✔ ok    · core-api · local · 0.1.0-dev.... installed into minikube
 ```
 
 ## Why one directory per runtime rather than one module with a switch

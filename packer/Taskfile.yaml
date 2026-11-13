@@ -75,8 +75,8 @@ vars:
   _PK_NO_SUCH_BUILD: taskfiles-no-such-build
   # Status markers. The shape carries the meaning, so a line still reads in
   # a monochrome log; the colour sits on top and drops out under NO_COLOR.
-  _PK_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
-  _PK_ERR: '{{if .NO_COLOR}}✖{{else}}{{"\x1b[31m✖\x1b[0m"}}{{end}}'
+  _PK_OK: '{{if .NO_COLOR}}✔ ok    ·{{else}}{{"\x1b[32m✔ ok\x1b[0m    ·"}}{{end}}'
+  _PK_ERR: '{{if .NO_COLOR}}✖ fail  ·{{else}}{{"\x1b[31m✖ fail\x1b[0m  ·"}}{{end}}'
   # Interpolated by the tasks below, each of which runs in PACKER_DIR: the
   # template is then ".", and its own relative paths — a file() it reads, a
   # -var-file, a builder's output directory — resolve from where it lives.

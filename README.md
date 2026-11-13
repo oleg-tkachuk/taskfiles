@@ -538,29 +538,42 @@ a deliberate difference goes in `SURFACE_EXCEPT` with a reason.
 
 ### Logging
 
-Component-scoped modules print `<marker> <component> · <area> ·
+Component-scoped modules print `<marker> · <component> · <area> ·
 <what happened>`; repo-scoped ones (`security`, `monorepo`, `argocd`) print
-`<marker> <module> · <what happened>`, because there is no one component to
+`<marker> · <module> · <what happened>`, because there is no one component to
 name.
 
-The marker vocabulary:
+```
+◉ start · core-api · image · build registry.example.com/acme/core-api:1.4.0
+✔ ok    · core-api · image · pushed 1.4.0
+○ skip  · core-api · chart · 1.4.0 already in the registry — skipping
+▲ warn  · orders · cosign · commit cosign.pub, keep cosign.key out of the repo
+✖ fail  · api · hcloud · poweron did not take on: api-1
+```
+
+A marker is a glyph and a word:
 
 | Marker | Means | Colour |
 | --- | --- | --- |
-| `◉` | starting work | cyan |
-| `✔` | done | green |
-| `○` | nothing to do — skipped on purpose | grey |
-| `▲` | worth reading, but not fatal | yellow |
-| `✖` | failed | red |
+| `◉ start` | starting work | cyan |
+| `✔ ok` | done | green |
+| `○ skip` | nothing to do — skipped on purpose | grey |
+| `▲ warn` | worth reading, but not fatal | yellow |
+| `✖ fail` | failed | red |
 
-The shape carries the meaning and the colour only reinforces it, so a line
-still reads in a log that has been stripped of ANSI. Each marker is a single
-codepoint — no variation selector — so every line starts the same width in
-every terminal. Set `NO_COLOR` to any value to get the glyphs without the
-escapes.
+The glyph and the word carry the meaning twice over, and the colour only
+reinforces it: a line still reads in a log that has been stripped of ANSI,
+and is found by a search for a plain word — `fail ·` — where a glyph is hard
+to type. Each glyph is a single codepoint — no variation selector — and the
+words are padded to one width, so every line's first field starts in the same
+column in every terminal. Set `NO_COLOR` to any value to get the markers
+without the escapes.
 
 `·` separates the fields of a line and `→` marks a result, both from the same
 vocabulary.
+
+Each module defines its own markers, since one cannot import another's
+variables; `task check:markers` holds the copies to one spelling.
 
 ### Versioning
 

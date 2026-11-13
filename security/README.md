@@ -84,13 +84,13 @@ to anything: `secrets`, `trivy` and `dockerfile`. `scan` runs `secrets` and
 `GO_MODULES` without a `go.mod` is skipped with a line saying so:
 
 ```
-◉ sec · gitleaks
-✔ sec · no secrets in history
-◉ sec · trivy fs .
-✔ sec · trivy clean
-○ sec · govulncheck · . is not a Go module — skipped
-○ sec · golangci-lint · . is not a Go module — skipped
-○ sec · gosec · . is not a Go module — skipped
+◉ start · sec · gitleaks
+✔ ok    · sec · no secrets in history
+◉ start · sec · trivy fs .
+✔ ok    · sec · trivy clean
+○ skip  · sec · govulncheck · . is not a Go module — skipped
+○ skip  · sec · golangci-lint · . is not a Go module — skipped
+○ skip  · sec · gosec · . is not a Go module — skipped
 ```
 
 The rule is: **skip when there is nothing to scan, fail when there is

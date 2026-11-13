@@ -66,8 +66,8 @@ tasks:
 
 ```console
 $ task k8s:restart
-◉ core-api · k8s · roll deploy/core-api in acme
-✔ core-api · k8s · rolled core-api
+◉ start · core-api · k8s · roll deploy/core-api in acme
+✔ ok    · core-api · k8s · rolled core-api
 
 $ task k8s:port-forward PORT=8080
 $ task k8s:port-forward PORT=8081 TARGET_PORT=80    # container listens on :80
@@ -81,11 +81,11 @@ resolved, so a `restart` or an `uninstall` is not the thing that discovers
 them:
 
 ```
-✔ orders-api · doctor · context prod-eu (pinned)
-✔ orders-api · doctor · chart ./deploy/chart
-✔ orders-api · doctor · namespace acme
-✔ orders-api · doctor · deployment orders-api
-✔ orders-api · doctor · ready
+✔ ok    · orders-api · doctor · context prod-eu (pinned)
+✔ ok    · orders-api · doctor · chart ./deploy/chart
+✔ ok    · orders-api · doctor · namespace acme
+✔ ok    · orders-api · doctor · deployment orders-api
+✔ ok    · orders-api · doctor · ready
 ```
 
 An unpinned context is a warning rather than a pass: without `K8S_CONTEXT`
@@ -122,9 +122,9 @@ the roll, both inside `ROLLOUT_TIMEOUT`:
 ```console
 $ task release:deploy && task argocd:refresh APP_PREFIX=acme-
 $ task k8s:rollout:wait VERSION=$(task release:version)
-◉ core-api · k8s · wait for 1.4.0 on deploy/core-api in acme
+◉ start · core-api · k8s · wait for 1.4.0 on deploy/core-api in acme
 deployment "core-api" successfully rolled out
-✔ core-api · k8s · 1.4.0 rolled out
+✔ ok    · core-api · k8s · 1.4.0 rolled out
 ```
 
 By default the version is a container's image tag. A chart that runs someone
@@ -158,7 +158,7 @@ lookup the cluster refuses fails at once.
 
 ```console
 $ task k8s:restart
-○ core-api · k8s · deploy/core-api not found in acme — skipping restart
+○ skip  · core-api · k8s · deploy/core-api not found in acme — skipping restart
 ```
 
 That is deliberate. These tasks sit in chains that have to stay green on a laptop

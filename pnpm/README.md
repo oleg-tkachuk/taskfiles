@@ -132,8 +132,8 @@ the command that crosses it, rather than crossing it for you.
 ## Example
 
 ```
-◉ pnpm · 11.15.1 → 11.25.0
-✔ pnpm · pinned at 11.25.0 everywhere — review the package.json, Dockerfile and lockfile diff
-▲ pnpm · 12.3.4 is out and this task stays inside major 11
+◉ start · pnpm · 11.15.1 → 11.25.0
+✔ ok    · pnpm · pinned at 11.25.0 everywhere — review the package.json, Dockerfile and lockfile diff
+▲ warn  · pnpm · 12.3.4 is out and this task stays inside major 11
          cross it deliberately: task pnpm:pin:update:major -- 12
 ```

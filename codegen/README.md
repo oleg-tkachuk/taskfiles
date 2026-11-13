@@ -77,12 +77,12 @@ includes:
 
 ```console
 $ task codegen:regenerate
-◉ core-api · gen · mocks → proto → generate → sqlc
-✔ core-api · gen · regenerated
+◉ start · core-api · gen · mocks → proto → generate → sqlc
+✔ ok    · core-api · gen · regenerated
 
 $ task codegen:check
-✔ core-api · gen · mocks match their interfaces
-✔ core-api · gen · sqlc bindings match their queries
+✔ ok    · core-api · gen · mocks match their interfaces
+✔ ok    · core-api · gen · sqlc bindings match their queries
 ```
 
 ## Why the order is fixed

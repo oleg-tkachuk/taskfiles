@@ -21,7 +21,7 @@ expect_status ok "refresh: hard-refreshes"
 expect_call "kubectl -n argocd patch application.argoproj.io svc-api --type merge" "refresh: patches a matching application"
 expect_call "kubectl -n argocd patch application.argoproj.io svc-web --type merge" "refresh: patches every matching application"
 refute_call "patch application.argoproj.io infra-db" "refresh: leaves an application outside the prefix alone"
-expect_output "✔ argocd · hard-refreshed svc-api" "refresh: reports each application"
+expect_output "✔ ok    · argocd · hard-refreshed svc-api" "refresh: reports each application"
 expect_call "kubectl version --request-timeout=3s" "refresh: probes the cluster with a bounded wait"
 
 reset_calls

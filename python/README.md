@@ -114,12 +114,12 @@ includes:
 this component resolved:
 
 ```
-✔ orders-api · doctor · poetry 2.5.1
-✔ orders-api · doctor · interpreter python3.13 (Python 3.13.15)
-✔ orders-api · doctor · pyproject.toml is here
-✔ orders-api · doctor · poetry.lock is here
-✔ orders-api · doctor · install flags --no-interaction
-✔ orders-api · doctor · ready
+✔ ok    · orders-api · doctor · poetry 2.5.1
+✔ ok    · orders-api · doctor · interpreter python3.13 (Python 3.13.15)
+✔ ok    · orders-api · doctor · pyproject.toml is here
+✔ ok    · orders-api · doctor · poetry.lock is here
+✔ ok    · orders-api · doctor · install flags --no-interaction
+✔ ok    · orders-api · doctor · ready
 ```
 
 `PY` is the line worth having. It names the interpreter the deployed image

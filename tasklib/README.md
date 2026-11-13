@@ -39,9 +39,9 @@ an entry point of its own, from its own directory; name them in
 
 ```console
 $ task tasklib:bump VERSION=v15.0.0
-◉ tasklib · 3 Taskfile(s) pin v15.0.0
-✔ tasklib · ./.task/remote locked
-✔ tasklib · api/.task/remote locked
+◉ start · tasklib · 3 Taskfile(s) pin v15.0.0
+✔ ok    · tasklib · ./.task/remote locked
+✔ ok    · tasklib · api/.task/remote locked
 $ git add -A . && git commit -m 'build(tasks): bump taskfiles v14.3.2 → v15.0.0'
 ```
 
@@ -98,7 +98,7 @@ names them:
 
 ```console
 $ task tasklib:check
-✖ tasklib · the Taskfiles pin different refs — task tasklib:bump VERSION=<tag> moves them together:
+✖ fail  · tasklib · the Taskfiles pin different refs — task tasklib:bump VERSION=<tag> moves them together:
     v14.3.1	api/Taskfile.yaml
     v14.3.2	Taskfile.yaml
 ```

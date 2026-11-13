@@ -164,9 +164,9 @@ two from being tried; the task then exits non-zero naming the ones that did not
 take:
 
 ```
-◉ api · hcloud · poweron · api-0 api-1 api-2
+◉ start · api · hcloud · poweron · api-0 api-1 api-2
 
-✖ api · hcloud · poweron did not take on: api-1
+✖ fail  · api · hcloud · poweron did not take on: api-1
 ```
 
 The line above the actions is the expanded selector. Since the selector is the
