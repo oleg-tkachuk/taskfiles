@@ -1,3 +1,5 @@
+![A Taskfile pinned to a tag includes the release and go modules over git, and task --list shows their tasks. Headline: "Delete your per-repo scripts. We kept them all for you."](docs/assets/social-preview@2x.png)
+
 # taskfiles
 
 [![release](https://img.shields.io/github/v/release/oleg-tkachuk/taskfiles?sort=semver&label=release)](https://github.com/oleg-tkachuk/taskfiles/releases/latest)
