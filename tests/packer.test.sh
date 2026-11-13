@@ -92,6 +92,12 @@ expect_ran_in "packer init ." images "init: from PACKER_DIR"
 FAKE_INIT=1 run_task pk:init
 expect_status fail "init: a plugin that could not be installed fails"
 
+consumer pk packer '{ PACKER_DIR: images, PACKER_INIT_FLAGS: "-upgrade" }'
+reset_calls
+run_task pk:init
+expect_line "packer init -upgrade ." "init: PACKER_INIT_FLAGS reach it"
+consumer pk packer '{ PACKER_DIR: images }'
+
 # ─── inspect ─────────────────────────────────────────────────────────────────
 reset_calls
 run_task pk:inspect

@@ -44,6 +44,7 @@ At the include's own `vars:` — see
 | `PACKER_DIR` | `.` | The template's directory |
 | `PACKER_VAR_FLAGS` | — | Flags for reading the template, in `validate` and `build` alike: a `-var`, a `-var-file` |
 | `PACKER_BUILD_FLAGS` | — | Extra flags for the build: `-force`, `-parallel-builds=1` |
+| `PACKER_INIT_FLAGS` | — | Extra flags for `init`: `-upgrade` |
 
 On the call itself:
 
