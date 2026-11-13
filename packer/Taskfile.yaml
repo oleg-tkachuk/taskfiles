@@ -1,0 +1,199 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# packer — the gates of one Packer template: formatting and validity; and
+# building it only once it is valid, with every build named in ONLY held to a
+# build the template has.
+#
+#   includes:
+#     packer:
+#       taskfile: '{{printf .TASKLIB "packer"}}'
+#       dir: .
+#       vars: { PACKER_DIR: images }
+#
+#   task packer:build ONLY=base.amazon-ebs.web
+#
+# One include is one template: one directory of .pkr.hcl files. A repository
+# with several includes this once per template.
+#
+# `build` is the one task that makes anything: machines, images, whatever the
+# template's builders and post-processors create, wherever its credentials
+# reach. `init` installs plugins. Every other task only reads.
+#
+# The CLI is never left to decide what a mistyped build name means. A name in
+# -only that matches no build is a warning to it: the builds that do match are
+# built and it exits 0, and a validation that selected nothing reports a valid
+# template. Here that name is refused.
+#
+# Credentials, plugin locations and PKR_VAR_ variables are the environment's.
+# This module runs the CLI in the environment it is given.
+#
+# ── Inputs ───────────────────────────────────────────────────────────────────
+# Pass these at the include's own `vars:`, not the consumer's top-level
+# `vars:`. In a repository with more than one component the top level is
+# shared with every other component — see README.md#variable-scoping.
+#
+#   PACKER_DIR          the template's directory                   (default .)
+#   PACKER_VAR_FLAGS    flags for reading the template, in validate and build
+#                       alike — a -var, a -var-file; paths are relative to
+#                       PACKER_DIR
+#   PACKER_BUILD_FLAGS  extra flags for the build — -force, -parallel-builds=1
+#
+# And on the call itself:
+#
+#   ONLY                build names, separated by spaces, to narrow validate
+#                       and build to; each has to match a build
+# ─────────────────────────────────────────────────────────────────────────────
+# shell-verbatim: _PK_SH _PK_VAR_FLAGS _PK_BUILD_FLAGS PACKER_VAR_FLAGS PACKER_BUILD_FLAGS
+
+silent: true
+
+vars:
+  _PK_DIR: '{{.PACKER_DIR | default "."}}'
+  _PK_VAR_FLAGS: '{{.PACKER_VAR_FLAGS | default ""}}'
+  _PK_BUILD_FLAGS: '{{.PACKER_BUILD_FLAGS | default ""}}'
+  # `fmt -check` exits with this when a file is not in the canonical format.
+  # Any other non-zero code is a file it could not read.
+  _PK_UNFORMATTED: "3"
+  # What the CLI prints, beside exit 0, when a name in -only matches no build.
+  # It has no other way of saying so: no exit code, and -machine-readable
+  # carries the same sentence. tests/contracts holds it to the pinned CLI.
+  _PK_UNMATCHED: "an 'only' option was passed"
+  # A name no build has. The CLI is asked about it to learn whether this
+  # version still says _PK_UNMATCHED: one that words it otherwise would let
+  # every mistyped name through.
+  _PK_NO_SUCH_BUILD: taskfiles-no-such-build
+  # Status markers. The shape carries the meaning, so a line still reads in
+  # a monochrome log; the colour sits on top and drops out under NO_COLOR.
+  _PK_OK: '{{if .NO_COLOR}}✔{{else}}{{"\x1b[32m✔\x1b[0m"}}{{end}}'
+  _PK_ERR: '{{if .NO_COLOR}}✖{{else}}{{"\x1b[31m✖\x1b[0m"}}{{end}}'
+  # Interpolated by the tasks below, each of which runs in PACKER_DIR: the
+  # template is then ".", and its own relative paths — a file() it reads, a
+  # -var-file, a builder's output directory — resolve from where it lives.
+  #
+  # `pk_only <names>` sets `names` to <names> joined by commas, as -only
+  # takes them, and the positional parameters to that flag — or to nothing:
+  # an empty -only is itself a name that matches no build.
+  #
+  # `pk_unmatched <file>` is whether the CLI's output in <file> says a name
+  # matched no build.
+  _PK_SH: |
+    pk_only() {
+      names=$(printf '%s\n' "$1" | awk -v OFS=, '{ $1 = $1; print }')
+    }
+    pk_unmatched() {
+      NEEDLE={{._PK_UNMATCHED | q}} awk 'index($0, ENVIRON["NEEDLE"]) { found = 1 } END { exit !found }' "$1"
+    }
+
+tasks:
+
+  _ready:
+    internal: true
+    preconditions:
+      - sh: command -v packer >/dev/null
+        msg: "packer is not installed — https://developer.hashicorp.com/packer/install"
+      - sh: test -d {{._PK_DIR | q}}
+        msg: "PACKER_DIR is {{._PK_DIR}}, which is not a directory"
+
+  init:
+    desc: "Install the plugins the template requires"
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          cd {{._PK_DIR | q}}
+          packer init .
+
+  fmt:
+    desc: "Fail when a file under PACKER_DIR is not in the canonical format"
+    # Templates and variable files alike, and none is rewritten. The CLI tells
+    # a file that is not formatted from one it could not read by its exit code.
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          cd {{._PK_DIR | q}}
+          status=0
+          packer fmt -check -recursive . || status=$?
+          case "$status" in
+            0) printf '%s packer · every file under %s is formatted\n' "{{._PK_OK}}" {{._PK_DIR | q}} ;;
+            {{._PK_UNFORMATTED | q}})
+              printf '%s packer · the files above are not formatted — packer fmt -recursive %s rewrites them\n' "{{._PK_ERR}}" {{._PK_DIR | q}} >&2
+              exit 1 ;;
+            *)
+              printf '%s packer · the format check did not complete (exit %s) — the output above names the file it could not read\n' "{{._PK_ERR}}" "$status" >&2
+              exit 1 ;;
+          esac
+
+  inspect:
+    desc: "Show the variables and builds of the template; changes nothing"
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          cd {{._PK_DIR | q}}
+          packer inspect .
+
+  validate:
+    desc: "Validate the template, or the builds ONLY names; changes nothing"
+    # With an ONLY, the CLI is asked twice. Once for the template: its output
+    # is read for the warning a name matching no build gets. Then about a name
+    # no build has: a CLI that does not give that warning there would not have
+    # given it for a mistyped name either, and ONLY is refused.
+    cmds:
+      - task: _ready
+      - cmd: |
+          set -eu
+          {{._PK_SH}}
+          cd {{._PK_DIR | q}}
+          pk_only {{.ONLY | default "" | q}}
+          out=$(mktemp)
+          trap 'rm -f "$out"' EXIT
+          if [ -n "$names" ]; then set -- "-only=$names"; else set --; fi
+          status=0
+          packer validate {{._PK_VAR_FLAGS}} "$@" . > "$out" 2>&1 || status=$?
+          cat "$out"
+          if [ "$status" != 0 ]; then
+            printf '%s packer · the template in %s is not valid\n' "{{._PK_ERR}}" {{._PK_DIR | q}} >&2
+            exit 1
+          fi
+          if [ -n "$names" ]; then
+            if pk_unmatched "$out"; then
+              printf '%s packer · a name in ONLY (%s) matches no build — the CLI would build the rest and exit 0. The output above lists the builds there are.\n' "{{._PK_ERR}}" "$names" >&2
+              exit 1
+            fi
+            packer validate {{._PK_VAR_FLAGS}} -only={{._PK_NO_SUCH_BUILD | q}} . > "$out" 2>&1 || true
+            if ! pk_unmatched "$out"; then
+              cat "$out" >&2
+              printf '%s packer · this packer does not say when a name matches no build — asked about %s, it said the above. ONLY cannot be held to the builds there are.\n' "{{._PK_ERR}}" {{._PK_NO_SUCH_BUILD | q}} >&2
+              exit 1
+            fi
+          fi
+          printf '%s packer · the template in %s is valid\n' "{{._PK_OK}}" {{._PK_DIR | q}}
+
+  build:
+    desc: "Build the template, or the builds ONLY names, once it is valid — asks first"
+    # Task runs a task's deps, then asks its prompt: the template is validated,
+    # and ONLY held to its builds, before the question. Nothing is saved in
+    # between — the build reads the template again.
+    #
+    # A build that fails does not undo the others: the builds that finished
+    # keep their artifacts, and the CLI's exit code is 1 for the lot.
+    deps:
+      - task: validate
+        vars: { ONLY: "{{.ONLY}}" }
+    prompt: "Build {{if .ONLY}}{{.ONLY}}{{else}}every build{{end}} of the template in {{._PK_DIR}}, validated above. Continue?"
+    cmds:
+      - cmd: |
+          set -eu
+          {{._PK_SH}}
+          cd {{._PK_DIR | q}}
+          pk_only {{.ONLY | default "" | q}}
+          if [ -n "$names" ]; then set -- "-only=$names"; else set --; fi
+          status=0
+          packer build {{._PK_VAR_FLAGS}} {{._PK_BUILD_FLAGS}} "$@" . || status=$?
+          if [ "$status" != 0 ]; then
+            printf '%s packer · the build of %s failed (exit %s) — a build that finished has left its artifacts; the output above lists them\n' "{{._PK_ERR}}" {{._PK_DIR | q}} "$status" >&2
+            exit 1
+          fi
+          printf '%s packer · built the template in %s\n' "{{._PK_OK}}" {{._PK_DIR | q}}
