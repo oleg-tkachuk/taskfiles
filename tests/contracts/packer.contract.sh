@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # packer, against the real CLI: the exit codes the tasks read still mean what
-# they report, and a name that matches no build is still a warning beside
-# exit 0 — in the words the module looks for.
+# they report, and a name that matches nothing is still a warning beside
+# exit 0 — in the words the module looks for, for -only and for -except.
 #
 # Only the null and file builders are used: they are part of the CLI, so no
 # plugin is installed, and nothing is made outside this run's own directory.
@@ -36,6 +36,11 @@ source "file" "two" {
 build {
   name    = "files"
   sources = ["source.file.one", "source.file.two"]
+
+  post-processor "manifest" {
+    name   = "listing"
+    output = "out/manifest.json"
+  }
 }
 HCL
 
@@ -125,6 +130,45 @@ expect_output "files.file.no-such" "validate: and named"
 run_task pk:validate ONLY=file.one
 expect_status fail "validate: a name short of its build block's is refused"
 
+# The same for EXCEPT, which fails the other way: what was to be left out is
+# built.
+packer_here validate -except=files.file.one,files.file.no-such .
+if [ "$status" = 0 ] && holds "$OUT" "an 'except' option was passed"; then
+  pass "the CLI still warns beside exit 0 when one name in -except matches nothing"
+else
+  fail "the CLI no longer warns beside exit 0 for an -except that matches nothing (exit $status) — the module looks for that warning"
+fi
+
+packer_here build -except=files.file.no-such .
+if [ "$status" = 0 ] && [ -f "$BUILT/one.txt" ] && [ -f "$BUILT/two.txt" ]; then
+  pass "the CLI still builds everything, and exits 0, when -except matches nothing"
+else
+  fail "the CLI no longer builds past an -except that matches nothing (exit $status) — EXCEPT need not be refused"
+fi
+rm -rf "$BUILT"
+
+# A build that -only has already left out is, to -except, a name that matches
+# nothing: why EXCEPT is said to match among the builds ONLY names.
+packer_here validate -only=files.file.one -except=files.file.two .
+if holds "$OUT" "an 'except' option was passed"; then
+  pass "the CLI still matches -except only among the builds -only has left"
+else
+  fail "the CLI now matches -except against every build — EXCEPT need not be read against ONLY"
+fi
+
+run_task pk:validate EXCEPT=files.file.one
+expect_status ok "validate: EXCEPT naming a build passes"
+
+run_task pk:validate EXCEPT=listing
+expect_status ok "validate: so does EXCEPT naming a post-processor"
+
+run_task pk:validate EXCEPT="files.file.one files.file.no-such"
+expect_status fail "validate: a name in EXCEPT that matches nothing is refused"
+expect_output "files.file.no-such" "validate: and named"
+
+run_task pk:validate ONLY="files.*" EXCEPT=files.file.two
+expect_status ok "validate: ONLY and EXCEPT together pass"
+
 # ─── build ───────────────────────────────────────────────────────────────────
 run_task pk:build ONLY="files.file.one files.file.no-such"
 expect_status fail "build: a name in ONLY that matches no build is refused"
@@ -134,6 +178,22 @@ run_task pk:build ONLY=files.file.one
 expect_status ok "build: builds the build ONLY names"
 expect_built one "build: its artifact is there"
 refute_built two "build: and no other build's"
+rm -rf "$BUILT"
+
+run_task pk:build EXCEPT=files.file.no-such
+expect_status fail "build: a name in EXCEPT that matches nothing is refused"
+refute_built one "build: and what it was meant to leave out is not built"
+
+run_task pk:build EXCEPT=files.file.one
+expect_status ok "build: leaves out the build EXCEPT names"
+refute_built one "build: its artifact is not there"
+expect_built two "build: and the other build's is"
+rm -rf "$BUILT"
+
+run_task pk:build EXCEPT=listing
+expect_status ok "build: leaves out a post-processor EXCEPT names"
+expect_built one "build: with every build built"
+if [ -e "$BUILT/manifest.json" ]; then fail "build: the post-processor EXCEPT named ran"; else pass "build: and that post-processor's output is not there"; fi
 rm -rf "$BUILT"
 
 consumer pk packer '{ PACKER_DIR: images, PACKER_VAR_FLAGS: "-var content=given" }'
