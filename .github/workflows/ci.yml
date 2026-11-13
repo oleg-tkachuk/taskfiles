@@ -183,6 +183,8 @@ jobs:
       PULUMI_VERSION: 3.274.1
       # renovate: datasource=docker depName=hashicorp/nomad
       NOMAD_VERSION: 2.1.1
+      # renovate: datasource=docker depName=hashicorp/packer
+      PACKER_VERSION: 1.16.2
       # The cluster the k8s contract runs against, and the kubectl it uses.
       # renovate: datasource=github-releases depName=kubernetes-sigs/kind
       KIND_VERSION: v0.33.0

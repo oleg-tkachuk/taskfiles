@@ -17,6 +17,7 @@ const VERSIONS = {
   OPENTOFU_VERSION: "1.0.0",
   PULUMI_VERSION: "3.0.0",
   NOMAD_VERSION: "2.0.0",
+  PACKER_VERSION: "1.0.0",
 };
 
 test("a wrapper runs the pinned image as the runner's user, in the working directory, with its own entrypoint", () => {
