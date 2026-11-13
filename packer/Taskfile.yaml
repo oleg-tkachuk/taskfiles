@@ -38,13 +38,14 @@ version: "3"
 #                       alike — a -var, a -var-file; paths are relative to
 #                       PACKER_DIR
 #   PACKER_BUILD_FLAGS  extra flags for the build — -force, -parallel-builds=1
+#   PACKER_INIT_FLAGS   extra flags for init — -upgrade
 #
 # And on the call itself:
 #
 #   ONLY                build names, separated by spaces, to narrow validate
 #                       and build to; each has to match a build
 # ─────────────────────────────────────────────────────────────────────────────
-# shell-verbatim: _PK_SH _PK_VAR_FLAGS _PK_BUILD_FLAGS PACKER_VAR_FLAGS PACKER_BUILD_FLAGS
+# shell-verbatim: _PK_SH _PK_VAR_FLAGS _PK_BUILD_FLAGS _PK_INIT_FLAGS PACKER_VAR_FLAGS PACKER_BUILD_FLAGS PACKER_INIT_FLAGS
 
 silent: true
 
@@ -52,6 +53,7 @@ vars:
   _PK_DIR: '{{.PACKER_DIR | default "."}}'
   _PK_VAR_FLAGS: '{{.PACKER_VAR_FLAGS | default ""}}'
   _PK_BUILD_FLAGS: '{{.PACKER_BUILD_FLAGS | default ""}}'
+  _PK_INIT_FLAGS: '{{.PACKER_INIT_FLAGS | default ""}}'
   # `fmt -check` exits with this when a file is not in the canonical format.
   # Any other non-zero code is a file it could not read.
   _PK_UNFORMATTED: "3"
@@ -102,7 +104,7 @@ tasks:
       - cmd: |
           set -eu
           cd {{._PK_DIR | q}}
-          packer init .
+          packer init {{._PK_INIT_FLAGS}} .
 
   fmt:
     desc: "Fail when a file under PACKER_DIR is not in the canonical format"
