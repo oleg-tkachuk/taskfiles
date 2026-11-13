@@ -4,9 +4,10 @@
 source "$(dirname "$0")/lib.sh"
 
 # Answers as the CLI does, by subcommand. A name that matches no build is a
-# warning beside a pass, never a failure: any -only holding "no-such" gets
-# it, on the stream FAKE_WARN_FD names. FAKE_SILENT is a CLI that words the
-# warning otherwise. Every call also logs the directory it ran in.
+# warning beside a pass, never a failure: an -only or an -except holding
+# "no-such" gets its own, on the stream FAKE_WARN_FD names. FAKE_SILENT is a
+# CLI that words both warnings otherwise, FAKE_SILENT_EXCEPT one that words
+# only the second so. Every call also logs the directory it ran in.
 shim packer '
 printf "in %s\n" "${PWD##*/}" >> "$CALLS"
 case " $* " in
@@ -14,11 +15,15 @@ case " $* " in
   *" init "*) printf "%s\n" "Installed plugin"; exit "${FAKE_INIT:-0}" ;;
   *" inspect "*) printf "%s\n" "> builds:"; exit "${FAKE_INSPECT:-0}" ;;
   *" validate "*)
-    case "${FAKE_SILENT:-0} $*" in
-      "0 "*-only=*no-such*)
-        printf "%s\n" "Warning: an '\''only'\'' option was passed, but not all matches were found for the given build." >&"${FAKE_WARN_FD:-1}" ;;
-      "1 "*-only=*no-such*) printf "%s\n" "Warning: no build is named so." ;;
-    esac
+    for arg in "$@"; do
+      case "${FAKE_SILENT:-0}${FAKE_SILENT_EXCEPT:-0} $arg" in
+        "0"?" -only="*no-such*)
+          printf "%s\n" "Warning: an '\''only'\'' option was passed, but not all matches were found for the given build." >&"${FAKE_WARN_FD:-1}" ;;
+        "00 -except="*no-such*)
+          printf "%s\n" "Warning: an '\''except'\'' option was passed, but did not match any build." >&"${FAKE_WARN_FD:-1}" ;;
+        *" -only="*no-such* | *" -except="*no-such*) printf "%s\n" "Warning: no build is named so." ;;
+      esac
+    done
     printf "%s\n" "The configuration is valid."; exit "${FAKE_VALIDATE:-0}" ;;
   *" build "*) printf "%s\n" "==> Builds finished."; exit "${FAKE_BUILD:-0}" ;;
 esac'
@@ -113,6 +118,11 @@ expect_status ok "validate: a valid template passes"
 expect_line "packer validate ." "validate: every build, with no -only to match nothing"
 expect_ran_in "packer validate ." images "validate: from PACKER_DIR, so the template's own relative paths resolve"
 refute_call "$SENTINEL" "validate: with no ONLY there is nothing to ask the CLI about"
+if [ "$(awk '$0 == "packer validate ." { n++ } END { print n + 0 }' "$CALLS")" = 1 ]; then
+  pass "validate: and the CLI is asked once"
+else
+  fail "validate: the CLI was not asked exactly once"; quoted '    > ' "$CALLS"
+fi
 
 FAKE_VALIDATE=1 run_task pk:validate
 expect_status fail "validate: a template the CLI rejects fails"
@@ -150,11 +160,50 @@ called_before "-only=base.null.one" "-only=$SENTINEL" "validate: after the templ
 
 FAKE_SILENT=1 run_task pk:validate ONLY=base.null.one
 expect_status fail "validate: a CLI that does not say when a name matches nothing is refused"
-expect_output "cannot be held" "validate: rather than trusted with ONLY"
+expect_output "ONLY cannot be held" "validate: rather than trusted with ONLY"
 expect_output "no build is named so" "validate: and what it said instead is shown"
 
 FAKE_SILENT=1 run_task pk:validate
 expect_status ok "validate: which only matters when there is an ONLY"
+
+# EXCEPT is held the same way. A mistyped name there leaves nothing out: the
+# CLI builds what it was told to skip, and exits 0.
+reset_calls
+run_task pk:validate EXCEPT="base.null.one listing"
+expect_status ok "validate: EXCEPT naming what is there passes"
+expect_line "packer validate -except=base.null.one,listing ." "validate: the names reach the CLI as one list"
+expect_line "packer validate -except=$SENTINEL ." "validate: the CLI is asked about a name nothing has, as an -except alone"
+
+reset_calls
+run_task pk:validate EXCEPT="base.null.one base.null.no-such"
+expect_status fail "validate: a name in EXCEPT that matches nothing is refused"
+expect_output "EXCEPT" "validate: and says which input"
+refute_output "in ONLY" "validate: and not the other"
+refute_call "$SENTINEL" "validate: with nothing further asked"
+
+FAKE_WARN_FD=2 run_task pk:validate EXCEPT="base.null.no-such"
+expect_status fail "validate: wherever the CLI writes that warning"
+
+reset_calls
+run_task pk:validate ONLY="base.*" EXCEPT=base.null.two
+expect_status ok "validate: ONLY and EXCEPT together pass"
+expect_line "packer validate -only=base.* -except=base.null.two ." "validate: both reach the CLI"
+expect_line "packer validate -only=$SENTINEL -except=$SENTINEL ." "validate: and the CLI is asked about both in one call"
+
+run_task pk:validate ONLY=base.null.no-such EXCEPT=base.null.one
+expect_status fail "validate: a bad ONLY beside a good EXCEPT is refused"
+expect_output "in ONLY" "validate: as the ONLY it is"
+
+FAKE_SILENT_EXCEPT=1 run_task pk:validate EXCEPT=base.null.one
+expect_status fail "validate: a CLI that does not say when an -except matches nothing is refused"
+expect_output "EXCEPT cannot be held" "validate: rather than trusted with EXCEPT"
+
+FAKE_SILENT_EXCEPT=1 run_task pk:validate ONLY=base.null.one
+expect_status ok "validate: which only matters when there is an EXCEPT"
+
+FAKE_SILENT=1 run_task pk:validate ONLY=base.null.one EXCEPT=base.null.two
+expect_status fail "validate: a CLI that says neither is refused with both"
+expect_output "ONLY cannot be held" "validate: for the first of them"
 
 reset_calls
 FAKE_VALIDATE=1 run_task pk:validate ONLY=base.null.one
@@ -182,12 +231,29 @@ run_task pk:build ONLY="base.null.one base.null.no-such"
 expect_status fail "build: a name in ONLY that matches no build is refused"
 refute_call "packer build" "build: and the builds it does match are not built"
 
+reset_calls
+run_task pk:build ONLY="base.*" EXCEPT=base.null.two
+expect_status ok "build: ONLY and EXCEPT narrow it together"
+expect_line "packer build -only=base.* -except=base.null.two ." "build: both reach the build"
+called_before "packer validate -only=base.* -except=base.null.two ." "packer build" "build: and the validation before it"
+
+reset_calls
+run_task pk:build EXCEPT=base.null.no-such
+expect_status fail "build: a name in EXCEPT that matches nothing is refused"
+refute_call "packer build" "build: and what it was meant to leave out is not built"
+
 # Called by another task, ONLY is that call's and not the command line's.
 printf '%s\n' 'tasks:' '  narrow:' '    cmds:' '      - task: pk:build' '        vars: { ONLY: base.null.no-such }' >> "$CONSUMER/Taskfile.yaml"
 reset_calls
 run_task narrow
 expect_status fail "build: an ONLY given by a calling task is held to the builds too"
 refute_call "packer build" "build: and nothing is built"
+consumer pk packer '{ PACKER_DIR: images }'
+printf '%s\n' 'tasks:' '  leave-out:' '    cmds:' '      - task: pk:build' '        vars: { EXCEPT: base.null.no-such }' >> "$CONSUMER/Taskfile.yaml"
+reset_calls
+run_task leave-out
+expect_status fail "build: so is an EXCEPT given by a calling task"
+refute_call "packer build" "build: and nothing is built then either"
 consumer pk packer '{ PACKER_DIR: images }'
 
 reset_calls

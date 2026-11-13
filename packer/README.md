@@ -1,8 +1,8 @@
 # packer — one template, and every build named for real
 
 The gates of one Packer template — formatting and validity — and building it
-only once it is valid, with every build named in `ONLY` held to a build the
-template has.
+only once it is valid, with every name in `ONLY` and `EXCEPT` held to
+something the template has.
 
 ```yaml
 includes:
@@ -31,8 +31,8 @@ with several includes this once per template.
 | `init` | Install the plugins the template requires |
 | `fmt` | Fail when a file under `PACKER_DIR` is not in the canonical format |
 | `inspect` | Show the variables and builds of the template; changes nothing |
-| `validate` | Validate the template, or the builds `ONLY` names; changes nothing |
-| `build` | Validate, ask, then build the template, or the builds `ONLY` names |
+| `validate` | Validate the template, or the builds `ONLY` and `EXCEPT` leave; changes nothing |
+| `build` | Validate, ask, then build the template, or the builds `ONLY` and `EXCEPT` leave |
 
 ## Inputs
 
@@ -51,6 +51,7 @@ On the call itself:
 | Var | Meaning |
 |---|---|
 | `ONLY` | Build names, separated by spaces, to narrow `validate` and `build` to. Each has to match a build |
+| `EXCEPT` | Names of builds and post-processors, separated by spaces, to leave out of `validate` and `build`. Each has to match one |
 
 Every task runs the CLI in `PACKER_DIR`, with `.` for the template: its own
 relative paths — a `file()` it reads, a `-var-file` in `PACKER_VAR_FLAGS`, a
@@ -81,7 +82,7 @@ sources — the CLI leaves them out unless asked, since reading one may cost.
 A directory with no template fails, and so does a template with no build: the
 CLI refuses both itself.
 
-## Every name in ONLY is a build
+## Every name in ONLY and EXCEPT is there
 
 A build's name is `<type>.<name>` of its source — `amazon-ebs.web` — and
 `<build>.<type>.<name>` where the `build` block has a name of its own. A name
@@ -92,19 +93,25 @@ names that do match, and exits 0: a mistyped name is an image nobody built,
 in a run that passed. Asked to validate, it reports a valid template having
 checked no build at all.
 
-`validate` reads the CLI's output for that warning and refuses the `ONLY`, and
-`build` validates first. The warning is a sentence and nothing else — no exit
-code, nothing more in `-machine-readable` — so `validate` also asks the CLI
-about a name no build has, and refuses `ONLY` altogether on a CLI that does
-not give the warning there, showing what it said instead. Without an `ONLY` neither is asked.
+`EXCEPT` fails the other way. A name there that matches nothing leaves
+nothing out: the build it was meant to skip is built, and the CLI exits 0. It
+takes the names of post-processors as well as builds, and matches a build
+only among those `ONLY` has left — a build `ONLY` already leaves out is, to
+`EXCEPT`, a name that matches nothing.
 
-This holds for `ONLY`. An `-only` or an `-except` put in `PACKER_BUILD_FLAGS`
-is passed as written: nothing checks it, and a mistyped `-except` builds
-everything.
+`validate` reads the CLI's output for either warning and refuses the input,
+and `build` validates first. The warnings are sentences and nothing else — no
+exit code, nothing more in `-machine-readable` — so `validate` also asks the
+CLI about a name nothing has, and refuses `ONLY` or `EXCEPT` altogether on a
+CLI that does not give the warning there, showing what it said instead.
+Without an `ONLY` or an `EXCEPT` nothing more is asked.
+
+This holds for `ONLY` and `EXCEPT`. An `-only` or an `-except` put in
+`PACKER_BUILD_FLAGS` is passed as written: nothing checks it.
 
 ## Validated, asked, then built
 
-`build` validates the template with the same variables and the same `ONLY`,
+`build` validates the template with the same variables, `ONLY` and `EXCEPT`,
 then asks, then builds. Nothing is saved in between: the build reads the
 template again, and Packer has no preview of what a build will create.
 

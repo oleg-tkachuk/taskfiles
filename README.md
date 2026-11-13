@@ -223,7 +223,7 @@ implementation; they are not the current one.
 |---|---|---|
 | [`terraform/`](terraform/README.md) | `terraform` | the gates of a Terraform or OpenTofu configuration — format, validity, a lock file covering every platform, drift — and plan, apply and destroy through a saved plan |
 | [`pulumi/`](pulumi/README.md) | `pulumi` | preview, update, refresh and destroy one Pulumi project, and read its outputs — the stack named on every call, the change shown before it is made |
-| [`packer/`](packer/README.md) | `packer` | the gates of one Packer template — format, validity — and building it only once it is valid, with every build named in `ONLY` held to a build the template has |
+| [`packer/`](packer/README.md) | `packer` | the gates of one Packer template — format, validity — and building it only once it is valid, with every name in `ONLY` and `EXCEPT` held to something the template has |
 | [`nomad/`](nomad/README.md) | `nomad` | the gates of a directory of Nomad job files — format, validity — and submitting a job only as a plan that was saved, held to the modify index it was read at; stopping a job named whole |
 | [`hcloud/`](hcloud/README.md) | `hcloud` | what a project owns in Hetzner Cloud, the power state of its servers, restarts at three levels of force, SSH and a VNC console |
 
