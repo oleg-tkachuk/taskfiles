@@ -9,6 +9,7 @@ shim kubectl '
 case "$*" in
   *" version "*) [ -z "${FAKE_UNREACHABLE:-}" ] ;;
   *"config get-contexts -o name"*) printf "dev\nprod\n" ;;
+  *"config current-context"*) printf "dev\n" ;;
   *"-o go-template="*) [ -n "${FAKE_NO_LABELS:-}" ] || printf "app=web," ;;
   *" get deploy/"*"--ignore-not-found"*)
     if [ -n "${FAKE_FORBIDDEN:-}" ]; then echo "Error from server (Forbidden)" >&2; exit 1; fi
@@ -154,6 +155,14 @@ consumer k8s k8s '{ PROJECT_NAME: web, K8S_CONTEXT: de }'
 run_task k8s:doctor
 expect_status fail "doctor: a pinned context the kubeconfig does not have fails"
 expect_output "K8S_CONTEXT de is not in the kubeconfig" "doctor: the missing context is named, a prefix of a real one included"
+
+# No K8S_CONTEXT at all, which is how most components start: doctor runs, and
+# says the context is whatever kubectl's current one is.
+consumer k8s k8s '{ PROJECT_NAME: web }'
+run_task k8s:doctor
+expect_status ok "doctor: runs with no K8S_CONTEXT set"
+refute_output "invalid value" "doctor: an unset K8S_CONTEXT is not a template error"
+expect_output "context dev — not pinned" "doctor: reports the current context as unpinned"
 
 # ─── logs: LOG_TAIL, and the old TAIL refused ───────────────────────────────
 consumer k8s k8s '{ PROJECT_NAME: web, K8S_NAMESPACE: apps, K8S_CONTEXT: dev }'
