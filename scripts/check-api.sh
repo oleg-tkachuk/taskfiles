@@ -10,7 +10,10 @@
 # Names compared, per module:
 #   tasks and their aliases, less internal ones;
 #   inputs — every unprefixed upper-case name a template reads, less Task's own
-#   variables and the parameters a module passes between its own tasks.
+#   variables and the parameters a module passes between its own tasks. One
+#   passed on under its own name — `PORT: "{{.PORT}}"` — is no such parameter:
+#   a nested call sees nothing its caller was given, so that is an input
+#   being handed down.
 #
 # An allowlist entry is <module>:<name>, or <module>:* for a whole module. One
 # whose name the base no longer has is stale — the major that removed it has
@@ -131,7 +134,7 @@ names() {
   yaml=$(cat)
   [ -n "$yaml" ] || return 0
   printf '%s\n' "$yaml" | yq -r '.tasks // {} | to_entries[] | select((.value | select(type == "!!map") | .internal) != true) | [.key] + ((.value | select(type == "!!map") | .aliases) // []) | .[]'
-  params=$(printf '%s\n' "$yaml" | yq -r '.tasks // {} | .[] | select(type == "!!map") | ((.cmds // []) + (.deps // []))[] | select(type == "!!map") | .vars // {} | keys | .[]')
+  params=$(printf '%s\n' "$yaml" | yq -r '.tasks // {} | .[] | select(type == "!!map") | ((.cmds // []) + (.deps // []))[] | select(type == "!!map") | .vars // {} | to_entries[] | select(.value != "{{." + .key + "}}") | .key')
   # Template actions in any string, and `ref:` expressions, which are a
   # template without the braces — a list input is read only there.
   {
