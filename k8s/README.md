@@ -24,7 +24,7 @@ workspace — tasks then read `k8s:<task>`.
 | `logs` | Tail the deployment's logs (Ctrl-C to stop) |
 | `port-forward` | Port-forward the deployment (PORT local, TARGET_PORT in the pod) |
 | `rollout:wait` | Wait until the Deployment runs VERSION and has rolled out (VERSION=1.4.0) |
-| `restart` | Roll the deployment (no-op when the cluster, namespace or deployment is absent) |
+| `restart` | Roll the deployment (no-op when the cluster, namespace or deployment is absent; `RESTART_UNREACHABLE=fail` makes an unreachable cluster an error) |
 | `status` | Show the deployment and its pods |
 | `upgrade` | helm upgrade --install the release from the local chart directory |
 | `uninstall` | helm uninstall this component's release — asks first |
@@ -40,6 +40,7 @@ workspace — tasks then read `k8s:<task>`.
 | `CHART_DIR` | `./deploy/chart` | for `upgrade` |
 | `VALUES` | — | a values file for `upgrade` |
 | `ROLLOUT_TIMEOUT` | `2m` | how long `restart` waits, and `rollout:wait` in all; a whole number with `s`, `m` or `h` |
+| `RESTART_UNREACHABLE` | `skip` | what `restart` does when the cluster does not answer: `skip`, or `fail` |
 | `VERSION` | — | required by `rollout:wait`: the version to wait for |
 | `ROLLOUT_MATCH` | `image` | what says a Deployment runs `VERSION`: `image`, a container's image tag, or `chart`, its `helm.sh/chart` label |
 | `ROLLOUT_SELECTOR` | — | label selector: `rollout:wait` then waits for every Deployment it matches, not `K8S_DEPLOYMENT_NAME` alone |
@@ -111,6 +112,29 @@ Pin `K8S_CONTEXT` at the include, never on a call. The kubectl tasks take
 the context as the include loads and do not see a call's, while `upgrade` and
 `uninstall` hand helm whatever the call says — so a context given on a call
 would send the two halves of this module to different clusters.
+
+## restart — when there is nothing to roll
+
+`restart` skips, and passes, when the cluster does not answer or the
+Deployment is not there: it sits in chains that have to stay green on a
+laptop with no cluster running. It says which of the two happened, and a
+lookup the cluster refuses — RBAC, an expired login — fails.
+
+In a chain that deploys, a cluster that did not answer is a roll that never
+ran, and a green step hides it. `RESTART_UNREACHABLE=fail` makes that case an
+error, at the include or on the call:
+
+```yaml
+- task: k8s:restart
+  vars: { RESTART_UNREACHABLE: fail }
+```
+
+```
+✖ fail  · core-api · k8s · cluster unreachable — nothing was rolled
+```
+
+An absent namespace or Deployment is still a skip under it: that is an answer
+from the cluster, not the lack of one.
 
 ## doctor — what this component points at
 

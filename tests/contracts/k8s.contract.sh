@@ -71,4 +71,15 @@ run_task k8s:restart
 expect_status ok "restart: an unreachable cluster is skipped"
 expect_output "cluster unreachable" "restart: says the cluster was unreachable"
 
+run_task k8s:restart RESTART_UNREACHABLE=fail
+expect_status fail "restart: an unreachable cluster fails under RESTART_UNREACHABLE=fail"
+expect_output "cluster unreachable — nothing was rolled" "restart: says nothing was rolled"
+
+# The option is about a cluster that does not answer, and no other case: an
+# absent deployment on one that does is still nothing to roll.
+consumer k8s k8s "{ PROJECT_NAME: absent, K8S_NAMESPACE: $ns, K8S_CONTEXT: $ctx }"
+run_task k8s:restart RESTART_UNREACHABLE=fail
+expect_status ok "restart: an absent deployment is skipped under RESTART_UNREACHABLE=fail"
+expect_output "deploy/absent not found in $ns" "restart: says the deployment is not there"
+
 finish

@@ -51,7 +51,39 @@ expect_status ok "restart: an unreachable cluster is skipped, not failed"
 refute_call "rollout restart" "restart: nothing is rolled when the cluster is unreachable"
 expect_output "cluster unreachable" "restart: says the cluster was unreachable"
 refute_output "not found" "restart: an unreachable cluster is not reported as an absent deployment"
+
+# In a chain that deploys, a cluster that did not answer is a roll that never
+# ran: RESTART_UNREACHABLE=fail makes it one.
+reset_calls
+run_task k8s:restart RESTART_UNREACHABLE=fail
+expect_status fail "restart: RESTART_UNREACHABLE=fail fails on an unreachable cluster"
+expect_output "✖ fail  · web · k8s · cluster unreachable — nothing was rolled" "restart: and says nothing was rolled"
+refute_output "skipping" "restart: and does not report a skip"
+refute_call "rollout restart" "restart: nothing is rolled then either"
+
+run_task k8s:restart RESTART_UNREACHABLE=skip
+expect_status ok "restart: RESTART_UNREACHABLE=skip is the default spelled out"
+run_task k8s:restart RESTART_UNREACHABLE=
+expect_status ok "restart: an empty RESTART_UNREACHABLE is the default"
 unset FAKE_UNREACHABLE
+
+# It is about the cluster alone: one that answers is rolled, and an absent
+# deployment is still nothing to roll.
+reset_calls
+run_task k8s:restart RESTART_UNREACHABLE=fail
+expect_status ok "restart: RESTART_UNREACHABLE=fail rolls on a cluster that answers"
+expect_call "rollout restart deploy/web" "restart: the deployment is rolled under it"
+export FAKE_NO_DEPLOY=1
+run_task k8s:restart RESTART_UNREACHABLE=fail
+expect_status ok "restart: RESTART_UNREACHABLE=fail still skips an absent deployment"
+expect_output "deploy/web not found in apps" "restart: and says that is why"
+unset FAKE_NO_DEPLOY
+
+reset_calls
+run_task k8s:restart RESTART_UNREACHABLE=yes
+expect_status fail "restart: RESTART_UNREACHABLE takes skip or fail and nothing else"
+expect_output "RESTART_UNREACHABLE is yes" "restart: the refusal names the value"
+refute_call "kubectl" "restart: nothing runs on another value"
 
 # A cluster that answers with anything but "not found" is a failure: the old
 # pods would keep running behind a green step.
@@ -212,6 +244,10 @@ reset_calls
 run_task go
 expect_output "namespace jobs" "on the call: doctor reports the namespace named"
 expect_output "deployment worker" "on the call: and the Deployment"
+
+calling restart '{ RESTART_UNREACHABLE: fail }'
+FAKE_UNREACHABLE=1 run_task go
+expect_status fail "on the call: RESTART_UNREACHABLE is read there too"
 
 # ─── rollout:wait ────────────────────────────────────────────────────────────
 # What the cluster holds is read from files: the Deployments a lookup names,
