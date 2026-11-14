@@ -218,6 +218,21 @@ update creates it again. So `refresh` is shown and asked about like an update,
 and `refresh:plan` is the same preview by itself — what the state no longer
 matches, for one stack, with nothing written.
 
+## No retry after a failed update
+
+There is no task that updates, and on a failure refreshes and updates again.
+A refresh rewrites the state, and the second update is not the one that was
+previewed: both would happen with nothing shown and nothing asked, which is
+the one thing every task here holds to. Which failures are safe to repeat is
+also the repository's judgement, not something this module can read off the
+CLI.
+
+The pieces are here for a repository that wants that loop in a task of its
+own: `refresh`, then `apply`. Where the state is known to drift, `--refresh`
+in `PULUMI_UP_FLAGS` — at the include, or on the call — makes every update
+refresh first, and `--refresh` in `PULUMI_PLAN_FLAGS` makes its preview show
+the same.
+
 ## Outputs
 
 ```console
