@@ -21,7 +21,9 @@ lock_file() { printf '%s/git.fake.%s.checksum' "$LOCK" "$1"; }
 # as Task does under -v, names each lock file it reads — unless FAKE_SILENT is
 # set. Under FAKE_COLOR those lines are coloured as Task colours them in CI,
 # the colour starting each line and ending on the next, unless --color=false
-# is passed. Each faked call records whether git's GIT_DIR reached it.
+# is passed. Under FAKE_GARBLED each line is run into the start of another, as
+# writes that interleave leave it: it still starts as one, and names no file.
+# Each faked call records whether git's GIT_DIR reached it.
 REAL_TASK=$(command -v task)
 export REAL_TASK
 export FAILS="$WORK/fails"
@@ -54,6 +56,7 @@ if [ "$mode" = download ]; then
 fi
 for r in $refs; do
   [ -f "$cache/remote/git.fake.$r.yaml" ] || { echo "not found in the cache" >&2; exit 1; }
+  [ -z "${FAKE_GARBLED:-}" ] || printf "checking cache for \"https://example.invalid//m?ref=%s\" in \"" "$r" >&2
   [ -n "${FAKE_SILENT:-}" ] || printf "%schecking cache for \"https://example.invalid//m?ref=%s\" in \"%s/%s/remote/git.fake.%s.yaml\"\n%s" "$on" "$r" "$PWD" "$cache" "$r" "$off" >&2
 done'
 
@@ -161,6 +164,16 @@ FAKE_COLOR=1 run_task tasklib:check
 expect_status ok "check: a clean lock passes when Task would colour its output"
 refute_output "files left by earlier refs are not checked" "check: the leftover check is not skipped when Task would colour its output"
 expect_call "--color=false" "check: asks Task for output without colour"
+
+# What Task said cannot be read as file names: lines run into each other. Every
+# file of a lock that is right would otherwise be called left over, in every
+# directory at once. Said as what it is, and no file is named.
+FAKE_GARBLED=1 run_task tasklib:check
+expect_status fail "check: fails when what Task said of the lock cannot be read"
+expect_output "could not tell which lock files the Taskfiles in api read" "check: says it could not tell, for each directory"
+expect_output "could not tell which lock files the Taskfiles in . read" "check: the root among them"
+refute_output "an earlier ref left it" "check: calls no file of a lock it could not read left over"
+refute_output "refresh the lock with" "check: and does not ask for a lock that may be right to be refreshed"
 
 run_task tasklib:check
 expect_status ok "check: a restored lock passes again"
