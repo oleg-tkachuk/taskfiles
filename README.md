@@ -422,16 +422,35 @@ task's own `vars:` and nowhere else.
 
 ```yaml
 # configures the module — the include carries the value
-k8s: { taskfile: '{{printf .TASKLIB "k8s"}}', dir: ., vars: { K8S_NAMESPACE: orders } }
+k8s: { taskfile: '{{printf .TASKLIB "k8s"}}', dir: ., vars: { CHART_DIR: deploy/orders } }
 
-# does not — the module derived its namespace when it loaded
+# does not — the module derived its chart directory when it loaded
+- task: k8s:upgrade
+  vars: { CHART_DIR: deploy/orders }
+```
+
+That is why a module here is scoped to one component. A repository that
+needs the same module aimed at several targets includes it once per target,
+rather than passing the target at the call.
+
+Two modules read what they act on a second time, in each task's own `vars:`,
+so that one include can serve several targets: [`pulumi`](pulumi/README.md#one-include-several-projects)
+reads `PULUMI_DIR` and its `*_FLAGS`, and [`k8s`](k8s/README.md#one-include-several-deployments)
+reads `PROJECT_NAME`, `K8S_NAMESPACE` and `K8S_DEPLOYMENT_NAME`. For those
+inputs a value on the call that is not empty wins, then the include's, then
+the default:
+
+```yaml
+# acts on orders — these three are read on the call
 - task: k8s:restart
   vars: { K8S_NAMESPACE: orders }
 ```
 
-That is why every module here is scoped to one component. A repository that
-needs the same module aimed at several targets includes it once per target,
-rather than passing the target at the call.
+Nothing else a module derives in its own top-level `vars:` follows a call:
+`K8S_CONTEXT` and `CHART_DIR` in `k8s`, and what every other module derives
+there, are decided as the include loads. An input a task reads where it uses
+it — `ROLLOUT_TIMEOUT`, `TARGETS`, anything a task `requires` — has always
+been the call's.
 
 The `X: '{{.X | default "..."}}'` form in the quickstart is not decoration: a var
 that reads a *different* name is fixed at whatever that name held, while one
