@@ -135,6 +135,84 @@ expect_status fail "logs: the old TAIL is refused"
 expect_output "TAIL is now LOG_TAIL" "logs: the refusal names the new input"
 refute_call "logs deploy/" "logs: nothing runs on the old TAIL"
 
+# ─── on the call ─────────────────────────────────────────────────────────────
+# A repository that rolls several Deployments includes the module once and
+# names each on the call it makes from a task of its own. What the call gives
+# wins over what the include gave, for that call alone.
+#
+# calling <task> <vars as a flow mapping> [include vars] — a consumer whose
+# task `go` calls k8s:<task> with those vars, over an include for web in apps.
+readonly WEB_IN_APPS='{ PROJECT_NAME: web, K8S_NAMESPACE: apps, K8S_CONTEXT: dev }'
+calling() {
+  consumer k8s k8s "${3:-$WEB_IN_APPS}"
+  cat >> "$CONSUMER/Taskfile.yaml" <<YAML
+tasks:
+  go:
+    cmds:
+      - task: k8s:$1
+        vars: $2
+YAML
+}
+
+calling restart '{ K8S_NAMESPACE: jobs, K8S_DEPLOYMENT_NAME: worker }'
+reset_calls
+run_task go
+expect_status ok "on the call: a restart with its own namespace and Deployment passes"
+expect_call "kubectl --context dev -n jobs rollout restart deploy/worker" "on the call: K8S_NAMESPACE and K8S_DEPLOYMENT_NAME are what is rolled"
+expect_call "kubectl --context dev -n jobs rollout status deploy/worker" "on the call: and what is waited for"
+refute_call "-n apps" "on the call: nothing runs in the include's namespace"
+refute_call "deploy/web" "on the call: nothing runs on the include's Deployment"
+expect_output "web · k8s · rolled worker" "on the call: the line keeps the include's label and names what was rolled"
+
+calling restart '{ PROJECT_NAME: api }'
+reset_calls
+run_task go
+expect_call "-n apps rollout restart deploy/api" "on the call: PROJECT_NAME names the Deployment too"
+expect_output "api · k8s · rolled api" "on the call: and is the label of the line"
+
+calling restart '{ PROJECT_NAME: api }' '{ PROJECT_NAME: web, K8S_DEPLOYMENT_NAME: web-server, K8S_CONTEXT: dev }'
+reset_calls
+run_task go
+expect_call "rollout restart deploy/web-server" "on the call: PROJECT_NAME leaves a Deployment the include named"
+
+calling restart '{ K8S_NAMESPACE: "", K8S_DEPLOYMENT_NAME: "", PROJECT_NAME: "" }'
+reset_calls
+run_task go
+expect_call "-n apps rollout restart deploy/web" "on the call: empty values fall back to the include's"
+expect_output "web · k8s · rolled web" "on the call: the label among them"
+
+calling uninstall '{ K8S_NAMESPACE: jobs, K8S_DEPLOYMENT_NAME: worker }'
+reset_calls
+run_task go
+expect_call "helm uninstall worker --namespace jobs" "on the call: uninstall removes the release named"
+expect_output "Uninstall worker from jobs" "on the call: and asks about it"
+
+calling upgrade '{ K8S_NAMESPACE: jobs, K8S_DEPLOYMENT_NAME: worker }'
+reset_calls
+run_task go
+expect_call "helm upgrade --install worker ./deploy/chart --namespace jobs" "on the call: upgrade installs the release named"
+
+calling status '{ K8S_NAMESPACE: jobs, K8S_DEPLOYMENT_NAME: worker }'
+reset_calls
+run_task go
+expect_call "-n jobs get deploy/worker -o wide" "on the call: status shows the Deployment named"
+
+calling logs '{ K8S_NAMESPACE: jobs, K8S_DEPLOYMENT_NAME: worker }'
+reset_calls
+run_task go
+expect_call "-n jobs logs deploy/worker" "on the call: logs tails the Deployment named"
+
+calling port-forward '{ K8S_NAMESPACE: jobs, K8S_DEPLOYMENT_NAME: worker }'
+reset_calls
+run_task go
+expect_call "-n jobs port-forward deploy/worker 8080:8080" "on the call: port-forward reaches the Deployment named"
+
+calling doctor '{ K8S_NAMESPACE: jobs, K8S_DEPLOYMENT_NAME: worker }'
+reset_calls
+run_task go
+expect_output "namespace jobs" "on the call: doctor reports the namespace named"
+expect_output "deployment worker" "on the call: and the Deployment"
+
 # ─── rollout:wait ────────────────────────────────────────────────────────────
 # What the cluster holds is read from files: the Deployments a lookup names,
 # and per Deployment its images and its chart label. BEHIND counts down the
@@ -257,5 +335,11 @@ expect_status fail "rollout:wait: an empty VERSION is refused"
 run_task k8s:rollout:wait VERSION=1.4.0 ROLLOUT_TIMEOUT=soon
 expect_status fail "rollout:wait: a ROLLOUT_TIMEOUT that is not a duration is refused"
 expect_output "ROLLOUT_TIMEOUT must be a whole number with s, m or h, got: soon" "rollout:wait: the refusal names the value"
+
+calling rollout:wait '{ VERSION: 1.4.0, K8S_NAMESPACE: jobs, K8S_DEPLOYMENT_NAME: worker }'
+reset_calls
+run_task go
+expect_call "-n jobs get deploy/worker" "on the call: rollout:wait watches the Deployment named"
+refute_call "-n apps" "on the call: and not the include's namespace"
 
 finish

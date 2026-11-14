@@ -49,6 +49,10 @@ workspace — tasks then read `k8s:<task>`.
 | `TARGET_PORT` | `PORT` | pod-side port for `port-forward`, when it differs |
 | `LOG_TAIL` | `100` | line count for `logs` |
 
+`PROJECT_NAME`, `K8S_NAMESPACE` and `K8S_DEPLOYMENT_NAME` are also read from
+the `vars:` of a `task:` call — see
+[One include, several Deployments](#one-include-several-deployments).
+
 ## Examples
 
 ```yaml
@@ -73,6 +77,40 @@ $ task k8s:port-forward PORT=8080
 $ task k8s:port-forward PORT=8081 TARGET_PORT=80    # container listens on :80
 $ task k8s:logs LOG_TAIL=500
 ```
+
+## One include, several Deployments
+
+`PROJECT_NAME`, `K8S_NAMESPACE` and `K8S_DEPLOYMENT_NAME` are read on every
+call. A value in the `vars:` of a `task:` call wins over the include's, for
+that call alone, so a repository that operates more than one Deployment names
+each where it acts on it:
+
+```yaml
+includes:
+  k8s: { taskfile: '{{printf .TASKLIB "k8s"}}', dir: ., vars: { K8S_NAMESPACE: acme } }
+
+tasks:
+  restart:
+    cmds:
+      - task: k8s:restart
+        vars: { K8S_DEPLOYMENT_NAME: example-app }
+      - task: k8s:restart
+        vars: { K8S_DEPLOYMENT_NAME: my-service, K8S_NAMESPACE: jobs }
+```
+
+The order, most specific first: the call's value when it is not empty, the
+include's, the default. A `PROJECT_NAME` on the call names the Deployment as
+well, unless a `K8S_DEPLOYMENT_NAME` is given on the call or at the include.
+An empty value on the call turns nothing off — it falls back, as
+[an empty value does everywhere](../README.md#an-empty-value-turns-nothing-off).
+
+This is the `vars:` of a `task:` call, not the command line: Task ranks an
+include's `vars:` above the command line, so `task k8s:restart
+K8S_NAMESPACE=…` reaches the module only when the include sets none.
+Pin `K8S_CONTEXT` at the include, never on a call. The kubectl tasks take
+the context as the include loads and do not see a call's, while `upgrade` and
+`uninstall` hand helm whatever the call says — so a context given on a call
+would send the two halves of this module to different clusters.
 
 ## doctor — what this component points at
 
