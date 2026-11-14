@@ -38,6 +38,8 @@ version: "3"
 #   CHART_DIR            for k8s:upgrade  (default ./deploy/chart)
 #   VALUES               a values file for k8s:upgrade
 #   ROLLOUT_TIMEOUT      how long to wait for a roll      (default 2m)
+#   RESTART_UNREACHABLE  what k8s:restart does when the cluster does not
+#                        answer: "skip", or "fail"        (default skip)
 #   VERSION              required by rollout:wait: the version to wait for
 #   ROLLOUT_MATCH        what says a Deployment runs VERSION: "image", a
 #                        container's image tag, or "chart", its helm.sh/chart
@@ -76,6 +78,9 @@ vars:
   # How long restart's reachability probe waits before calling the cluster
   # gone: a dead context would otherwise hang the chain it sits in.
   _K8S_PROBE_TIMEOUT: 3s
+  # What RESTART_UNREACHABLE may be.
+  _K8S_UNREACHABLE_SKIP: skip
+  _K8S_UNREACHABLE_FAIL: fail
   # What ROLLOUT_MATCH may be.
   _K8S_MATCH_IMAGE: image
   _K8S_MATCH_CHART: chart
@@ -174,14 +179,25 @@ tasks:
     # "not found", and the old pods kept running behind a green step.
     # --ignore-not-found turns "absent" into empty output and exit 0, so
     # "absent" is told from an error without reading kubectl's prose.
+    #
+    # RESTART_UNREACHABLE=fail is for a chain that deploys: there a cluster
+    # that did not answer is a roll that never ran. An absent deployment stays
+    # a skip under it — that one the cluster did answer about.
     vars:
       _K8S_SVC: '{{or .PROJECT_NAME ._K8S_SVC}}'
       _K8S_NS: '{{or .K8S_NAMESPACE ._K8S_NS}}'
       _K8S_DEPLOY: '{{or .K8S_DEPLOYMENT_NAME ._K8S_DEPLOY_NAME .PROJECT_NAME ._K8S_DEPLOY}}'
+    preconditions:
+      - sh: '{{$u := .RESTART_UNREACHABLE | default ._K8S_UNREACHABLE_SKIP}}{{if or (eq $u ._K8S_UNREACHABLE_SKIP) (eq $u ._K8S_UNREACHABLE_FAIL)}}true{{else}}false{{end}}'
+        msg: "RESTART_UNREACHABLE is {{.RESTART_UNREACHABLE}} — set it to {{._K8S_UNREACHABLE_SKIP}} (an unreachable cluster is skipped, the default) or {{._K8S_UNREACHABLE_FAIL}} (it fails the task)"
     cmds:
       - cmd: |-
           set -eu
           if ! {{._K8S_KUBECTL}} version --request-timeout={{._K8S_PROBE_TIMEOUT | q}} >/dev/null 2>&1; then
+            if [ {{.RESTART_UNREACHABLE | default ._K8S_UNREACHABLE_SKIP | q}} = {{._K8S_UNREACHABLE_FAIL | q}} ]; then
+              printf '%s %s · k8s · cluster unreachable — nothing was rolled\n' "{{._K8S_ERR}}" {{._K8S_SVC | q}} >&2
+              exit 1
+            fi
             printf '%s %s · k8s · cluster unreachable — skipping restart\n' "{{._K8S_SKIP}}" {{._K8S_SVC | q}}
             exit 0
           fi
