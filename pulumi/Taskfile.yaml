@@ -38,6 +38,9 @@ version: "3"
 #                         — --ignore-protect, an --exclude
 #   PULUMI_REFRESH_FLAGS  flags for a refresh and its preview alike
 #                                                               (default --diff)
+#   PULUMI_ENV            NAME=value words, separated by spaces: environment
+#                         for the CLI of this call and nothing else. A value
+#                         holds no space, and is never printed
 #
 # Each of these is also read from the `vars:` of a `task:` call, where a
 # value that is not empty wins for that call alone. An empty one falls back
@@ -68,6 +71,10 @@ vars:
   _PU_UP_FLAGS: '{{.PULUMI_UP_FLAGS | default ""}}'
   _PU_DESTROY_FLAGS: '{{.PULUMI_DESTROY_FLAGS | default ""}}'
   _PU_REFRESH_FLAGS: '{{.PULUMI_REFRESH_FLAGS | default "--diff"}}'
+  # secret: a value in it may be a credential, and Task prints ***** for a
+  # secret var wherever it echoes a task. Only a var marked so is masked, not
+  # one derived from it, so each task's own copy is marked as well.
+  _PU_ENV: { value: '{{.PULUMI_ENV | default ""}}', secret: true }
   # `preview --expect-no-changes` exits with this when changes were proposed.
   # Any other non-zero code is a preview that did not finish. The CLI has had
   # distinct codes since 3.227.0; before that, both were 255.
@@ -78,10 +85,17 @@ vars:
   _PU_ERR: '{{if .NO_COLOR}}✖ fail  ·{{else}}{{"\x1b[31m✖ fail\x1b[0m  ·"}}{{end}}'
   # Interpolated by every task below.
   #
-  # `pu <directory> <targets> <arguments…>` runs the CLI on <directory> with
-  # no terminal assumed, and a --target for each word of <targets>. The
-  # directory is an argument and not written in here: this text is fixed as
-  # the include loads, and the directory is the call's.
+  # `pu <directory> <environment> <targets> <arguments…>` runs the CLI on
+  # <directory> with no terminal assumed, each NAME=value word of
+  # <environment> exported to it, and a --target for each word of <targets>.
+  # The directory and the environment are arguments and not written in here:
+  # this text is fixed as the include loads, and they are the call's.
+  #
+  # The environment is exported in a subshell, so it reaches this one run of
+  # the CLI and is gone after it — not `env NAME=value pulumi`, which would
+  # put the values in an argument list. A word that is not NAME=value is
+  # refused by its place in the list: it may be half of a value, and no value
+  # is printed.
   #
   # Only whole URNs are taken. A pattern that matches nothing is not an error
   # to the CLI: `preview --target '**::Release::no-such'` reports no changes
@@ -91,9 +105,20 @@ vars:
   # is seen as written and not as the files it happens to match.
   _PU_SH: |
     pu() {
-      directory=$1 targets=$2
-      shift 2
+      directory=$1 environment=$2 targets=$3
+      shift 3
       set -f
+      place=0
+      for pair in $environment; do
+        place=$((place + 1))
+        name=
+        case "$pair" in *=*) name=${pair%%=*} ;; esac
+        case "$name" in
+          '' | [0-9]* | *[!A-Za-z0-9_]*)
+            printf '%s pulumi · word %s of PULUMI_ENV is not NAME=value — nothing was run\n' "{{._PU_ERR}}" "$place" >&2
+            return 1 ;;
+        esac
+      done
       for target in $targets; do
         case "$target" in
           *[*?]*)
@@ -103,7 +128,13 @@ vars:
         set -- "$@" --target "$target"
       done
       set +f
-      pulumi --non-interactive --cwd "$directory" "$@"
+      # Last, so that the CLI's exit code is this function's.
+      (
+        set -f
+        for pair in $environment; do export "$pair"; done
+        set +f
+        pulumi --non-interactive --cwd "$directory" "$@"
+      )
     }
 
 tasks:
@@ -124,6 +155,7 @@ tasks:
       vars: [STACK]
     vars:
       _PU_DIR: '{{or .PULUMI_DIR ._PU_DIR}}'
+      _PU_ENV: { value: '{{or .PULUMI_ENV ._PU_ENV}}', secret: true }
       _PU_PLAN_FLAGS: '{{or .PULUMI_PLAN_FLAGS ._PU_PLAN_FLAGS}}'
     cmds:
       - task: _ready
@@ -131,7 +163,7 @@ tasks:
       - cmd: |
           set -eu
           {{._PU_SH}}
-          pu {{._PU_DIR | q}} {{.TARGETS | default "" | q}} preview --stack {{.STACK | q}} {{._PU_PLAN_FLAGS}}
+          pu {{._PU_DIR | q}} {{._PU_ENV | q}} {{.TARGETS | default "" | q}} preview --stack {{.STACK | q}} {{._PU_PLAN_FLAGS}}
 
   apply:
     desc: "Update STACK, after showing the preview — asks first"
@@ -144,16 +176,17 @@ tasks:
       vars: [STACK]
     vars:
       _PU_DIR: '{{or .PULUMI_DIR ._PU_DIR}}'
+      _PU_ENV: { value: '{{or .PULUMI_ENV ._PU_ENV}}', secret: true }
       _PU_UP_FLAGS: '{{or .PULUMI_UP_FLAGS ._PU_UP_FLAGS}}'
     deps:
       - task: plan
-        vars: { STACK: "{{.STACK}}", TARGETS: "{{.TARGETS}}", PULUMI_DIR: "{{.PULUMI_DIR}}", PULUMI_PLAN_FLAGS: "{{.PULUMI_PLAN_FLAGS}}" }
+        vars: { STACK: "{{.STACK}}", TARGETS: "{{.TARGETS}}", PULUMI_DIR: "{{.PULUMI_DIR}}", PULUMI_PLAN_FLAGS: "{{.PULUMI_PLAN_FLAGS}}", PULUMI_ENV: "{{.PULUMI_ENV}}" }
     prompt: "Update the stack {{.STACK}} of {{._PU_DIR}} as previewed above. Continue?"
     cmds:
       - cmd: |
           set -eu
           {{._PU_SH}}
-          pu {{._PU_DIR | q}} {{.TARGETS | default "" | q}} up --stack {{.STACK | q}} --yes {{._PU_UP_FLAGS}}
+          pu {{._PU_DIR | q}} {{._PU_ENV | q}} {{.TARGETS | default "" | q}} up --stack {{.STACK | q}} --yes {{._PU_UP_FLAGS}}
 
   destroy:plan:
     desc: "Preview the destruction of STACK; changes nothing"
@@ -161,6 +194,7 @@ tasks:
       vars: [STACK]
     vars:
       _PU_DIR: '{{or .PULUMI_DIR ._PU_DIR}}'
+      _PU_ENV: { value: '{{or .PULUMI_ENV ._PU_ENV}}', secret: true }
       _PU_DESTROY_FLAGS: '{{or .PULUMI_DESTROY_FLAGS ._PU_DESTROY_FLAGS}}'
     cmds:
       - task: _ready
@@ -168,7 +202,7 @@ tasks:
       - cmd: |
           set -eu
           {{._PU_SH}}
-          pu {{._PU_DIR | q}} {{.TARGETS | default "" | q}} destroy --stack {{.STACK | q}} --preview-only {{._PU_DESTROY_FLAGS}}
+          pu {{._PU_DIR | q}} {{._PU_ENV | q}} {{.TARGETS | default "" | q}} destroy --stack {{.STACK | q}} --preview-only {{._PU_DESTROY_FLAGS}}
 
   destroy:
     desc: "Destroy what STACK holds, after showing the preview — needs CONFIRM, asks first"
@@ -179,10 +213,11 @@ tasks:
       vars: [STACK, CONFIRM]
     vars:
       _PU_DIR: '{{or .PULUMI_DIR ._PU_DIR}}'
+      _PU_ENV: { value: '{{or .PULUMI_ENV ._PU_ENV}}', secret: true }
       _PU_DESTROY_FLAGS: '{{or .PULUMI_DESTROY_FLAGS ._PU_DESTROY_FLAGS}}'
     deps:
       - task: destroy:plan
-        vars: { STACK: "{{.STACK}}", TARGETS: "{{.TARGETS}}", PULUMI_DIR: "{{.PULUMI_DIR}}", PULUMI_DESTROY_FLAGS: "{{.PULUMI_DESTROY_FLAGS}}" }
+        vars: { STACK: "{{.STACK}}", TARGETS: "{{.TARGETS}}", PULUMI_DIR: "{{.PULUMI_DIR}}", PULUMI_DESTROY_FLAGS: "{{.PULUMI_DESTROY_FLAGS}}", PULUMI_ENV: "{{.PULUMI_ENV}}" }
     preconditions:
       - sh: test {{.CONFIRM | q}} = {{.STACK | q}}
         msg: "CONFIRM does not name the stack this would destroy — it must repeat STACK"
@@ -191,7 +226,7 @@ tasks:
       - cmd: |
           set -eu
           {{._PU_SH}}
-          pu {{._PU_DIR | q}} {{.TARGETS | default "" | q}} destroy --stack {{.STACK | q}} --yes {{._PU_DESTROY_FLAGS}}
+          pu {{._PU_DIR | q}} {{._PU_ENV | q}} {{.TARGETS | default "" | q}} destroy --stack {{.STACK | q}} --yes {{._PU_DESTROY_FLAGS}}
 
   unchanged:
     desc: "Fail when an update of STACK would change anything; changes nothing"
@@ -203,6 +238,7 @@ tasks:
       vars: [STACK]
     vars:
       _PU_DIR: '{{or .PULUMI_DIR ._PU_DIR}}'
+      _PU_ENV: { value: '{{or .PULUMI_ENV ._PU_ENV}}', secret: true }
       _PU_PLAN_FLAGS: '{{or .PULUMI_PLAN_FLAGS ._PU_PLAN_FLAGS}}'
     cmds:
       - task: _ready
@@ -211,7 +247,7 @@ tasks:
           set -eu
           {{._PU_SH}}
           status=0
-          pu {{._PU_DIR | q}} {{.TARGETS | default "" | q}} preview --stack {{.STACK | q}} {{._PU_PLAN_FLAGS}} --expect-no-changes || status=$?
+          pu {{._PU_DIR | q}} {{._PU_ENV | q}} {{.TARGETS | default "" | q}} preview --stack {{.STACK | q}} {{._PU_PLAN_FLAGS}} --expect-no-changes || status=$?
           case "$status" in
             0) printf '%s pulumi · no changes to the stack %s of %s\n' "{{._PU_OK}}" {{.STACK | q}} {{._PU_DIR | q}} ;;
             {{._PU_CHANGED | q}})
@@ -228,6 +264,7 @@ tasks:
       vars: [STACK]
     vars:
       _PU_DIR: '{{or .PULUMI_DIR ._PU_DIR}}'
+      _PU_ENV: { value: '{{or .PULUMI_ENV ._PU_ENV}}', secret: true }
       _PU_REFRESH_FLAGS: '{{or .PULUMI_REFRESH_FLAGS ._PU_REFRESH_FLAGS}}'
     cmds:
       - task: _ready
@@ -235,7 +272,7 @@ tasks:
       - cmd: |
           set -eu
           {{._PU_SH}}
-          pu {{._PU_DIR | q}} {{.TARGETS | default "" | q}} refresh --stack {{.STACK | q}} --preview-only {{._PU_REFRESH_FLAGS}}
+          pu {{._PU_DIR | q}} {{._PU_ENV | q}} {{.TARGETS | default "" | q}} refresh --stack {{.STACK | q}} --preview-only {{._PU_REFRESH_FLAGS}}
 
   refresh:
     desc: "Bring the state of STACK in line with what exists, after showing the preview — asks first"
@@ -246,16 +283,17 @@ tasks:
       vars: [STACK]
     vars:
       _PU_DIR: '{{or .PULUMI_DIR ._PU_DIR}}'
+      _PU_ENV: { value: '{{or .PULUMI_ENV ._PU_ENV}}', secret: true }
       _PU_REFRESH_FLAGS: '{{or .PULUMI_REFRESH_FLAGS ._PU_REFRESH_FLAGS}}'
     deps:
       - task: refresh:plan
-        vars: { STACK: "{{.STACK}}", TARGETS: "{{.TARGETS}}", PULUMI_DIR: "{{.PULUMI_DIR}}", PULUMI_REFRESH_FLAGS: "{{.PULUMI_REFRESH_FLAGS}}" }
+        vars: { STACK: "{{.STACK}}", TARGETS: "{{.TARGETS}}", PULUMI_DIR: "{{.PULUMI_DIR}}", PULUMI_REFRESH_FLAGS: "{{.PULUMI_REFRESH_FLAGS}}", PULUMI_ENV: "{{.PULUMI_ENV}}" }
     prompt: "Rewrite the state of the stack {{.STACK}} of {{._PU_DIR}} as previewed above. Continue?"
     cmds:
       - cmd: |
           set -eu
           {{._PU_SH}}
-          pu {{._PU_DIR | q}} {{.TARGETS | default "" | q}} refresh --stack {{.STACK | q}} --yes {{._PU_REFRESH_FLAGS}}
+          pu {{._PU_DIR | q}} {{._PU_ENV | q}} {{.TARGETS | default "" | q}} refresh --stack {{.STACK | q}} --yes {{._PU_REFRESH_FLAGS}}
 
   output:
     desc: "Print one output of STACK, and nothing else"
@@ -266,6 +304,7 @@ tasks:
       vars: [STACK, OUTPUT]
     vars:
       _PU_DIR: '{{or .PULUMI_DIR ._PU_DIR}}'
+      _PU_ENV: { value: '{{or .PULUMI_ENV ._PU_ENV}}', secret: true }
     preconditions:
       - sh: 'case {{.SHOW_SECRETS | default "0" | q}} in 0|1) ;; *) exit 1 ;; esac'
         msg: "SHOW_SECRETS is {{.SHOW_SECRETS}} — it is 1 to print a secret in plaintext, or 0"
@@ -275,4 +314,4 @@ tasks:
       - cmd: |
           set -eu
           {{._PU_SH}}
-          pu {{._PU_DIR | q}} "" stack output {{.OUTPUT | q}} --stack {{.STACK | q}}{{if eq (.SHOW_SECRETS | default "0" | toString) "1"}} --show-secrets{{end}}
+          pu {{._PU_DIR | q}} {{._PU_ENV | q}} "" stack output {{.OUTPUT | q}} --stack {{.STACK | q}}{{if eq (.SHOW_SECRETS | default "0" | toString) "1"}} --show-secrets{{end}}

@@ -45,6 +45,7 @@ At the include's own `vars:` — see
 | `PULUMI_UP_FLAGS` | — | Extra flags for the update: `--refresh --run-program` |
 | `PULUMI_DESTROY_FLAGS` | — | Extra flags for a destruction and its preview alike: `--ignore-protect`, an `--exclude` |
 | `PULUMI_REFRESH_FLAGS` | `--diff` | Flags for a refresh and its preview alike: `--run-program` |
+| `PULUMI_ENV` | — | `NAME=value` words, separated by spaces: [environment for the CLI of one call](#environment-for-one-call) |
 
 On the call itself:
 
@@ -68,7 +69,7 @@ the reverse of it to destroy.
 
 ## One include, several projects
 
-`PULUMI_DIR` and the four `*_FLAGS` inputs are read on every call. A value in
+`PULUMI_DIR`, the four `*_FLAGS` inputs and `PULUMI_ENV` are read on every call. A value in
 the `vars:` of a `task:` call wins over the include's, for that call and the
 preview it shows first:
 
@@ -94,6 +95,72 @@ pulumi:plan PULUMI_DIR=…` reaches the module only when the include sets no
 `PULUMI_DIR` of its own: Task ranks an include's `vars:` above the command
 line. A repository that includes the module once per project is not affected
 by any of this, and needs none of it.
+
+## Environment for one call
+
+A Pulumi program and its providers take some of their settings from the
+environment, and some of those belong to one run only: a variable that tells
+the program this is a teardown must not be set when it is updated. A task's
+`env:` does not follow a `task:` call, so `PULUMI_ENV` carries them:
+
+```yaml
+tasks:
+  destroy:
+    requires: { vars: [LAYER, STACK, CONFIRM] }
+    cmds:
+      - task: pulumi:destroy
+        vars:
+          STACK: "{{.STACK}}"
+          CONFIRM: "{{.CONFIRM}}"
+          PULUMI_DIR: "layers/{{.LAYER}}"
+          PULUMI_ENV: "EXAMPLE_TEARDOWN=1 HELM_REPOSITORY_CACHE=.cache/helm"
+```
+
+Each word is `NAME=value` and is exported to the CLI of that call — the
+change and the preview shown before it — and to nothing else: not to the
+next call, and not to any other command. Words are separated by spaces, so a
+value holds none; anything else in a value is data, and an `=` after the
+first is part of it. A word that is not `NAME=value` is refused before
+anything runs.
+
+At the include it is every call's. A call's own replaces the include's
+whole — the two are not merged — and an empty one falls back to it.
+
+No value is printed: the module says which word it refused by its place in
+the list, and holds the list in a `secret: true` var, so `task --verbose` and
+`task --dry` print `*****` for it. The name *you* pass it under is yours to
+mark the same way — see [Secrets are marked](../README.md#secrets-are-marked):
+`task --summary` lists a call's vars under their own names, and one typed on
+the command line cannot be marked at all. Keep a credential in a var of your
+own that is.
+
+This is an input of this module alone, not a convention of the library.
+Everywhere else a per-run setting is a flag, and
+[every tool invocation takes flags](../README.md#every-tool-invocation-takes-flags);
+here the thing being configured is the consumer's own program, which the CLI
+has no flag for.
+
+### Without it: a child process
+
+A task's `env:` does reach a command, and a command can be Task itself. That
+needs nothing from this module, and works with any module here:
+
+```yaml
+includes:
+  pulumi: { taskfile: '{{printf .TASKLIB "pulumi"}}', dir: . }
+
+tasks:
+  plan:
+    requires: { vars: [LAYER, STACK] }
+    env: { HELM_REPOSITORY_CACHE: .cache/helm }
+    cmds:
+      - task pulumi:plan STACK={{.STACK | q}} PULUMI_DIR={{printf "layers/%s" .LAYER | q}}
+```
+
+The include must set no `PULUMI_DIR` of its own for that, since an include's
+value outranks the command line. The child is a second Task process: it asks
+its own question for `apply`, and a `--yes` given to the parent has to be
+passed on to it.
 
 ## The stack is always named
 
