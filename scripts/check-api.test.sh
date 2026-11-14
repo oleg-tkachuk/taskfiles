@@ -96,6 +96,14 @@ expect clean internal-task-renamed '' "${BASE//_run/_go}"
 
 expect clean parameter-between-tasks-renamed '' "${BASE//REF/TARGET}"
 
+# An input handed to a nested call under its own name is still an input: the
+# nested task sees nothing its caller was given unless it is passed on.
+readonly passed_on='REF: x, PORT: "{{.PORT}}"'
+readonly FORWARDED="${BASE/REF: x/$passed_on}"
+expect clean input-passed-on-under-its-own-name '' "$FORWARDED"
+expect reported input-passed-on-and-then-dropped '' "${FORWARDED//PORT/LISTEN}"
+said "PORT is in v1.0.0 and gone now" "input-passed-on-and-then-dropped: PORT is reported gone"
+
 loop='      - for: [a]
         cmd: echo {{.ITEM | q}}
 '
