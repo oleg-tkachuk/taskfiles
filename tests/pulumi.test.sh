@@ -5,8 +5,10 @@
 source "$(dirname "$0")/lib.sh"
 
 # Answers as the CLI does, by subcommand; a destroy is told from its preview
-# by --preview-only.
+# by --preview-only. Each call also logs three variables of the environment
+# it was run in, for the PULUMI_ENV cases.
 shim pulumi '
+printf "environment: HELM_REPOSITORY_CONFIG=%s EXAMPLE_TEARDOWN=%s PROBE=%s\n" "${HELM_REPOSITORY_CONFIG-unset}" "${EXAMPLE_TEARDOWN-unset}" "${PROBE-unset}" >> "$CALLS"
 case " $* " in
   *" preview "*) printf "%s\n" "~ one resource will change"; exit "${FAKE_PREVIEW:-0}" ;;
   *" up "*) printf "%s\n" "updated"; exit "${FAKE_UP:-0}" ;;
@@ -411,5 +413,99 @@ calling output '{ STACK: dev, OUTPUT: url, PULUMI_DIR: layers/10-network }'
 reset_calls
 run_task go
 expect_call "--cwd layers/10-network stack output url --stack dev" "on the call: output reads the project named"
+
+# ─── PULUMI_ENV ──────────────────────────────────────────────────────────────
+# Environment for the CLI of one call: a variable a program or a provider
+# reads, which must not be set for the runs beside it.
+readonly HELM_CONFIG=.cache/helm/repositories.yaml
+
+calling plan "{ STACK: dev, PULUMI_ENV: 'HELM_REPOSITORY_CONFIG=$HELM_CONFIG PROBE=a=b' }"
+reset_calls
+run_task go
+expect_status ok "PULUMI_ENV: a plan with its own environment passes"
+expect_call "environment: HELM_REPOSITORY_CONFIG=$HELM_CONFIG EXAMPLE_TEARDOWN=unset PROBE=a=b" "PULUMI_ENV: each word is a variable of the CLI's environment, an = in a value kept"
+
+calling plan '{ STACK: dev }'
+reset_calls
+run_task go
+expect_call "environment: HELM_REPOSITORY_CONFIG=unset EXAMPLE_TEARDOWN=unset PROBE=unset" "PULUMI_ENV: a call without it runs with none of it"
+
+# The preview a change is shown by runs in the environment the change does.
+calling destroy '{ STACK: dev, CONFIRM: dev, PULUMI_ENV: "EXAMPLE_TEARDOWN=1" }'
+reset_calls
+run_task go
+expect_status ok "PULUMI_ENV: a destroy with its own environment passes"
+expect_call "destroy --stack dev --yes" "PULUMI_ENV: the destruction runs"
+expect_call "EXAMPLE_TEARDOWN=1" "PULUMI_ENV: with the variable set"
+refute_call "EXAMPLE_TEARDOWN=unset" "PULUMI_ENV: and its preview has it too"
+
+for task in apply refresh unchanged refresh:plan destroy:plan; do
+  calling "$task" '{ STACK: dev, PULUMI_ENV: "EXAMPLE_TEARDOWN=1" }'
+  reset_calls
+  run_task go
+  expect_call "EXAMPLE_TEARDOWN=1" "PULUMI_ENV: $task runs the CLI with it"
+  refute_call "EXAMPLE_TEARDOWN=unset" "PULUMI_ENV: $task runs the CLI with it every time"
+done
+
+calling output '{ STACK: dev, OUTPUT: url, PULUMI_ENV: "EXAMPLE_TEARDOWN=1" }'
+reset_calls
+run_task go
+expect_call "EXAMPLE_TEARDOWN=1" "PULUMI_ENV: output runs the CLI with it"
+
+# At the include it is every call's, and a call's own replaces it whole.
+consumer pu pulumi '{ PULUMI_DIR: infra, PULUMI_ENV: "PROBE=include EXAMPLE_TEARDOWN=0" }'
+cat >> "$CONSUMER/Taskfile.yaml" <<YAML
+tasks:
+  own:
+    cmds:
+      - task: pu:plan
+        vars: { STACK: dev, PULUMI_ENV: "PROBE=call" }
+  empty:
+    cmds:
+      - task: pu:plan
+        vars: { STACK: dev, PULUMI_ENV: "" }
+YAML
+reset_calls
+run_task pu:plan STACK=dev
+expect_call "EXAMPLE_TEARDOWN=0 PROBE=include" "PULUMI_ENV: at the include, it is every call's"
+reset_calls
+run_task own
+expect_call "EXAMPLE_TEARDOWN=unset PROBE=call" "PULUMI_ENV: on the call, it replaces the include's whole"
+reset_calls
+run_task empty
+expect_call "EXAMPLE_TEARDOWN=0 PROBE=include" "PULUMI_ENV: empty on the call, it falls back to the include's"
+
+# A value is data: nothing in it runs, and nothing in it is matched to files.
+calling plan "{ STACK: dev, PULUMI_ENV: 'PROBE=\$(touch\${IFS}$WORK/pwned) HELM_REPOSITORY_CONFIG=*' }"
+reset_calls
+run_task go
+expect_status ok "PULUMI_ENV: hostile values still run"
+if [ -e "$WORK/pwned" ]; then fail "PULUMI_ENV: a \$( ) in a value ran"; else pass "PULUMI_ENV: a \$( ) in a value does not run"; fi
+expect_call "HELM_REPOSITORY_CONFIG=* " "PULUMI_ENV: a glob reaches the CLI unexpanded"
+
+# A word that is not NAME=value is refused before anything runs, and by its
+# place: it may be half of a value, so it is not printed.
+readonly PLAIN=hunter2-not-in-any-log
+for words in "$PLAIN" "PROBE=1 $PLAIN" "1PROBE=$PLAIN" "=$PLAIN" "PRO-BE=$PLAIN"; do
+  calling apply "{ STACK: dev, PULUMI_ENV: '$words' }"
+  reset_calls
+  run_task go
+  expect_status fail "PULUMI_ENV: '${words//$PLAIN/…}' is refused"
+  expect_output "of PULUMI_ENV is not NAME=value" "PULUMI_ENV: '${words//$PLAIN/…}' — says why"
+  refute_output "$PLAIN" "PULUMI_ENV: '${words//$PLAIN/…}' — prints no part of it"
+  refute_call "pulumi" "PULUMI_ENV: '${words//$PLAIN/…}' — nothing runs"
+done
+
+# Nothing the module prints holds a value, and Task masks it where it echoes
+# the task; the CLI still gets it.
+calling apply "{ STACK: dev, PULUMI_ENV: 'PROBE=$PLAIN' }"
+reset_calls
+run_task go
+expect_status ok "PULUMI_ENV: an apply with a credential passes"
+refute_output "$PLAIN" "PULUMI_ENV: no line of the run holds the value"
+expect_call "PROBE=$PLAIN" "PULUMI_ENV: and the CLI has it"
+run_task -v pu:apply STACK=dev "PULUMI_ENV=PROBE=$PLAIN"
+refute_output "$PLAIN" "PULUMI_ENV: --verbose does not print the value"
+expect_output "*****" "PULUMI_ENV: --verbose prints the mask in its place"
 
 finish
