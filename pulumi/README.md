@@ -35,7 +35,8 @@ component's directory. Tasks then read `pulumi:<task>`.
 ## Inputs
 
 At the include's own `vars:` — see
-[Variable scoping](../README.md#variable-scoping):
+[Variable scoping](../README.md#variable-scoping) — or on a `task:` call, as
+[One include, several projects](#one-include-several-projects) shows:
 
 | Var | Default | Meaning |
 |---|---|---|
@@ -61,9 +62,38 @@ Logging in and the backend, the passphrase or access token, and creating the
 stack: this module runs the CLI in the environment it is given, and a stack
 that does not exist is the CLI's own error.
 
-So is the order of several projects. One include is one project; a repository
-with layers includes the module once per layer, or calls these tasks from a
-loop it owns, in the order it knows and the reverse of it to destroy.
+So is the order of several projects. A call acts on one project; a repository
+with layers calls these tasks from a loop it owns, in the order it knows and
+the reverse of it to destroy.
+
+## One include, several projects
+
+`PULUMI_DIR` and the four `*_FLAGS` inputs are read on every call. A value in
+the `vars:` of a `task:` call wins over the include's, for that call and the
+preview it shows first:
+
+```yaml
+includes:
+  pulumi: { taskfile: '{{printf .TASKLIB "pulumi"}}', dir: . }
+
+tasks:
+  plan:
+    desc: "Preview one layer (task plan LAYER=10-network STACK=dev)"
+    requires: { vars: [LAYER, STACK] }
+    cmds:
+      - task: pulumi:plan
+        vars: { STACK: "{{.STACK}}", PULUMI_DIR: "layers/{{.LAYER}}" }
+```
+
+The order, most specific first: the call's value when it is not empty, the
+include's, the default. An empty value on the call turns nothing off — it
+falls back, as [an empty value does everywhere](../README.md#an-empty-value-turns-nothing-off).
+
+This is the `vars:` of a `task:` call, not the command line. `task
+pulumi:plan PULUMI_DIR=…` reaches the module only when the include sets no
+`PULUMI_DIR` of its own: Task ranks an include's `vars:` above the command
+line. A repository that includes the module once per project is not affected
+by any of this, and needs none of it.
 
 ## The stack is always named
 
