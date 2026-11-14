@@ -116,8 +116,13 @@ Last, the lock itself. Offline, Task reads a module's `.yaml` and never its
 - a file no Taskfile in that directory reads, which is what an earlier ref
   leaves behind when the pin is moved by hand.
 
-Which files are read is what Task itself reports under `--verbose`. Should a
+Which files are read is what Task itself reports under `--verbose`, asked
+for without colour: Task has no listing of the files it resolves. Should a
 later Task stop saying, `check` says that it could not tell, and passes.
+Should it say something that does not read as file names — lines run into
+each other, a wording that changed — `check` fails, says it could not tell
+which files that directory's Taskfiles read, and calls none of them left
+over. That is not a lock to refresh; run it again.
 
 ## Renovate
 
