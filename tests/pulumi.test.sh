@@ -325,4 +325,91 @@ expect_status fail "PULUMI_DIR: a directory that does not exist is refused"
 expect_output "nowhere" "PULUMI_DIR: names it"
 refute_call "pulumi" "PULUMI_DIR: nothing runs"
 
+# ─── on the call ─────────────────────────────────────────────────────────────
+# A repository with several projects includes the module once and names the
+# project on each call it makes from a task of its own. What the call gives
+# wins over what the include gave, for that call alone.
+#
+# calling <task> <vars as a flow mapping> — a consumer whose task `go` calls
+# pu:<task> with those vars, over an include that names infra and --diff.
+calling() {
+  consumer pu pulumi '{ PULUMI_DIR: infra }'
+  cat >> "$CONSUMER/Taskfile.yaml" <<YAML
+tasks:
+  go:
+    cmds:
+      - task: pu:$1
+        vars: $2
+YAML
+}
+
+mkdir -p "$CONSUMER/layers/10-network"
+
+calling plan '{ STACK: dev, PULUMI_DIR: layers/10-network }'
+reset_calls
+run_task go
+expect_status ok "on the call: a plan with its own PULUMI_DIR passes"
+expect_call "pulumi --non-interactive --cwd layers/10-network preview --stack dev --diff" "on the call: PULUMI_DIR is the project previewed"
+refute_call "--cwd infra" "on the call: and the include's is not"
+
+calling plan '{ STACK: dev, PULUMI_DIR: "" }'
+reset_calls
+run_task go
+expect_call "--cwd infra preview" "on the call: an empty PULUMI_DIR falls back to the include's"
+
+calling plan '{ STACK: dev }'
+reset_calls
+run_task go
+expect_call "--cwd infra preview" "on the call: no PULUMI_DIR leaves the include's"
+
+calling plan '{ STACK: dev, PULUMI_DIR: layers/20-absent }'
+reset_calls
+run_task go
+expect_status fail "on the call: a PULUMI_DIR that does not exist is refused"
+expect_output "layers/20-absent" "on the call: names it"
+refute_call "pulumi" "on the call: nothing runs"
+
+calling plan '{ STACK: dev, PULUMI_PLAN_FLAGS: "--refresh" }'
+reset_calls
+run_task go
+expect_call "preview --stack dev --refresh" "on the call: PULUMI_PLAN_FLAGS are the preview's flags"
+refute_call "--diff" "on the call: and replace the include's"
+
+# The preview a change is shown by acts on what the call named, as the change
+# does, and the question names it.
+calling apply '{ STACK: dev, PULUMI_DIR: layers/10-network, PULUMI_PLAN_FLAGS: "--refresh", PULUMI_UP_FLAGS: "--run-program" }'
+reset_calls
+run_task go
+expect_status ok "on the call: an apply with its own PULUMI_DIR passes"
+expect_call "--cwd layers/10-network preview --stack dev --refresh" "on the call: apply previews the project and with the flags it was given"
+expect_call "--cwd layers/10-network up --stack dev --yes --run-program" "on the call: and updates the same project, with PULUMI_UP_FLAGS"
+refute_call "--cwd infra" "on the call: apply runs nothing on the include's project"
+expect_output "of layers/10-network" "on the call: apply asks about the project it acts on"
+
+calling destroy '{ STACK: dev, CONFIRM: dev, PULUMI_DIR: layers/10-network, PULUMI_DESTROY_FLAGS: "--ignore-protect" }'
+reset_calls
+run_task go
+expect_call "--cwd layers/10-network destroy --stack dev --preview-only --ignore-protect" "on the call: destroy previews the project and with the flags it was given"
+expect_call "--cwd layers/10-network destroy --stack dev --yes --ignore-protect" "on the call: and destroys the same project"
+refute_call "--cwd infra" "on the call: destroy runs nothing on the include's project"
+expect_output "of layers/10-network" "on the call: destroy asks about the project it acts on"
+
+calling refresh '{ STACK: dev, PULUMI_DIR: layers/10-network, PULUMI_REFRESH_FLAGS: "--run-program" }'
+reset_calls
+run_task go
+expect_call "--cwd layers/10-network refresh --stack dev --preview-only --run-program" "on the call: refresh previews the project and with the flags it was given"
+expect_call "--cwd layers/10-network refresh --stack dev --yes --run-program" "on the call: and refreshes the same project"
+refute_call "--cwd infra" "on the call: refresh runs nothing on the include's project"
+
+calling unchanged '{ STACK: dev, PULUMI_DIR: layers/10-network }'
+reset_calls
+run_task go
+expect_call "--cwd layers/10-network preview --stack dev --diff --expect-no-changes" "on the call: unchanged checks the project named"
+expect_output "of layers/10-network" "on the call: and reports on it"
+
+calling output '{ STACK: dev, OUTPUT: url, PULUMI_DIR: layers/10-network }'
+reset_calls
+run_task go
+expect_call "--cwd layers/10-network stack output url --stack dev" "on the call: output reads the project named"
+
 finish
