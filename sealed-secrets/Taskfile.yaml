@@ -24,6 +24,9 @@ version: "3"
 #   SECRET_KEY SECRET_VALUE                      seal, seal:merge
 #   SECRET_FILE                                  seal:file
 #   SECRET_LITERALS                              seal:literals
+#   SECRET_FILES                                 seal:files
+#   SECRET_TYPE      the Secret's type, for every sealing task but seal:merge
+#                    — kubernetes.io/basic-auth           (default: Opaque)
 #
 # `seal` takes the value as a variable, which puts it in this process's
 # argument list for as long as kubectl runs — visible to anything that can read
@@ -31,9 +34,10 @@ version: "3"
 # credential and a poor one for anything else: prefer `seal:file`, which reads
 # from disk, when the value matters.
 #
-# Nothing here reads the cluster's secrets. Both tasks build a manifest locally
-# with --dry-run=client and hand it to kubeseal, so the plaintext never leaves
-# this machine and the output is encrypted to a key only the controller holds.
+# Nothing here reads the cluster's secrets. Every sealing task builds a
+# manifest locally with --dry-run=client and pipes it to kubeseal, so the
+# plaintext never leaves this machine, is never written to disk by this
+# module, and the output is encrypted to a key only the controller holds.
 # ─────────────────────────────────────────────────────────────────────────────
 # shell-verbatim: _SS_CTX _SS_KUBECTL _SS_SEAL KUBESEAL_FLAGS FROM _SS_FROM
 
@@ -65,6 +69,7 @@ tasks:
           SECRET_NAMESPACE: '{{.SECRET_NAMESPACE}}'
           SECRET_NAME: '{{.SECRET_NAME}}'
           SECRET_OUTPUT: '{{.SECRET_OUTPUT}}'
+          SECRET_TYPE: '{{.SECRET_TYPE}}'
           FROM: '--from-literal={{printf "%s=%s" .SECRET_KEY .SECRET_VALUE | q}}'
 
   seal:file:
@@ -80,6 +85,7 @@ tasks:
           SECRET_NAMESPACE: '{{.SECRET_NAMESPACE}}'
           SECRET_NAME: '{{.SECRET_NAME}}'
           SECRET_OUTPUT: '{{.SECRET_OUTPUT}}'
+          SECRET_TYPE: '{{.SECRET_TYPE}}'
           FROM: '--from-env-file={{.SECRET_FILE | q}}'
 
   seal:literals:
@@ -96,7 +102,30 @@ tasks:
           SECRET_NAMESPACE: '{{.SECRET_NAMESPACE}}'
           SECRET_NAME: '{{.SECRET_NAME}}'
           SECRET_OUTPUT: '{{.SECRET_OUTPUT}}'
+          SECRET_TYPE: '{{.SECRET_TYPE}}'
           FROM: '{{range (regexSplit "\\s+" (trim .SECRET_LITERALS) -1)}}--from-literal={{q .}} {{end}}'
+
+  seal:files:
+    desc: "Seal whole files, each as the value of one key, into one SealedSecret manifest"
+    requires:
+      vars: [SECRET_NAMESPACE, SECRET_NAME, SECRET_FILES, SECRET_OUTPUT]
+    # `SECRET_FILES` is `key=path` words, split on whitespace as SECRET_LITERALS
+    # is: the file's bytes are the key's value, line breaks and all, which an
+    # env file cannot hold — a PEM key, a certificate chain. kubectl reads each
+    # file itself, so no value is in an argument list and none is copied
+    # anywhere on the way. A word with no `key=` is a path whose file name is
+    # the key, as kubectl has it.
+    preconditions:
+      - sh: 'for pair in {{range (regexSplit "\\s+" (trim .SECRET_FILES) -1)}}{{q .}} {{end}}; do test -f "${pair#*=}" || exit 1; done'
+        msg: "SECRET_FILES names a file that is not there — it is key=path words, separated by spaces: {{.SECRET_FILES}}"
+    cmds:
+      - task: _seal
+        vars:
+          SECRET_NAMESPACE: '{{.SECRET_NAMESPACE}}'
+          SECRET_NAME: '{{.SECRET_NAME}}'
+          SECRET_OUTPUT: '{{.SECRET_OUTPUT}}'
+          SECRET_TYPE: '{{.SECRET_TYPE}}'
+          FROM: '{{range (regexSplit "\\s+" (trim .SECRET_FILES) -1)}}--from-file={{q .}} {{end}}'
 
   _seal:
     internal: true
@@ -121,7 +150,7 @@ tasks:
           tmp=$(mktemp {{printf "%s.XXXXXX" .SECRET_OUTPUT | q}})
           trap 'rm -f "$tmp"' EXIT
           {{._SS_KUBECTL}} create secret generic {{.SECRET_NAME | q}} \
-            --namespace {{.SECRET_NAMESPACE | q}} {{._SS_FROM}} --dry-run=client -o yaml \
+            --namespace {{.SECRET_NAMESPACE | q}}{{if .SECRET_TYPE}} --type={{.SECRET_TYPE | q}}{{end}} {{._SS_FROM}} --dry-run=client -o yaml \
             | {{._SS_SEAL}} --format yaml {{.KUBESEAL_FLAGS | default ""}} > "$tmp"
           mv "$tmp" {{.SECRET_OUTPUT | q}}
       - printf '%s sealed-secrets · %s/%s → %s\n' "{{._SS_OK}}" {{.SECRET_NAMESPACE | q}} {{.SECRET_NAME | q}} {{.SECRET_OUTPUT | q}}
@@ -142,6 +171,9 @@ tasks:
     # Rotating one credential in a manifest that holds several: --merge-into
     # rewrites that key's ciphertext and leaves every other key, and the file's
     # structure, as they were. The plaintext only ever reaches kubeseal's stdin.
+    #
+    # No SECRET_TYPE here: the type is part of that structure. kubeseal keeps
+    # the one the manifest was sealed with and drops the incoming Secret's.
     cmds:
       - cmd: |-
           set -euo pipefail
