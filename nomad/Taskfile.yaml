@@ -15,7 +15,8 @@ version: "3"
 #
 # `apply` submits the job `plan` rendered and saved, with the modify index the
 # plan was made against: the server refuses it once the job has changed, so
-# what runs is what was read. `stop` stops a job. Every other task only reads.
+# what runs is what was read. `stop` stops a job. Every other task only reads;
+# `images` lists what each job's tasks run.
 #
 # The CLI is never left to pick a cluster. With no NOMAD_ADDR it talks to
 # http://127.0.0.1:4646 — whatever answers there — so a task that asks a
@@ -25,7 +26,8 @@ version: "3"
 #
 # The address, the namespace, the region and the token are the environment's:
 # NOMAD_ADDR, NOMAD_NAMESPACE, NOMAD_REGION, NOMAD_TOKEN. This module runs the
-# CLI in the environment it is given.
+# CLI in the environment it is given; NOMAD_NAMESPACE=* has `images` list
+# every namespace.
 #
 # ── Inputs ───────────────────────────────────────────────────────────────────
 # Pass these at the include's own `vars:`, not the consumer's top-level
@@ -76,6 +78,20 @@ vars:
   _NM_INDEX_TEMPLATE: '{{"{{.JobModifyIndex}}"}}'
   # What `job inspect` is asked to print, for the ID a name resolves to.
   _NM_ID_TEMPLATE: '{{"{{.ID}}"}}'
+  # What `images` asks the CLI for, as Go templates. The job list, one line
+  # per job — a marker, then namespace and ID, tab-separated: the CLI prints
+  # a sentence instead of an empty list, and the marker tells a job from it.
+  _NM_JOB_LINE: job
+  _NM_JOBS_TEMPLATE: >-
+    {{`{{range .}}job{{"\t"}}{{.Summary.Namespace}}{{"\t"}}{{.Summary.JobID}}{{"\n"}}{{end}}`}}
+  # One job's tasks: version, status and whether it was stopped, then one
+  # line per task — group/task, driver, image, or "-" for a driver that runs
+  # none (exec, raw_exec, java).
+  _NM_TASKS_TEMPLATE: >-
+    {{`{{.Version}}{{"\t"}}{{.Status}}{{"\t"}}{{.Stop}}{{"\n"}}{{range .TaskGroups}}{{$g := .Name}}{{range .Tasks}}{{$g}}/{{.Name}}{{"\t"}}{{.Driver}}{{"\t"}}{{with index .Config "image"}}{{.}}{{else}}-{{end}}{{"\n"}}{{end}}{{end}}`}}
+  # The status `images` shows for a job that was stopped and not yet purged:
+  # it is listed, and runs nothing.
+  _NM_STOPPED: stopped
   # The address the CLI uses when it is given none.
   _NM_DEFAULT_ADDR: http://127.0.0.1:4646
   # Status markers. The shape carries the meaning, so a line still reads in
@@ -279,6 +295,54 @@ tasks:
               printf '%s nomad · %s was not submitted (exit %s) — a job that moved on since the plan needs a new one\n' "{{._NM_ERR}}" {{.FILE | q}} "$status" >&2
               exit 1 ;;
           esac
+
+  images:
+    desc: "List the image each task of every job runs, with the job's version; changes nothing"
+    # What the job was submitted with, version by version — the image a
+    # task runs once its allocation is placed. A job that was stopped and not
+    # yet purged is listed as stopped. A cluster that refuses the listing
+    # fails: an empty list would read as "nothing is running".
+    cmds:
+      - task: _ready
+      - task: _cluster
+      - cmd: |
+          set -eu
+          # The CLI follows an empty list with a link to its web UI, on stderr
+          # among what would be an error; this listing has no use for it.
+          export NOMAD_CLI_SHOW_HINTS=0
+          jobs=$(mktemp)
+          rows=$(mktemp)
+          trap 'rm -f "$jobs" "$rows"' EXIT
+          if ! nomad job status -t {{._NM_JOBS_TEMPLATE | q}} > "$jobs"; then
+            printf '%s nomad · could not list the jobs at %s — the output above says why\n' "{{._NM_ERR}}" "$NOMAD_ADDR" >&2
+            exit 1
+          fi
+          found=0
+          while IFS="$(printf '\t')" read -r line namespace job; do
+            [ "$line" = {{._NM_JOB_LINE | q}} ] || continue
+            found=1
+            if ! tasks=$(nomad job inspect -namespace "$namespace" -t {{._NM_TASKS_TEMPLATE | q}} "$job"); then
+              printf '%s nomad · could not read the job %s in %s — the output above says why\n' "{{._NM_ERR}}" "$job" "$namespace" >&2
+              exit 1
+            fi
+            printf '%s\n' "$tasks" | NS="$namespace" JOB="$job" STOPPED={{._NM_STOPPED | q}} awk -F '\t' '
+              NR == 1 { version = $1; status = ($3 == "true") ? ENVIRON["STOPPED"] : $2; next }
+              NF { printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", ENVIRON["NS"], ENVIRON["JOB"], version, status, $1, $2, $3 }' >> "$rows"
+          done < "$jobs"
+          if [ "$found" = 0 ]; then
+            printf '%s nomad · no job at %s in namespace "%s"\n' "{{._NM_OK}}" "$NOMAD_ADDR" "${NOMAD_NAMESPACE:-default}"
+            exit 0
+          fi
+          LC_ALL=C sort "$rows" | awk -F '\t' '
+            BEGIN { split("NAMESPACE JOB VERSION STATUS TASK DRIVER IMAGE", head, " "); for (i = 1; i <= 7; i++) w[i] = length(head[i]) }
+            { n++; for (i = 1; i <= 7; i++) { cell[n, i] = $i; if (length($i) > w[i]) w[i] = length($i) } }
+            END {
+              fmt = ""
+              for (i = 1; i < 7; i++) fmt = fmt "%-" w[i] "s  "
+              fmt = fmt "%s\n"
+              printf fmt, head[1], head[2], head[3], head[4], head[5], head[6], head[7]
+              for (r = 1; r <= n; r++) printf fmt, cell[r, 1], cell[r, 2], cell[r, 3], cell[r, 4], cell[r, 5], cell[r, 6], cell[r, 7]
+            }'
 
   stop:plan:
     desc: "Show the job that stop would stop; changes nothing"

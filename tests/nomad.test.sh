@@ -326,4 +326,57 @@ expect_status fail "stop, unanswered: fails"
 expect_call "job status" "stop, unanswered: the job was shown"
 refute_call "job stop" "stop, unanswered: and not stopped"
 
+# ─── images ──────────────────────────────────────────────────────────────────
+# The job list answers with what its template prints — after a sentence of the
+# CLI's own, as an empty list is answered with one — and each job's inspect
+# with its version, status and stop flag, then a line per task. NM_LIST_FAIL
+# makes the cluster refuse the listing.
+NM_FIX="$WORK/nomad-images"
+mkdir -p "$NM_FIX"
+export NM_FIX
+shim nomad '
+case " $* " in
+  *" job status "*)
+    if [ -n "${NM_LIST_FAIL:-}" ]; then echo "Error querying jobs" >&2; exit 1; fi
+    cat "$NM_FIX/list" ;;
+  *" job inspect "*" web ") printf "3\trunning\tfalse\napp/server\tdocker\tregistry.example.com/web:1.4.0\napp/log\traw_exec\t-\n" ;;
+  *" job inspect "*" api ") printf "1\tdead\ttrue\napi/http\tdocker\tregistry.example.com/api:0.9.0\n" ;;
+  *" job inspect "*) printf "0\trunning\tfalse\nx/y\tdocker\tbusybox:1.37\n" ;;
+esac'
+printf 'Some sentence of the CLI\njob\tdefault\tweb\njob\tteam\tapi\n' > "$NM_FIX/list"
+export NOMAD_ADDR=$ADDR
+
+reset_calls
+run_task nm:images
+expect_status ok "images: lists the image of every task"
+expect_call "nomad job inspect -namespace default -t " "images: reads each job in its own namespace"
+expect_call "nomad job inspect -namespace team -t " "images: across namespaces"
+expect_output "NAMESPACE  JOB  VERSION  STATUS   TASK        DRIVER    IMAGE" "images: under a header, in columns"
+expect_output "default    web  3        running  app/server  docker    registry.example.com/web:1.4.0" "images: a task with its job's version and status"
+expect_output "default    web  3        running  app/log     raw_exec  -" "images: a driver that runs no image shows -"
+expect_output "team       api  1        stopped  api/http    docker    registry.example.com/api:0.9.0" "images: a stopped job says so"
+refute_output "Some sentence" "images: the CLI's own sentences are not rows"
+
+reset_calls
+NM_LIST_FAIL=1 run_task nm:images
+expect_status fail "images: a listing the cluster refuses fails"
+expect_output "could not list the jobs at $ADDR" "images: and says so, not that nothing runs"
+refute_call "job inspect" "images: and reads no job"
+
+printf 'No running jobs\n' > "$NM_FIX/list"
+reset_calls
+run_task nm:images
+expect_status ok "images: no job is not an error"
+expect_output "no job at $ADDR" "images: and says so"
+refute_call "job inspect" "images: nothing more is read then"
+
+printf 'job\tdefault\t$(touch %s/pwned)\n' "$WORK" > "$NM_FIX/list"
+run_task nm:images
+if [ -e "$WORK/pwned" ]; then fail "images: a job ID from the server is data"; rm -f "$WORK/pwned"; else pass "images: a job ID from the server is data"; fi
+
+(unset NOMAD_ADDR; reset_calls; run_task nm:images)
+expect_status fail "images: no NOMAD_ADDR is refused"
+refute_call "nomad" "images: and nothing runs"
+unset NOMAD_ADDR
+
 finish
