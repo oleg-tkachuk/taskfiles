@@ -29,6 +29,7 @@ component's directory. Tasks then read `nomad:<task>`.
 | `validate` | Validate `FILE`, or every job file under `NOMAD_DIR`; needs no cluster |
 | `plan` | Plan `FILE` against the cluster and save the plan for `apply`; changes nothing |
 | `apply` | Ask, then submit the plan that `plan` saved for `FILE`, and nothing else |
+| `images` | List the image each task of every job runs, with the job's version; changes nothing |
 | `stop:plan` | Show the job that `stop` would stop; changes nothing |
 | `stop` | Show the job, ask, then stop `JOB` — needs `CONFIRM` |
 
@@ -65,6 +66,18 @@ them. This module runs the CLI in the environment it is given: the caller's,
 or the `env:` at the top of the including Taskfile. An `env:` on a task that
 calls these does not reach them.
 
+`NOMAD_NAMESPACE=*` has `images` list the jobs of every namespace.
+
+```console
+$ task nomad:images
+NAMESPACE  JOB       VERSION  STATUS   TASK             DRIVER    IMAGE
+default    core-api  4        running  api/server       docker    registry.example.com/core-api:1.4.0
+default    nightly   1        stopped  report/run       raw_exec  -
+```
+
+The version and image are the job's as submitted; a task's driver that runs
+no image — `exec`, `raw_exec`, `java` — shows `-`.
+
 So is the order of several jobs. One call is one job; a repository whose jobs
 depend on each other calls these tasks in the order it knows.
 
@@ -72,8 +85,8 @@ depend on each other calls these tasks in the order it knows.
 
 With no `NOMAD_ADDR` the CLI talks to `http://127.0.0.1:4646` — whatever
 answers there: a development agent, a tunnel left open to production. `plan`,
-`apply`, `stop:plan` and `stop` are refused without one rather than left to
-that default.
+`apply`, `images`, `stop:plan` and `stop` are refused without one rather than
+left to that default.
 
 `validate` is the exception, and the reason it works as a gate in a pipeline
 with no cluster: the CLI asks an agent to validate the job when it finds one,

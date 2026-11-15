@@ -214,4 +214,44 @@ run_task nm:stop JOB=contract-web CONFIRM=contract-web
 expect_status ok "stop: a job named whole, twice, is stopped"
 if [ "$(nomad job inspect -t '{{.Stop}}' contract-web)" = true ]; then pass "stop: and the cluster has it stopped"; else fail "stop: the job is not stopped"; fi
 
+# ─── images ──────────────────────────────────────────────────────────────────
+# The templates `images` hands the CLI still read what they name: the job list
+# its namespace and ID, a job its version, status, stop flag and each task's
+# driver and image. A job with an image needs no driver to be registered.
+cat > "$WORK/contract-image.nomad.hcl" <<HCL
+job "contract-image" {
+  group "app" {
+    task "server" {
+      driver = "docker"
+
+      config {
+        image = "registry.example.com/contract:1.0.0"
+      }
+    }
+  }
+}
+HCL
+nomad job run -detach "$WORK/contract-image.nomad.hcl" > /dev/null
+
+run_task nm:images
+expect_status ok "images: lists the jobs the agent holds"
+if awk '$2 == "contract-image" && $5 == "app/server" && $6 == "docker" && $7 == "registry.example.com/contract:1.0.0" { found = 1 } END { exit !found }' "$OUT"; then
+  pass "images: a task's driver and image, read from the job"
+else
+  fail "images: no row for contract-image's task with its image"
+fi
+if awk '$2 == "contract-web" && $4 == "stopped" && $6 == "raw_exec" && $7 == "-" { found = 1 } END { exit !found }' "$OUT"; then
+  pass "images: a stopped job, and a driver that runs no image"
+else
+  fail "images: contract-web is not listed as stopped with no image"
+fi
+
+nomad namespace apply contract-empty > /dev/null
+NOMAD_NAMESPACE=contract-empty run_task nm:images
+expect_status ok "images: a namespace with no job is not an error"
+expect_output 'no job at' "images: and says so"
+
+NOMAD_ADDR=$NOBODY_ADDR run_task nm:images
+expect_status fail "images: an address nothing answers at fails"
+
 finish
