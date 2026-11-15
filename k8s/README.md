@@ -1,7 +1,7 @@
 # k8s — the cluster side
 
-Rolling a deployment, tailing it, looking at what is running, installing the
-chart from disk.
+Rolling a deployment, tailing it, looking at what is running and which images
+it runs, installing the chart from disk.
 
 Independent of `release` and usable without it: a repository that operates a
 cluster it does not build for needs this module alone. Include both when a
@@ -21,6 +21,7 @@ workspace — tasks then read `k8s:<task>`.
 | Task | What it does |
 |---|---|
 | `doctor` | Check that the context, namespace and deployment this component declares resolve |
+| `images` | List the images the pods in `K8S_NAMESPACE` run, by workload (`IMAGES_SCOPE=cluster` for every namespace) |
 | `logs` | Tail the deployment's logs (Ctrl-C to stop) |
 | `port-forward` | Port-forward the deployment (PORT local, TARGET_PORT in the pod) |
 | `rollout:wait` | Wait until the Deployment runs VERSION and has rolled out (VERSION=1.4.0) |
@@ -49,6 +50,7 @@ workspace — tasks then read `k8s:<task>`.
 | `PORT` | `8080` | local port for `port-forward` |
 | `TARGET_PORT` | `PORT` | pod-side port for `port-forward`, when it differs |
 | `LOG_TAIL` | `100` | line count for `logs` |
+| `IMAGES_SCOPE` | `namespace` | what `images` lists: `namespace`, `K8S_NAMESPACE` alone, or `cluster`, every namespace |
 
 `PROJECT_NAME`, `K8S_NAMESPACE` and `K8S_DEPLOYMENT_NAME` are also read from
 the `vars:` of a `task:` call — see
@@ -77,6 +79,26 @@ $ task k8s:restart
 $ task k8s:port-forward PORT=8080
 $ task k8s:port-forward PORT=8081 TARGET_PORT=80    # container listens on :80
 $ task k8s:logs LOG_TAIL=500
+```
+
+### Which images are running
+
+`images` reads the pods, not the Deployments: what an operator runs — a
+database cluster, a broker — has pods and no workload of a kind the module
+could know. Each pod is shown under the controller that owns it, followed one
+step further where that controller is owned in turn, so a ReplicaSet's pods
+read as its Deployment and a Job's as its CronJob; replicas collapse into one
+line. Pods that have finished are left out. A listing the cluster refuses
+fails rather than printing an empty table.
+
+```console
+$ task k8s:images
+NAMESPACE  WORKLOAD             CONTAINER       IMAGE
+acme       Cluster/core-db      postgres        ghcr.io/cloudnative-pg/postgresql:18.1
+acme       Deployment/core-api  core-api        registry.example.com/core-api:1.4.0
+acme       Deployment/core-api  migrate (init)  registry.example.com/core-api:1.4.0
+
+$ task k8s:images IMAGES_SCOPE=cluster
 ```
 
 ## One include, several Deployments

@@ -387,4 +387,75 @@ run_task go
 expect_call "-n jobs get deploy/worker" "on the call: rollout:wait watches the Deployment named"
 refute_call "-n apps" "on the call: and not the include's namespace"
 
+# ─── images ──────────────────────────────────────────────────────────────────
+# The pods answer with what the go-template prints, one line per container;
+# the owners with each ReplicaSet's and Job's own controller. IMAGES_FAIL
+# makes the cluster refuse the pod listing.
+IMAGES_FIX="$WORK/images"
+mkdir -p "$IMAGES_FIX"
+export IMAGES_FIX
+shim kubectl '
+case "$*" in
+  *" get pods "*)
+    if [ -n "${IMAGES_FAIL:-}" ]; then echo "Error from server (Forbidden)" >&2; exit 1; fi
+    cat "$IMAGES_FIX/pods" ;;
+  *" get replicasets,jobs "*) cat "$IMAGES_FIX/owners" ;;
+  *) exit 0 ;;
+esac'
+printf '%s\t%s\t%s\t%s\n' \
+  apps ReplicaSet/web-6d4f web registry.example.com/web:1.4.0 \
+  apps ReplicaSet/web-6d4f web registry.example.com/web:1.4.0 \
+  apps ReplicaSet/web-6d4f 'migrate (init)' registry.example.com/web:1.4.0 \
+  apps Job/report-2911 report registry.example.com/report:2.0.1 \
+  apps Cluster/db postgres registry.example.com/postgres:18.1 \
+  apps Pod/debug shell busybox:1.37 > "$IMAGES_FIX/pods"
+printf '%s\t%s\t%s\n' \
+  apps ReplicaSet/web-6d4f Deployment/web \
+  apps Job/report-2911 CronJob/report \
+  apps Job/once '' > "$IMAGES_FIX/owners"
+
+consumer k8s k8s '{ PROJECT_NAME: web, K8S_NAMESPACE: apps, K8S_CONTEXT: dev }'
+reset_calls
+run_task k8s:images
+expect_status ok "images: lists the images in the namespace"
+expect_call "kubectl --context dev get pods -n apps --field-selector=status.phase!=Succeeded,status.phase!=Failed -o go-template=" "images: reads the live pods of K8S_NAMESPACE on the pinned context"
+expect_call "kubectl --context dev get replicasets,jobs -n apps -o go-template=" "images: and what owns their controllers"
+expect_output "NAMESPACE  WORKLOAD        CONTAINER       IMAGE" "images: under a header, in columns"
+expect_output "apps       Deployment/web  web             registry.example.com/web:1.4.0" "images: a ReplicaSet's pods are shown under its Deployment"
+expect_output "apps       Deployment/web  migrate (init)  registry.example.com/web:1.4.0" "images: init containers are listed and marked"
+expect_output "apps       CronJob/report  report          registry.example.com/report:2.0.1" "images: a Job's pods are shown under its CronJob"
+expect_output "apps       Cluster/db      postgres        registry.example.com/postgres:18.1" "images: an operator's pods are shown under its resource"
+expect_output "apps       Pod/debug       shell           busybox:1.37" "images: a pod nothing owns is shown as itself"
+if [ "$(grep -c 'Deployment/web  web ' "$OUT")" = 1 ]; then pass "images: replicas collapse into one line"; else fail "images: replicas collapse into one line"; fi
+if [ "$(awk 'NR > 1 { print $2 }' "$OUT" | LC_ALL=C sort -c 2>&1)" = "" ]; then pass "images: rows are sorted"; else fail "images: rows are sorted"; fi
+
+reset_calls
+run_task k8s:images IMAGES_SCOPE=cluster
+expect_status ok "images: IMAGES_SCOPE=cluster lists every namespace"
+expect_call "get pods --all-namespaces --field-selector=" "images: through --all-namespaces"
+refute_call " -n apps" "images: and not the include's namespace"
+
+reset_calls
+run_task k8s:images IMAGES_SCOPE=all
+expect_status fail "images: an IMAGES_SCOPE that is neither namespace nor cluster is refused"
+refute_call "get pods" "images: and nothing is listed"
+
+reset_calls
+IMAGES_FAIL=1 run_task k8s:images
+expect_status fail "images: a pod listing the cluster refuses fails"
+expect_output "could not list the pods in apps" "images: and says so, not that nothing runs"
+
+: > "$IMAGES_FIX/pods"
+reset_calls
+run_task k8s:images
+expect_status ok "images: no running pod is not an error"
+expect_output "no running pod in apps" "images: and says so"
+refute_call "replicasets,jobs" "images: nothing more is looked up then"
+
+consumer k8s k8s "{ PROJECT_NAME: web, K8S_NAMESPACE: 'ns$INJECT', K8S_CONTEXT: 'ctx$INJECT' }"
+reset_calls
+run_task k8s:images
+expect_call "kubectl --context ctx$INJECT get pods -n ns$INJECT " "images: the namespace and context reach kubectl as data"
+expect_not_pwned "images: namespace and context"
+
 finish
