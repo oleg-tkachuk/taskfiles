@@ -218,7 +218,9 @@ if [ "$(nomad job inspect -t '{{.Stop}}' contract-web)" = true ]; then pass "sto
 # The templates `images` hands the CLI still read what they name: the job list
 # its namespace and ID, a job its version, status, stop flag and each task's
 # driver and image. A job with an image needs no driver to be registered.
-cat > "$WORK/contract-image.nomad.hcl" <<HCL
+# Written and submitted from the jobs directory: CI runs the CLI in a
+# container that sees the working directory and nothing else.
+cat > "$JOBS/contract-image.nomad.hcl" <<HCL
 job "contract-image" {
   group "app" {
     task "server" {
@@ -231,7 +233,7 @@ job "contract-image" {
   }
 }
 HCL
-nomad job run -detach "$WORK/contract-image.nomad.hcl" > /dev/null
+(cd "$JOBS" && nomad job run -detach contract-image.nomad.hcl > /dev/null)
 
 run_task nm:images
 expect_status ok "images: lists the jobs the agent holds"
