@@ -2,7 +2,8 @@
 # k8s, against a real API server: restart tells "nothing to roll" from "the
 # cluster refused". It asks with `kubectl get --ignore-not-found -o name`, and
 # relies on kubectl printing nothing and exiting 0 for an absent deployment or
-# namespace, and failing for anything the server refuses.
+# namespace, and failing for anything the server refuses. And images' two
+# go-templates still read a pod's controller and image, and a ReplicaSet's own.
 #
 # CONTRACTS_KUBE_CONTEXT names the cluster to use; CI points it at a kind
 # cluster made for the run. Everything happens in a namespace made here and
@@ -53,6 +54,15 @@ run_task k8s:restart
 expect_status ok "restart: an existing deployment is rolled"
 expect_output "rolled web" "restart: reports the roll"
 
+# ─── the images it runs ──────────────────────────────────────────────────────
+run_task k8s:images
+expect_status ok "images: lists what the namespace runs"
+if awk -v ns="$ns" -v img="$PAUSE_IMAGE" '$1 == ns && $2 == "Deployment/web" && $3 == "pause" && $4 == img { found = 1 } END { exit !found }' "$OUT"; then
+  pass "images: the deployment's pod, under the Deployment that owns its ReplicaSet"
+else
+  fail "images: no row for Deployment/web running $PAUSE_IMAGE"
+fi
+
 # ─── a cluster that refuses ──────────────────────────────────────────────────
 # A service account with no role: the API server answers, and forbids the get.
 k create serviceaccount nobody >/dev/null
@@ -62,6 +72,10 @@ consumer k8s k8s "{ PROJECT_NAME: web, K8S_NAMESPACE: $ns, K8S_CONTEXT: contract
 run_task k8s:restart
 expect_status fail "restart: a lookup the cluster forbids fails"
 expect_output "could not look up deploy/web in $ns" "restart: says the lookup failed, not that nothing is there"
+
+run_task k8s:images
+expect_status fail "images: a pod listing the cluster forbids fails"
+expect_output "could not list the pods in $ns" "images: says the listing failed, not that nothing runs"
 
 # ─── no cluster at all ───────────────────────────────────────────────────────
 kubectl config set-cluster contract-nowhere --server="$NOWHERE" >/dev/null
