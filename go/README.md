@@ -129,6 +129,7 @@ $ task go:vuln
 ◉ start · api · go · govulncheck
 …
 ▲ warn  · api · go · passed over, by GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002
+✔ ok    · api · go · nothing reached outside GOVULNCHECK_IGNORE
 ```
 
 Any other finding fails the task as before, and so does a scan that did not
