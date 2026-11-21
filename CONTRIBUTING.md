@@ -85,7 +85,9 @@ line, `# shell-verbatim: _KUBECTL FLAGS`, and only those may go in unquoted.
 A status line starts with a marker variable — `_PREFIX_RUN`, `_OK`, `_SKIP`,
 `_WARN`, `_ERR` — inside quotes, since a marker holds spaces, and never with a
 glyph typed into it: see [Logging](README.md#logging). `check:markers` holds
-every module's definitions to one spelling.
+every module's definitions to one spelling. A task that prints `_RUN` prints
+`_OK` on success; `check:closed` refuses one that does not, unless it is
+`interactive: true` or carries a `# start-only: <reason>` comment.
 
 ## Commit messages
 

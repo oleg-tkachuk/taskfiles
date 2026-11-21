@@ -594,6 +594,12 @@ vocabulary.
 Each module defines its own markers, since one cannot import another's
 variables; `task check:markers` holds the copies to one spelling.
 
+A task that prints `◉ start` prints `✔ ok` when it succeeds, and
+`task check:closed` refuses one that does not. A task that runs until it is
+interrupted — a port-forward, a dev server — has no end to report and is let
+through by its `interactive: true`; any other says why in a
+`# start-only: <reason>` comment inside the task.
+
 ### Versioning
 
 One scheme, in [`release/`](release/README.md):
