@@ -72,6 +72,7 @@ tasks:
       - task: check:closed
       - task: check:behaviour
       - task: check:ci-scripts
+      - task: check:lockfile
       - task: check:renovate
 
   # ─── gates ──────────────────────────────────────────────────────────────────
@@ -260,6 +261,24 @@ tasks:
             printf '%s\n' "{{._LIB_WARN}} taskfiles · shellcheck absent, scripts/ and tests/ not linted" >&2
           fi
       - printf '%s\n' "{{._LIB_OK}} taskfiles · every workflow script lives in .github/ci, is run, and passes its types and tests"
+
+  check:lockfile:
+    desc: "Refuse a package.json its package-lock.json does not satisfy"
+    # npm ci refuses a lock file that has fallen behind its package.json, and
+    # the root one is installed by release.yml alone, after a merge: a bump
+    # that moves package.json and leaves the lock passed every check on its
+    # pull request and then stopped every release.
+    # Discovered, so a lock file added later is held to it too.
+    vars:
+      _LOCK_DIRS:
+        sh: >-
+          git ls-files 'package-lock.json' '*/package-lock.json' | awk '{ sub(/\/?package-lock\.json$/, ""); print ($0 == "" ? "." : $0) }' | sort | awk '{ printf "%s ", $0 }'
+    cmds:
+      - bash scripts/check-lockfile.test.sh >/dev/null
+      - cmd: |-
+          set -eu
+          bash scripts/check-lockfile.sh {{._LOCK_DIRS}}
+          printf '%s\n' "{{._LIB_OK}} taskfiles · every lock file satisfies its package.json"
 
   ci:install:
     desc: "Install the CI scripts' locked dependencies"
