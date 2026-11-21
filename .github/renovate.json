@@ -72,6 +72,12 @@
       "semanticCommitScope": "release"
     },
     {
+      "description": "semantic-release stays below 26: 26.0.1 depends on pre-release versions of its own plugins — @semantic-release/core, commit-analyzer, npm and release-notes-generator. Lifted once a 26.x release depends on stable ones.",
+      "matchFileNames": ["package.json"],
+      "matchPackageNames": ["semantic-release"],
+      "allowedVersions": "<26"
+    },
+    {
       "description": "The CI scripts' dependencies and the Node they run on. Not release tooling: Lint type-checks and tests them and Consumer smoke runs them on the pull request itself.",
       "matchFileNames": [".github/ci/**"],
       "groupName": "ci scripts",
