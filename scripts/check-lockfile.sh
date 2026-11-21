@@ -19,6 +19,10 @@ command -v npm >/dev/null || { printf '%s\n' "npm is not installed — https://n
 MANIFEST=package.json
 LOCK=package-lock.json
 
+# Nothing to judge is not a pass: a discovery that found no lock file would
+# otherwise report every lock file as satisfied.
+[ "$#" -gt 0 ] || { printf '%s\n' "no directory given — nothing was checked" >&2; exit 2; }
+
 log=$(mktemp)
 trap 'rm -f "$log"' EXIT
 

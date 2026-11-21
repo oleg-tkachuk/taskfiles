@@ -277,7 +277,7 @@ tasks:
       - bash scripts/check-lockfile.test.sh >/dev/null
       - cmd: |-
           set -eu
-          bash scripts/check-lockfile.sh {{._LOCK_DIRS}}
+          bash scripts/check-lockfile.sh {{range (splitList " " ._LOCK_DIRS | compact)}}{{q .}} {{end}}
           printf '%s\n' "{{._LIB_OK}} taskfiles · every lock file satisfies its package.json"
 
   ci:install:

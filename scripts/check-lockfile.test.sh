@@ -91,6 +91,8 @@ expect reported a-lock-with-no-manifest "no-manifest: no package.json" -- no-man
 expect reported a-bad-directory-after-a-good-one "behind: " -- in-sync behind
 expect reported every-bad-directory-is-reported "no-lock: " -- behind no-lock
 
+expect reported no-directory-at-all "nothing was checked" --
+
 # ─── what is reported of a refusal ──────────────────────────────────────────
 # An npm that refuses the way npm does, with the lines in $NPM_SAYS.
 mkdir -p "$work/bin"
