@@ -180,7 +180,7 @@ jobs:
       # renovate: datasource=docker depName=ghcr.io/opentofu/opentofu
       OPENTOFU_VERSION: 1.13.9
       # renovate: datasource=docker depName=pulumi/pulumi-base
-      PULUMI_VERSION: 3.276.0
+      PULUMI_VERSION: 3.277.0
       # renovate: datasource=docker depName=hashicorp/nomad
       NOMAD_VERSION: 2.1.1
       # renovate: datasource=docker depName=hashicorp/packer
