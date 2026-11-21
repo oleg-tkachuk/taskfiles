@@ -20,12 +20,23 @@ unset NOMAD_NAMESPACE NOMAD_REGION NOMAD_TOKEN
 export NOMAD_ADDR=$AGENT_ADDR
 export NOMAD_CLI_NO_COLOR=1
 
+# The cloud fingerprinters ask a metadata endpoint whether the host is a VM of
+# theirs. On a CI runner the AWS one can time out instead of being refused, and
+# the agent then refuses to start: none of them says anything this contract
+# reads, so none of them runs.
+CLOUD_FINGERPRINTERS=env_aws,env_azure,env_digitalocean,env_gce
+
 cat > "$WORK/agent.hcl" <<HCL
 bind_addr = "127.0.0.1"
 ports {
   http = $HTTP_PORT
   rpc  = $RPC_PORT
   serf = $SERF_PORT
+}
+client {
+  options = {
+    "fingerprint.denylist" = "$CLOUD_FINGERPRINTERS"
+  }
 }
 HCL
 
@@ -46,6 +57,15 @@ until nomad operator raft list-peers >/dev/null 2>&1; do
   sleep 1
   waited=$((waited + 1))
 done
+
+# An option key Nomad does not know is ignored without a word, and the agent
+# would go back to asking the metadata endpoints. It says what it skipped.
+if holds "$WORK/agent.log" "skipped due to allow/denylist"; then
+  pass "agent: the cloud fingerprinters are skipped"
+else
+  fail "agent: the cloud fingerprinters still run — fingerprint.denylist was not applied"
+  quoted '    | ' "$WORK/agent.log"
+fi
 
 JOBS="$CONSUMER/jobs"
 PLANS="$JOBS/.nomad-plan"
