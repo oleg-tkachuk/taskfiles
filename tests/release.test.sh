@@ -96,6 +96,14 @@ run_task release:chart:package
 expect_status ok "chart:package: PROJECT_NAME with a command substitution packages"
 expect_inert pwned-chart-name "chart:package: PROJECT_NAME is not run as shell"
 expect_output "packaged $p-$VERSION.tgz" "chart:package: PROJECT_NAME is printed as text"
+expect_output "✔ ok    · $p · chart · packaged" "chart:package: a packaged chart is reported as ok"
+
+# ─── metadata ─────────────────────────────────────────────────────────────────
+consumer release release "{ PROJECT_NAME: app, APP_VERSION: $VERSION }"
+run_task release:metadata
+expect_status ok "metadata: writes the info file"
+if has_line "$CONSUMER/deploy/info.env" "APP_VERSION=$VERSION"; then pass "metadata: the file holds the version"; else fail "metadata: the file lacks APP_VERSION=$VERSION"; fi
+expect_output "✔ ok    · app · version · $VERSION → ./deploy/info.env" "metadata: the written file is reported as ok"
 
 # ─── image:push: IMAGE_LATEST ─────────────────────────────────────────────────
 # The image is in the local store here, so push gets past its precondition.

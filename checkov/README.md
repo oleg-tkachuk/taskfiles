@@ -63,7 +63,7 @@ count is the only thing that tells them apart.
 
 ```console
 $ task checkov:baseline
-◉ start · checkov · baselined findings: 41 → 38
+✔ ok    · checkov · baselined findings: 41 → 38
 ```
 
 A number that went up is reported as a warning: something new was accepted
@@ -84,7 +84,7 @@ The count was always printed. It was printed the same way either direction, so
 `177 → 5` read like `12 → 5`:
 
 ```console
-◉ start · checkov · baselined findings: 177 → 5
+✔ ok    · checkov · baselined findings: 177 → 5
 ▲ warn  · checkov · the baseline LOST most of itself — 177 accepted findings became 5, 172 gone.
          Findings the current scan cannot see are not in the new file. If the
          config or the framework list has narrowed since it was written, those

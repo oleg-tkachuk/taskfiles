@@ -39,7 +39,7 @@ unset FAKE_CRASH
 
 run_task checkov:baseline
 expect_status ok "baseline: a run that wrote the baseline passes, findings or not"
-expect_output "baselined findings: 1 → 2" "baseline: reports the count before and after"
+expect_output "✔ ok    · checkov · baselined findings: 1 → 2" "baseline: reports the count before and after, as done"
 
 # A config scanning another directory writes the baseline there: named.
 consumer checkov checkov

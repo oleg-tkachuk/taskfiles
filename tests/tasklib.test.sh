@@ -100,6 +100,7 @@ done
 # ─── bump ────────────────────────────────────────────────────────────────────
 run_task tasklib:bump "VERSION=$NEW"
 expect_status ok "bump: runs"
+expect_output "✔ ok    · tasklib · 3 Taskfile(s) pin $NEW" "bump: reports the pins it moved, as done"
 expect_pin Taskfile.yaml "$NEW" "bump: moves the root pin"
 expect_pin Taskfile.dev.yaml "$NEW" "bump: moves a second entry point's pin"
 expect_pin api/Taskfile.yaml "$NEW" "bump: moves a component's pin"

@@ -56,6 +56,7 @@ reset_calls
 run_task go:bench "BENCH=Foo|$payload"
 if [ -e "$pwned" ]; then fail "bench: a \$( ) in BENCH ran"; else pass "bench: a \$( ) in BENCH does not run"; fi
 expect_call "go|test|-tags=integration|-run=^\$|-bench=Foo|$payload|-benchtime=1x|./...|" "bench: the pattern reaches go as one argument"
+expect_output "✔ ok    · go · go · benchmarks ran" "bench: a run that passed says so"
 
 reset_calls
 run_task go:test:integration
@@ -152,6 +153,8 @@ reset_calls
 only_shims go:vuln
 expect_call "go|tool|govulncheck|./...|" "vuln: a pinned govulncheck runs through go tool"
 refute_run govulncheck "vuln: PATH's govulncheck is passed over for the pinned one"
+expect_status ok "vuln: a clean scan passes"
+expect_output "✔ ok    · go · go · no reachable vulnerabilities" "vuln: a clean scan says so"
 
 reset_calls
 only_shims go:test
@@ -271,11 +274,13 @@ two_reached
 only_shims go:vuln
 expect_status fail "ignore: without the input a finding fails, as before"
 refute_output "GOVULNCHECK_IGNORE" "ignore: without the input nothing is said of it"
+refute_output "✔ ok" "vuln: a finding is not reported as ok"
 
 only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001 GO-2026-0002"
 expect_status ok "ignore: every finding named passes"
 expect_output "passed over, by GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002" "ignore: the IDs passed over are printed"
 expect_output "Vulnerability #1: GO-2026-0001" "ignore: the scan's own report is still shown"
+expect_output "✔ ok    · go · go · nothing reached outside GOVULNCHECK_IGNORE" "ignore: a scan that passed says so"
 
 # The input is a list where an include sets it; the cases around this one
 # pass it on the command line, where it can only be a string.
@@ -297,6 +302,7 @@ only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001"
 expect_status fail "ignore: a finding that is not named fails"
 expect_output "not in GOVULNCHECK_IGNORE: GO-2026-0002" "ignore: the unnamed finding is named"
 refute_output "passed over" "ignore: nothing is reported as passed over on a failure"
+refute_output "✔ ok" "ignore: a failure is not reported as ok"
 
 only_shims go:vuln "GOVULNCHECK_IGNORE=GO-2026-0001 GO-2026-0002 GO-2026-0003"
 expect_status fail "ignore: an entry the scan no longer reports fails"
@@ -314,6 +320,10 @@ expect_status fail "ignore: a scan that failed to run fails"
 expect_output "loading packages" "ignore: its error is shown"
 refute_output "drop the entry" "ignore: a failed scan says nothing about stale entries"
 refute_output "passed over" "ignore: a failed scan passes nothing over"
+refute_output "✔ ok" "ignore: a failed scan is not reported as ok"
+only_shims go:vuln
+expect_status fail "vuln: a scan that failed to run fails"
+refute_output "✔ ok" "vuln: a failed scan is not reported as ok"
 
 # -show verbose lists what a required module merely contains under the same
 # heading; only what the code reaches is held against the list.

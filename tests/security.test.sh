@@ -16,6 +16,8 @@ run_task security:vuln
 expect_status ok "vuln: a Go module and a plain directory pass"
 expect_call "govulncheck in api" "vuln: the Go module is scanned in its own directory"
 expect_output "docs is not a Go module — skipped" "vuln: a directory without go.mod is skipped"
+expect_output "✔ ok    · sec · govulncheck · api clean" "vuln: a module that scanned clean says so"
+refute_output "docs clean" "vuln: a skipped directory is not reported as clean"
 
 consumer security security "{ GO_MODULES: [api, apii] }"
 reset_calls
@@ -192,12 +194,14 @@ consumer security security "{ GO_MODULES: [api, web] }"
 only_shims security:vuln
 expect_status fail "ignore: without the input a finding fails, as before"
 refute_output "GOVULNCHECK_IGNORE" "ignore: without the input nothing is said of it"
+refute_output "✔ ok" "vuln: a finding is not reported as ok"
 if [ -e "$found" ]; then fail "ignore: without the input a state file was written"; else pass "ignore: without the input no state is kept"; fi
 
 consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: [GO-2026-0001, GO-2026-0002] }"
 only_shims security:vuln
 expect_status ok "ignore: each module's finding is named, and the scan passes"
 expect_output "passed over, by GOVULNCHECK_IGNORE: GO-2026-0001 GO-2026-0002" "ignore: the IDs passed over are printed"
+expect_output "✔ ok    · sec · govulncheck · api · nothing reached outside GOVULNCHECK_IGNORE" "ignore: a module whose findings are all named says so"
 if [ -e "$found" ]; then fail "ignore: the state file was left behind"; else pass "ignore: the state file is removed"; fi
 
 consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: [GO-2026-0001] }"
@@ -211,12 +215,19 @@ expect_status fail "ignore: an entry no module reports fails"
 expect_output "drop the entry: GO-2026-0003" "ignore: the stale entry is named"
 refute_output "drop the entry: GO-2026-0001" "ignore: an entry one module still reports is not stale"
 
+scan web 0 'No vulnerabilities found.'
+consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: [GO-2026-0001] }"
+only_shims security:vuln
+expect_status ok "ignore: a module with nothing to pass over passes"
+expect_output "✔ ok    · sec · govulncheck · web clean" "ignore: a module that scanned clean says so"
+
 scan web 1 'govulncheck: loading packages: cache entry not found'
 consumer security security "{ GO_MODULES: [api, web], GOVULNCHECK_IGNORE: [GO-2026-0001, GO-2026-0002] }"
 only_shims security:vuln
 expect_status fail "ignore: a scan that failed to run fails"
 refute_output "drop the entry" "ignore: a failed scan says nothing about stale entries"
 refute_output "passed over" "ignore: a failed scan passes nothing over"
+refute_output "✔ ok    · sec · govulncheck · web" "ignore: a failed scan is not reported as ok"
 
 # On the command line the input is a string, with the IDs separated by spaces.
 consumer security security "{ GO_MODULES: [api] }"

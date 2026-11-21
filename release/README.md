@@ -94,7 +94,7 @@ tasks:
 
 ```console
 $ task deploy
-◉ start · core-api · version 1.4.0 → ./deploy/info.env
+✔ ok    · core-api · version · 1.4.0 → ./deploy/info.env
 ◉ start · core-api · image · build registry.example.com/acme/core-api:1.4.0
 ✔ ok    · core-api · chart · renders 10 resources cleanly
 ✔ ok    · core-api · image · pushed 1.4.0
