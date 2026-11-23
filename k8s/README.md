@@ -91,6 +91,9 @@ read as its Deployment and a Job's as its CronJob; replicas collapse into one
 line. Pods that have finished are left out. A listing the cluster refuses
 fails rather than printing an empty table.
 
+It reads the cluster's answer as JSON, with [jq](https://jqlang.org/) — the
+one task here that needs it on `PATH`. Run against jq 1.6, 1.7.1 and 1.8.2.
+
 ```console
 $ task k8s:images
 NAMESPACE  WORKLOAD             CONTAINER       IMAGE

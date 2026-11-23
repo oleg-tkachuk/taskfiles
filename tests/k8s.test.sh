@@ -388,9 +388,9 @@ expect_call "-n jobs get deploy/worker" "on the call: rollout:wait watches the D
 refute_call "-n apps" "on the call: and not the include's namespace"
 
 # ─── images ──────────────────────────────────────────────────────────────────
-# The pods answer with what the go-template prints, one line per container;
-# the owners with each ReplicaSet's and Job's own controller. IMAGES_FAIL
-# makes the cluster refuse the pod listing.
+# The pods and the owners answer as kubectl does under -o json: a List whose
+# items carry their own kind. IMAGES_FAIL makes the cluster refuse the pod
+# listing.
 IMAGES_FIX="$WORK/images"
 mkdir -p "$IMAGES_FIX"
 export IMAGES_FIX
@@ -402,24 +402,45 @@ case "$*" in
   *" get replicasets,jobs "*) cat "$IMAGES_FIX/owners" ;;
   *) exit 0 ;;
 esac'
-printf '%s\t%s\t%s\t%s\n' \
-  apps ReplicaSet/web-6d4f web registry.example.com/web:1.4.0 \
-  apps ReplicaSet/web-6d4f web registry.example.com/web:1.4.0 \
-  apps ReplicaSet/web-6d4f 'migrate (init)' registry.example.com/web:1.4.0 \
-  apps Job/report-2911 report registry.example.com/report:2.0.1 \
-  apps Cluster/db postgres registry.example.com/postgres:18.1 \
-  apps Pod/debug shell busybox:1.37 > "$IMAGES_FIX/pods"
-printf '%s\t%s\t%s\n' \
-  apps ReplicaSet/web-6d4f Deployment/web \
-  apps Job/report-2911 CronJob/report \
-  apps Job/once '' > "$IMAGES_FIX/owners"
+cat > "$IMAGES_FIX/pods" <<'JSON'
+{ "apiVersion": "v1", "kind": "List", "items": [
+  { "kind": "Pod", "metadata": { "namespace": "apps", "name": "web-6d4f-aaaaa",
+      "ownerReferences": [ { "kind": "ReplicaSet", "name": "web-6d4f", "controller": true } ] },
+    "spec": { "initContainers": [ { "name": "migrate", "image": "registry.example.com/web:1.4.0" } ],
+              "containers": [ { "name": "web", "image": "registry.example.com/web:1.4.0" } ] } },
+  { "kind": "Pod", "metadata": { "namespace": "apps", "name": "web-6d4f-bbbbb",
+      "ownerReferences": [ { "kind": "ReplicaSet", "name": "web-6d4f", "controller": true } ] },
+    "spec": { "initContainers": [ { "name": "migrate", "image": "registry.example.com/web:1.4.0" } ],
+              "containers": [ { "name": "web", "image": "registry.example.com/web:1.4.0" } ] } },
+  { "kind": "Pod", "metadata": { "namespace": "apps", "name": "report-2911-ccccc",
+      "ownerReferences": [ { "kind": "Job", "name": "report-2911", "controller": true } ] },
+    "spec": { "containers": [ { "name": "report", "image": "registry.example.com/report:2.0.1" } ] } },
+  { "kind": "Pod", "metadata": { "namespace": "apps", "name": "db-1",
+      "ownerReferences": [ { "kind": "Node", "name": "worker-1" },
+                           { "kind": "Cluster", "name": "db", "controller": true } ] },
+    "spec": { "containers": [ { "name": "postgres", "image": "registry.example.com/postgres:18.1" } ] } },
+  { "kind": "Pod", "metadata": { "namespace": "apps", "name": "debug" },
+    "spec": { "containers": [ { "name": "shell", "image": "busybox:1.37" } ] } }
+] }
+JSON
+cat > "$IMAGES_FIX/owners" <<'JSON'
+{ "apiVersion": "v1", "kind": "List", "items": [
+  { "kind": "ReplicaSet", "metadata": { "namespace": "apps", "name": "web-6d4f",
+      "ownerReferences": [ { "kind": "Deployment", "name": "web", "controller": true } ] } },
+  { "kind": "Job", "metadata": { "namespace": "apps", "name": "report-2911",
+      "ownerReferences": [ { "kind": "CronJob", "name": "report", "controller": true } ] } },
+  { "kind": "Job", "metadata": { "namespace": "apps", "name": "once" } },
+  { "kind": "ReplicaSet", "metadata": { "namespace": "other", "name": "web-6d4f",
+      "ownerReferences": [ { "kind": "Deployment", "name": "elsewhere", "controller": true } ] } }
+] }
+JSON
 
 consumer k8s k8s '{ PROJECT_NAME: web, K8S_NAMESPACE: apps, K8S_CONTEXT: dev }'
 reset_calls
 run_task k8s:images
 expect_status ok "images: lists the images in the namespace"
-expect_call "kubectl --context dev get pods -n apps --field-selector=status.phase!=Succeeded,status.phase!=Failed -o go-template=" "images: reads the live pods of K8S_NAMESPACE on the pinned context"
-expect_call "kubectl --context dev get replicasets,jobs -n apps -o go-template=" "images: and what owns their controllers"
+expect_call "kubectl --context dev get pods -n apps --field-selector=status.phase!=Succeeded,status.phase!=Failed -o json" "images: reads the live pods of K8S_NAMESPACE on the pinned context"
+expect_call "kubectl --context dev get replicasets,jobs -n apps -o json" "images: and what owns their controllers"
 expect_output "NAMESPACE  WORKLOAD        CONTAINER       IMAGE" "images: under a header, in columns"
 expect_output "apps       Deployment/web  web             registry.example.com/web:1.4.0" "images: a ReplicaSet's pods are shown under its Deployment"
 expect_output "apps       Deployment/web  migrate (init)  registry.example.com/web:1.4.0" "images: init containers are listed and marked"
@@ -428,6 +449,23 @@ expect_output "apps       Cluster/db      postgres        registry.example.com/p
 expect_output "apps       Pod/debug       shell           busybox:1.37" "images: a pod nothing owns is shown as itself"
 if [ "$(grep -c 'Deployment/web  web ' "$OUT")" = 1 ]; then pass "images: replicas collapse into one line"; else fail "images: replicas collapse into one line"; fi
 if [ "$(awk 'NR > 1 { print $2 }' "$OUT" | LC_ALL=C sort -c 2>&1)" = "" ]; then pass "images: rows are sorted"; else fail "images: rows are sorted"; fi
+refute_output "Deployment/elsewhere" "images: an owner is followed within the pod's own namespace"
+if awk '/ $/ { found = 1 } END { exit !found }' "$OUT"; then fail "images: the last column is not padded"; else pass "images: the last column is not padded"; fi
+# The module carries the program as a var; what it prints is what the file
+# it is written in prints of the same answers.
+if [ "$(jq -rs -f "$LIB_ROOT/k8s/images.jq" "$IMAGES_FIX/pods" "$IMAGES_FIX/owners")" = "$(cat "$OUT")" ]; then
+  pass "images: the module runs images.jq"
+else
+  fail "images: the module's output is not what images.jq prints"
+fi
+# A consumer fetches the Taskfile alone: nothing beside it is there to read.
+mkdir -p "$WORK/alone/k8s"
+cp "$LIB_ROOT/k8s/Taskfile.yaml" "$WORK/alone/k8s/Taskfile.yaml"
+LIB_ROOT="$WORK/alone" consumer k8s k8s '{ PROJECT_NAME: web, K8S_NAMESPACE: apps, K8S_CONTEXT: dev }'
+run_task k8s:images
+expect_status ok "images: runs from the Taskfile alone"
+expect_output "apps       Deployment/web  web             registry.example.com/web:1.4.0" "images: and prints the same table"
+consumer k8s k8s '{ PROJECT_NAME: web, K8S_NAMESPACE: apps, K8S_CONTEXT: dev }'
 
 reset_calls
 run_task k8s:images IMAGES_SCOPE=cluster
@@ -445,7 +483,23 @@ IMAGES_FAIL=1 run_task k8s:images
 expect_status fail "images: a pod listing the cluster refuses fails"
 expect_output "could not list the pods in apps" "images: and says so, not that nothing runs"
 
-: > "$IMAGES_FIX/pods"
+cp "$IMAGES_FIX/pods" "$IMAGES_FIX/pods.kept"
+printf '%s\n' 'not json' > "$IMAGES_FIX/pods"
+reset_calls
+run_task k8s:images
+expect_status fail "images: an answer that is not JSON fails"
+expect_output "could not read the pods in apps as JSON" "images: and says what could not be read"
+refute_output "no running pod" "images: and is not taken for an empty namespace"
+
+cp "$IMAGES_FIX/owners" "$IMAGES_FIX/owners.kept"
+cp "$IMAGES_FIX/pods.kept" "$IMAGES_FIX/pods"
+printf '%s\n' 'not json' > "$IMAGES_FIX/owners"
+run_task k8s:images
+expect_status fail "images: owners that are not JSON fail"
+expect_output "could not read what runs in apps as JSON" "images: and says so"
+cp "$IMAGES_FIX/owners.kept" "$IMAGES_FIX/owners"
+
+printf '%s\n' '{ "apiVersion": "v1", "kind": "List", "items": [] }' > "$IMAGES_FIX/pods"
 reset_calls
 run_task k8s:images
 expect_status ok "images: no running pod is not an error"

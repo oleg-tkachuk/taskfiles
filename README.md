@@ -162,6 +162,12 @@ Only the YAML is fetched. Sibling scripts in this repo are **not** downloaded,
 which is why every module is self-contained and expresses its logic in Task's
 own primitives rather than shelling out to a helper.
 
+A jq program too long to read on one line is written as functions in a `.jq`
+file beside the module, and the module carries its text in a var behind a
+`# jq-file:` marker — `k8s/images.jq` in `_K8S_IMAGES_JQ`. `task embed` copies
+the file into the var, and `task lint` refuses the two apart, or a module that
+has jq read a file.
+
 #### Workflows are audited
 
 `zizmor` runs over `.github/workflows/` in CI and in
