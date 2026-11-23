@@ -235,9 +235,10 @@ expect_status ok "stop: a job named whole, twice, is stopped"
 if [ "$(nomad job inspect -t '{{.Stop}}' contract-web)" = true ]; then pass "stop: and the cluster has it stopped"; else fail "stop: the job is not stopped"; fi
 
 # ─── images ──────────────────────────────────────────────────────────────────
-# The templates `images` hands the CLI still read what they name: the job list
-# its namespace and ID, a job its version, status, stop flag and each task's
-# driver and image. A job with an image needs no driver to be registered.
+# What `images` asks the CLI for still holds what it reads: the job list's
+# template a namespace and ID, and a job's -json its version, status, stop
+# flag and each task's driver and image. A job with an image needs no driver
+# to be registered.
 # Written and submitted from the jobs directory: CI runs the CLI in a
 # container that sees the working directory and nothing else.
 cat > "$JOBS/contract-image.nomad.hcl" <<HCL

@@ -78,20 +78,58 @@ vars:
   _NM_INDEX_TEMPLATE: '{{"{{.JobModifyIndex}}"}}'
   # What `job inspect` is asked to print, for the ID a name resolves to.
   _NM_ID_TEMPLATE: '{{"{{.ID}}"}}'
-  # What `images` asks the CLI for, as Go templates. The job list, one line
-  # per job — a marker, then namespace and ID, tab-separated: the CLI prints
-  # a sentence instead of an empty list, and the marker tells a job from it.
+  # What `images` asks the CLI for the job list as, a Go template: one line
+  # per job — a marker, then namespace and ID, tab-separated. Not -json: the
+  # CLI answers an empty list with a sentence, under either, and the marker
+  # tells a job from it.
   _NM_JOB_LINE: job
   _NM_JOBS_TEMPLATE: >-
     {{`{{range .}}job{{"\t"}}{{.Summary.Namespace}}{{"\t"}}{{.Summary.JobID}}{{"\n"}}{{end}}`}}
-  # One job's tasks: version, status and whether it was stopped, then one
-  # line per task — group/task, driver, image, or "-" for a driver that runs
-  # none (exec, raw_exec, java).
-  _NM_TASKS_TEMPLATE: >-
-    {{`{{.Version}}{{"\t"}}{{.Status}}{{"\t"}}{{.Stop}}{{"\n"}}{{range .TaskGroups}}{{$g := .Name}}{{range .Tasks}}{{$g}}/{{.Name}}{{"\t"}}{{.Driver}}{{"\t"}}{{with index .Config "image"}}{{.}}{{else}}-{{end}}{{"\n"}}{{end}}{{end}}`}}
-  # The status `images` shows for a job that was stopped and not yet purged:
-  # it is listed, and runs nothing.
-  _NM_STOPPED: stopped
+  # What `images` prints, as a jq program over every job's `job inspect
+  # -json`. Written in images.jq; `task embed` copies it here, since a
+  # consumer fetches this file alone.
+  # jq-file: images.jq
+  _NM_IMAGES_JQ: |-
+    # What `nomad:images` prints: one line per task of every job, sorted, under a
+    # header, in columns as wide as their widest value.
+    #
+    # Input (--slurp): `nomad job inspect -json` of each job, one after another.
+
+    def header: ["NAMESPACE", "JOB", "VERSION", "STATUS", "TASK", "DRIVER", "IMAGE"];
+    def column_gap: "  ";
+    # The status of a job that was stopped and not yet purged: it is listed, and
+    # runs nothing.
+    def stopped: "stopped";
+    # The image of a driver that runs none: exec, raw_exec, java.
+    def no_image: "-";
+
+    def status: if .Stop then stopped else .Status end;
+
+    def image: (.Config.image // "") | if . == "" then no_image else . end;
+
+    # One row per task of every job, under the job's version and status.
+    def rows:
+      .[]
+      | [.Namespace, .ID, (.Version | tostring), status] as $job
+      | .TaskGroups[]?
+      | .Name as $group
+      | .Tasks[]?
+      | $job + ["\($group)/\(.Name)", .Driver, image];
+
+    def pad($width): . + ((" " * ($width - length)) // "");
+
+    # Rows as lines: every column but the last padded to its widest cell.
+    def table:
+      . as $rows
+      | [ range($rows[0] | length) | . as $column | $rows | map(.[$column] | length) | max ] as $widths
+      | $rows[]
+      | . as $row
+      | [ range(length) | . as $column
+          | if $column < ($row | length) - 1 then $row[$column] | pad($widths[$column]) else $row[$column] end
+        ]
+      | join(column_gap);
+
+    [header] + ([rows] | sort) | table
   # The address the CLI uses when it is given none.
   _NM_DEFAULT_ADDR: http://127.0.0.1:4646
   # Status markers. The shape carries the meaning, so a line still reads in
@@ -302,6 +340,9 @@ tasks:
     # task runs once its allocation is placed. A job that was stopped and not
     # yet purged is listed as stopped. A cluster that refuses the listing
     # fails: an empty list would read as "nothing is running".
+    preconditions:
+      - sh: command -v jq >/dev/null
+        msg: "jq is not installed — https://jqlang.org/download/"
     cmds:
       - task: _ready
       - task: _cluster
@@ -310,39 +351,31 @@ tasks:
           # The CLI follows an empty list with a link to its web UI, on stderr
           # among what would be an error; this listing has no use for it.
           export NOMAD_CLI_SHOW_HINTS=0
-          jobs=$(mktemp)
-          rows=$(mktemp)
-          trap 'rm -f "$jobs" "$rows"' EXIT
-          if ! nomad job status -t {{._NM_JOBS_TEMPLATE | q}} > "$jobs"; then
+          if ! jobs=$(nomad job status -t {{._NM_JOBS_TEMPLATE | q}}); then
             printf '%s nomad · could not list the jobs at %s — the output above says why\n' "{{._NM_ERR}}" "$NOMAD_ADDR" >&2
             exit 1
           fi
-          found=0
+          # Held in the shell and handed to jq on its input: a job as JSON is
+          # the job with every variable resolved, which no file is to keep.
+          inspected=''
           while IFS="$(printf '\t')" read -r line namespace job; do
             [ "$line" = {{._NM_JOB_LINE | q}} ] || continue
-            found=1
-            if ! tasks=$(nomad job inspect -namespace "$namespace" -t {{._NM_TASKS_TEMPLATE | q}} "$job"); then
+            if ! one=$(nomad job inspect -namespace "$namespace" -json "$job"); then
               printf '%s nomad · could not read the job %s in %s — the output above says why\n' "{{._NM_ERR}}" "$job" "$namespace" >&2
               exit 1
             fi
-            printf '%s\n' "$tasks" | NS="$namespace" JOB="$job" STOPPED={{._NM_STOPPED | q}} awk -F '\t' '
-              NR == 1 { version = $1; status = ($3 == "true") ? ENVIRON["STOPPED"] : $2; next }
-              NF { printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", ENVIRON["NS"], ENVIRON["JOB"], version, status, $1, $2, $3 }' >> "$rows"
-          done < "$jobs"
-          if [ "$found" = 0 ]; then
+            inspected="$inspected$one"
+          done <<EOF
+          $jobs
+          EOF
+          if [ -z "$inspected" ]; then
             printf '%s nomad · no job at %s in namespace "%s"\n' "{{._NM_OK}}" "$NOMAD_ADDR" "${NOMAD_NAMESPACE:-default}"
             exit 0
           fi
-          LC_ALL=C sort "$rows" | awk -F '\t' '
-            BEGIN { split("NAMESPACE JOB VERSION STATUS TASK DRIVER IMAGE", head, " "); for (i = 1; i <= 7; i++) w[i] = length(head[i]) }
-            { n++; for (i = 1; i <= 7; i++) { cell[n, i] = $i; if (length($i) > w[i]) w[i] = length($i) } }
-            END {
-              fmt = ""
-              for (i = 1; i < 7; i++) fmt = fmt "%-" w[i] "s  "
-              fmt = fmt "%s\n"
-              printf fmt, head[1], head[2], head[3], head[4], head[5], head[6], head[7]
-              for (r = 1; r <= n; r++) printf fmt, cell[r, 1], cell[r, 2], cell[r, 3], cell[r, 4], cell[r, 5], cell[r, 6], cell[r, 7]
-            }'
+          if ! printf '%s' "$inspected" | jq -rs {{._NM_IMAGES_JQ | q}}; then
+            printf '%s nomad · could not read the jobs at %s as JSON — the output above says why\n' "{{._NM_ERR}}" "$NOMAD_ADDR" >&2
+            exit 1
+          fi
 
   stop:plan:
     desc: "Show the job that stop would stop; changes nothing"
