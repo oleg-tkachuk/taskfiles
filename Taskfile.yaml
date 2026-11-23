@@ -358,12 +358,7 @@ tasks:
       # <module>:<name> removed on purpose, each with its reason in a comment
       # above it, or <module>:* for a whole module. Empty again once the major
       # that removes them has shipped — check-api.sh reports a stale entry.
-      #
-      # nomad:C D N T V — never inputs. They are what this gate read of the
-      # fields in the Go template `images` handed the CLI for a job's tasks
-      # (.Config, .Driver, .Name, .TaskGroups, .Version), and that template
-      # is gone: the job is read as JSON now.
-      API_REMOVED: "nomad:C nomad:D nomad:N nomad:T nomad:V"
+      API_REMOVED: ""
       # <module>:<INPUT> whose default changed on purpose, each with its
       # reason in a comment above it. A default is what every consumer who
       # never set the input runs with, so a changed one is named here and
