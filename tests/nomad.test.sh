@@ -329,19 +329,40 @@ refute_call "job stop" "stop, unanswered: and not stopped"
 # ─── images ──────────────────────────────────────────────────────────────────
 # The job list answers with what its template prints — after a sentence of the
 # CLI's own, as an empty list is answered with one — and each job's inspect
-# with its version, status and stop flag, then a line per task. NM_LIST_FAIL
-# makes the cluster refuse the listing.
+# with the job as -json prints it. NM_LIST_FAIL makes the cluster refuse the
+# listing, and NM_INSPECT_BROKEN answers an inspect with what is not JSON.
 NM_FIX="$WORK/nomad-images"
 mkdir -p "$NM_FIX"
 export NM_FIX
+cat > "$NM_FIX/web.json" <<'JSON'
+{ "ID": "web", "Namespace": "default", "Version": 3, "Status": "running", "Stop": false,
+  "TaskGroups": [ { "Name": "app", "Tasks": [
+    { "Name": "server", "Driver": "docker", "Config": { "image": "registry.example.com/web:1.4.0" } },
+    { "Name": "log", "Driver": "raw_exec", "Config": { "command": "tail" } },
+    { "Name": "idle", "Driver": "exec", "Config": null },
+    { "Name": "blank", "Driver": "docker", "Config": { "image": "" } } ] } ] }
+JSON
+cat > "$NM_FIX/api.json" <<'JSON'
+{ "ID": "api", "Namespace": "team", "Version": 1, "Status": "dead", "Stop": true,
+  "TaskGroups": [ { "Name": "api", "Tasks": [
+    { "Name": "http", "Driver": "docker", "Config": { "image": "registry.example.com/api:0.9.0" } } ] } ] }
+JSON
+cat > "$NM_FIX/other.json" <<'JSON'
+{ "ID": "other", "Namespace": "default", "Version": 0, "Status": "running", "Stop": false,
+  "TaskGroups": [ { "Name": "x", "Tasks": [ { "Name": "y", "Driver": "docker", "Config": { "image": "busybox:1.37" } } ] } ] }
+JSON
 shim nomad '
 case " $* " in
   *" job status "*)
     if [ -n "${NM_LIST_FAIL:-}" ]; then echo "Error querying jobs" >&2; exit 1; fi
     cat "$NM_FIX/list" ;;
-  *" job inspect "*" web ") printf "3\trunning\tfalse\napp/server\tdocker\tregistry.example.com/web:1.4.0\napp/log\traw_exec\t-\n" ;;
-  *" job inspect "*" api ") printf "1\tdead\ttrue\napi/http\tdocker\tregistry.example.com/api:0.9.0\n" ;;
-  *" job inspect "*) printf "0\trunning\tfalse\nx/y\tdocker\tbusybox:1.37\n" ;;
+  *" job inspect "*)
+    if [ -n "${NM_INSPECT_BROKEN:-}" ]; then echo "not json"; exit 0; fi
+    case " $* " in
+      *" web ") cat "$NM_FIX/web.json" ;;
+      *" api ") cat "$NM_FIX/api.json" ;;
+      *) cat "$NM_FIX/other.json" ;;
+    esac ;;
 esac'
 printf 'Some sentence of the CLI\njob\tdefault\tweb\njob\tteam\tapi\n' > "$NM_FIX/list"
 export NOMAD_ADDR=$ADDR
@@ -349,13 +370,38 @@ export NOMAD_ADDR=$ADDR
 reset_calls
 run_task nm:images
 expect_status ok "images: lists the image of every task"
-expect_call "nomad job inspect -namespace default -t " "images: reads each job in its own namespace"
-expect_call "nomad job inspect -namespace team -t " "images: across namespaces"
+expect_call "nomad job inspect -namespace default -json web" "images: reads each job in its own namespace"
+expect_call "nomad job inspect -namespace team -json api" "images: across namespaces"
 expect_output "NAMESPACE  JOB  VERSION  STATUS   TASK        DRIVER    IMAGE" "images: under a header, in columns"
 expect_output "default    web  3        running  app/server  docker    registry.example.com/web:1.4.0" "images: a task with its job's version and status"
 expect_output "default    web  3        running  app/log     raw_exec  -" "images: a driver that runs no image shows -"
 expect_output "team       api  1        stopped  api/http    docker    registry.example.com/api:0.9.0" "images: a stopped job says so"
+expect_output "default    web  3        running  app/idle    exec      -" "images: and so does a task with no config"
+expect_output "default    web  3        running  app/blank   docker    -" "images: and an image that is empty"
 refute_output "Some sentence" "images: the CLI's own sentences are not rows"
+if [ "$(awk 'NR > 1' "$OUT" | LC_ALL=C sort -c 2>&1)" = "" ]; then pass "images: rows are sorted"; else fail "images: rows are sorted"; fi
+if awk '/ $/ { found = 1 } END { exit !found }' "$OUT"; then fail "images: the last column is not padded"; else pass "images: the last column is not padded"; fi
+# The module carries the program as a var; what it prints is what the file
+# it is written in prints of the same jobs.
+if [ "$(jq -rs -f "$LIB_ROOT/nomad/images.jq" "$NM_FIX/web.json" "$NM_FIX/api.json")" = "$(cat "$OUT")" ]; then
+  pass "images: the module runs images.jq"
+else
+  fail "images: the module's output is not what images.jq prints"
+fi
+# A consumer fetches the Taskfile alone: nothing beside it is there to read.
+mkdir -p "$WORK/alone/nomad"
+cp "$LIB_ROOT/nomad/Taskfile.yaml" "$WORK/alone/nomad/Taskfile.yaml"
+cp "$CONSUMER/Taskfile.yaml" "$WORK/consumer.kept"
+LIB_ROOT="$WORK/alone" consumer nm nomad
+run_task nm:images
+expect_status ok "images: runs from the Taskfile alone"
+expect_output "team       api  1        stopped  api/http    docker    registry.example.com/api:0.9.0" "images: and prints the same table"
+cp "$WORK/consumer.kept" "$CONSUMER/Taskfile.yaml"
+
+reset_calls
+NM_INSPECT_BROKEN=1 run_task nm:images
+expect_status fail "images: a job that is not answered in JSON fails"
+expect_output "could not read the jobs at $ADDR as JSON" "images: and says what could not be read"
 
 reset_calls
 NM_LIST_FAIL=1 run_task nm:images

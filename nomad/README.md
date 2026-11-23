@@ -78,6 +78,9 @@ default    nightly   1        stopped  report/run       raw_exec  -
 The version and image are the job's as submitted; a task's driver that runs
 no image — `exec`, `raw_exec`, `java` — shows `-`.
 
+It reads each job as JSON, with [jq](https://jqlang.org/) — the one task here
+that needs it on `PATH`. Run against jq 1.6, 1.7.1 and 1.8.2.
+
 So is the order of several jobs. One call is one job; a repository whose jobs
 depend on each other calls these tasks in the order it knows.
 
