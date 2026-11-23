@@ -34,8 +34,7 @@ trap 'rm -rf "$work"' EXIT
 
 found=0
 for file in "$@"; do
-  dir=${file%/*}
-  [ "$dir" != "$file" ] || dir=.
+  dir=$(dirname "$file")
   FILE="$file" DIR="$dir" OUT="$work/next" awk -v check="$check" '
     function report(line, what) { printf "%s:%d: %s\n", file, line, what; bad++ }
     function emit(text) { if (!check) print text > out }

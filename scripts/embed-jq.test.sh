@@ -190,6 +190,13 @@ tasks:
     cmds:
       - "true"'
 
+# A Taskfile named with no directory is read beside the file it names.
+if (cd "$work/a-block-that-is-its-file" && bash "$here/embed-jq.sh" --check Taskfile.yaml) > "$work/out" 2>&1; then
+  pass "a-taskfile-named-with-no-directory: clean"
+else
+  fail "a-taskfile-named-with-no-directory: want clean, got reported"
+fi
+
 # ─── a rewrite ───────────────────────────────────────────────────────────────
 WANT='version: "3"
 vars:
