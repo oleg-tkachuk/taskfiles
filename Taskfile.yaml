@@ -70,6 +70,7 @@ tasks:
       - task: check:quoting
       - task: check:markers
       - task: check:closed
+      - task: check:jq
       - task: check:behaviour
       - task: check:ci-scripts
       - task: check:lockfile
@@ -198,6 +199,25 @@ tasks:
           set -eu
           bash scripts/check-closed.sh {{.MODULE_FILES}} demo/Taskfile.yaml
           printf '%s\n' "{{._LIB_OK}} taskfiles · every task that prints a start prints an ok"
+
+  check:jq:
+    desc: "Refuse a jq program a module carries that is not the .jq file it is written in"
+    # A consumer fetches a module's YAML and nothing beside it, so a jq program
+    # is written in a .jq file and carried by a var, behind a `# jq-file:`
+    # marker. This holds the two to one text, and refuses a module that has jq
+    # read its program from a file: it would run here and nowhere else.
+    # `task embed` rewrites the vars from the files.
+    cmds:
+      - bash scripts/embed-jq.test.sh >/dev/null
+      - cmd: |-
+          set -eu
+          bash scripts/embed-jq.sh --check {{.MODULE_FILES}}
+          printf '%s\n' "{{._LIB_OK}} taskfiles · every embedded jq program is its .jq file"
+
+  embed:
+    desc: "Copy each .jq file into the module var that carries it"
+    cmds:
+      - bash scripts/embed-jq.sh {{.MODULE_FILES}}
 
   check:behaviour:
     desc: "Run each module's behaviour tests against shimmed tools"

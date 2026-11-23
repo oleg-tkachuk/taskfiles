@@ -89,6 +89,13 @@ every module's definitions to one spelling. A task that prints `_RUN` prints
 `_OK` on success; `check:closed` refuses one that does not, unless it is
 `interactive: true` or carries a `# start-only: <reason>` comment.
 
+A jq program that is long, or awkward on one line, is written as functions in
+`<name>.jq` beside the module's Taskfile. A consumer fetches the YAML alone,
+so the module carries the program's text: a `|-` var on the line after a
+`# jq-file: <name>.jq` marker, passed on as `jq {{._PREFIX_NAME_JQ | q}}`.
+Edit the file and run `task embed`; `check:jq` refuses a var that is not its
+file, a file holding `{{`, and `jq -f` or `-L` in a module.
+
 ## Commit messages
 
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/),
