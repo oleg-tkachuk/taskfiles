@@ -69,6 +69,10 @@ $ task checkov:baseline
 A number that went up is reported as a warning: something new was accepted
 rather than fixed.
 
+A finding is one check of one resource. With [jq](https://jqlang.org/) on
+`PATH` they are counted from the baseline's JSON; without it, from the lines
+checkov writes them on, which is the same number for a baseline checkov wrote.
+
 A run that did not write the baseline fails, with the end of checkov's output.
 checkov exits 1 whenever it finds anything, so its exit status cannot tell a
 scan from a crash; whether the file was rewritten can.
