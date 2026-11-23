@@ -14,7 +14,11 @@ case "$*" in
       echo "Traceback: boom" >&2; exit 1
     fi
     dir=${FAKE_BASE_DIR:-.}; mkdir -p "$dir"
-    printf "{\n    \"CKV_K8S_1\",\n    \"CKV_K8S_2\"\n}\n" > "$dir/.checkov.baseline"
+    if [ -n "${FAKE_BASELINE:-}" ]; then
+      printf "%s\n" "$FAKE_BASELINE" > "$dir/.checkov.baseline"
+    else
+      printf "{\n    \"CKV_K8S_1\",\n    \"CKV_K8S_2\"\n}\n" > "$dir/.checkov.baseline"
+    fi
     exit 1 ;;
 esac'
 
@@ -40,6 +44,26 @@ unset FAKE_CRASH
 run_task checkov:baseline
 expect_status ok "baseline: a run that wrote the baseline passes, findings or not"
 expect_output "✔ ok    · checkov · baselined findings: 1 → 2" "baseline: reports the count before and after, as done"
+
+# A baseline as JSON: every check_id is a finding, whatever its line and its
+# name. Two resources, three ids, one of them a custom check's, on one line.
+ONE_LINE='{"failed_checks":[{"file":"/a.yaml","findings":[{"resource":"Pod.default.a","check_ids":["CKV_K8S_1","ACME_7"]},{"resource":"Pod.default.b","check_ids":["CKV_K8S_2"]}]}]}'
+printf '%s\n' '{"failed_checks":[]}' > "$CONSUMER/.checkov.baseline"
+FAKE_BASELINE=$ONE_LINE run_task checkov:baseline
+expect_output "baselined findings: 0 → 3" "baseline: findings are counted from the JSON, not its lines"
+
+# An empty file is not JSON, and jq says nothing of it: still a count.
+: > "$CONSUMER/.checkov.baseline"
+run_task checkov:baseline
+expect_output "baselined findings: 0 → 2" "baseline: an empty baseline counts as none"
+
+# Where jq does not answer, the lines are counted, as they are without it.
+shim jq 'exit 1'
+printf '{\n    "CKV_K8S_1"\n}\n' > "$CONSUMER/.checkov.baseline"
+run_task checkov:baseline
+expect_status ok "baseline: a jq that fails does not fail the task"
+expect_output "baselined findings: 1 → 2" "baseline: and the lines are counted instead"
+rm -f "$BIN/jq"
 
 # A config scanning another directory writes the baseline there: named.
 consumer checkov checkov
