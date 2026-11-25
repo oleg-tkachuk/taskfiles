@@ -92,7 +92,7 @@ jobs:
 
       - name: 'Run: Renovate'
         if: github.event_name != 'issues' || steps.tick.outputs.proceed == 'true'
-        uses: renovatebot/github-action@acdd6bda8b035c99ce59d5675816af2aa65a1774 # v46.3.14
+        uses: renovatebot/github-action@ebcbb513d07ead4d9c0c2139064301db05e84a3e # v46.3.15
         env:
           # renovate.json has no postUpgradeTasks: npm regenerates its own
           # lockfile and nothing else here is derived from a pin. A command
